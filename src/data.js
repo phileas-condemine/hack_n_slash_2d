@@ -46,7 +46,7 @@ AR.ERAS = [
     ground: '#33301f', groundTop: '#565236', accent: '#8a7f52', rock: '#454231',
     weather: 'rain', props: ['sandbag', 'wire', 'wreck', 'crater'],
     enemies: ['trench_soldier', 'flamethrower', 'armored_trooper', 'roller_scout', 'bombardier'],
-    elite: 'roller_scout', boss: 'armored_captain',
+    elite: 'roller_scout', boss: 'diesel_behemoth',
   },
   {
     id: 'cyber', name: 'ÈRE CYBER', sub: 'Le futur, c\'est maintenant.',
@@ -129,7 +129,7 @@ AR.BOSSES = {
     patterns: ['volley', 'mortars', 'volley', 'summon:musketeer'],
     phase2: 0.5, p2patterns: ['volley', 'mortars', 'mortars', 'charge', 'volley'],
   },
-  armored_captain: {
+  diesel_behemoth: {
     name: 'BÉHÉMOTH DIESEL', hp: 1200, dmg: 30, h: 195, speed: 70, xp: 480, coins: 260, armored: true,
     patterns: ['charge', 'flames', 'mortars', 'stomp'],
     phase2: 0.45, p2patterns: ['charge', 'flames', 'charge', 'mortars', 'stomp'],

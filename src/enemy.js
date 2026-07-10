@@ -12,7 +12,8 @@ AR.Enemy = class {
     this.dmg = Math.round(def.dmg * (elite ? 1.3 : 1) * Math.sqrt(eraScale || 1));
     this.drawH = def.h * (elite ? 1.18 : 1);
     this.h = this.drawH * 0.82;
-    const dw = AR.Assets.drawnW('enemies/' + id, this.drawH);
+    const neutralKey = 'enemies/states/' + id + '_neutral';
+    const dw = AR.Assets.drawnW(AR.SPRITE_META[neutralKey] ? neutralKey : 'enemies/' + id, this.drawH);
     this.w = AR.U.clamp(dw * 0.5, 26, this.drawH * 0.95);
     this.x = x - this.w / 2;
     this.y = footY - this.h;
@@ -24,6 +25,7 @@ AR.Enemy = class {
     this.blinkTimer = def.blinkCd || 0;
     this.burstN = 0; this.burstT = 0;
     this.flash = 0;
+    this.attackPoseT = 0;    // maintient brièvement la pose d'attaque pour les tirs instantanés
     this.hurtT = 0;           // affichage barre de vie
     this.dead = false; this.deadT = 0;
     this.active = false;
@@ -44,6 +46,7 @@ AR.Enemy = class {
     if (game.veilT > 0) dt *= 0.45;  // Voile temporel
     this.t += dt;
     this.flash = Math.max(0, this.flash - dt * 6);
+    this.attackPoseT = Math.max(0, this.attackPoseT - dt);
     this.hurtT = Math.max(0, this.hurtT - dt);
     this.atkTimer -= dt;
     this.blinkTimer -= dt;
@@ -239,6 +242,7 @@ AR.Enemy = class {
 
   // coup de mêlée : zone devant l'ennemi
   _strike(game) {
+    this.attackPoseT = Math.max(this.attackPoseT, 0.24);
     const def = this.def;
     const pl = game.player;
     const r = {
@@ -258,6 +262,7 @@ AR.Enemy = class {
   }
 
   _fire(game) {
+    this.attackPoseT = Math.max(this.attackPoseT, 0.24);
     const def = this.def;
     const pl = game.player;
     const sx = this.centerX() + this.facing * this.w * 0.4;
@@ -388,12 +393,26 @@ AR.Enemy = class {
 
   getRect() { return { x: this.x, y: this.y, w: this.w, h: this.h }; }
 
+  _visualState() {
+    if (this.dead) return 'neutral';
+    if (this.state === 'tele') return 'windup';
+    if (this.state === 'beam') return this.beam && this.beam.active ? 'attack' : 'windup';
+    if (this.attackPoseT > 0 || ['attack', 'charge', 'dive', 'stomp'].includes(this.state)) return 'attack';
+    return 'neutral';
+  }
+
+  _spriteKey(visualState) {
+    const stateKey = 'enemies/states/' + this.id + '_' + visualState;
+    return AR.SPRITE_META[stateKey] ? stateKey : 'enemies/' + this.id;
+  }
+
   draw(ctx, cam, time) {
     const cx = cam.cx(), cy = cam.cy();
     const fx = this.centerX() - cx;
     const fy = this.y + this.h - cy;
     if (fx < -180 || fx > AR.C.VIEW_W + 180) return;
-    const key = 'enemies/' + this.id;
+    const visualState = this._visualState();
+    const key = this._spriteKey(visualState);
     const alpha = this.dead ? Math.max(0, 1 - this.deadT * 2) : 1;
     if (alpha <= 0) return;
 
@@ -423,12 +442,14 @@ AR.Enemy = class {
       ctx.restore();
     }
 
-    const spriteFacesLeft = this.def.facing === 'l';
+    // Les triplets d'états sont tous orientés vers la droite. Les anciens sprites
+    // de repli conservent leur orientation déclarée dans les données.
+    const spriteFacesLeft = key.startsWith('enemies/states/') ? false : this.def.facing === 'l';
     const flip = spriteFacesLeft ? this.facing > 0 : this.facing < 0;
     const bob = (this.def.float || this.def.behavior === 'flyer') ? Math.sin(time * 3 + this.bobPhase) * 5 : 0;
     let tint;
     if (this.flash > 0.4) tint = 'brightness(2.6)';
-    else if (this.state === 'tele') tint = (Math.sin(time * 26) > 0) ? 'brightness(1.6) saturate(1.6)' : undefined;
+    else if (visualState === 'windup') tint = (Math.sin(time * 26) > 0) ? 'brightness(1.6) saturate(1.6)' : undefined;
     AR.Assets.draw(ctx, key, fx, fy + bob, this.drawH, flip, alpha, tint);
 
     // barre de vie (si récemment touché)
@@ -464,7 +485,8 @@ AR.Boss = class extends AR.Enemy {
     this.dmg = Math.round(bdef.dmg * Math.sqrt(ng));
     this.drawH = bdef.h;
     this.h = this.drawH * 0.8;
-    const dw = AR.Assets.drawnW('enemies/' + id, this.drawH);
+    const neutralKey = 'enemies/states/' + id + '_neutral';
+    const dw = AR.Assets.drawnW(AR.SPRITE_META[neutralKey] ? neutralKey : 'enemies/' + id, this.drawH);
     this.w = AR.U.clamp(dw * 0.55, 60, this.drawH * 1.1);
     this.x = x - this.w / 2;
     this.y = footY - this.h;
@@ -486,6 +508,7 @@ AR.Boss = class extends AR.Enemy {
     if (game.veilT > 0) dt *= 0.55;
     this.t += dt;
     this.flash = Math.max(0, this.flash - dt * 6);
+    this.attackPoseT = Math.max(0, this.attackPoseT - dt);
     const pl = game.player;
     const bdef = this.bdef;
     this.kvx = 0;
@@ -615,6 +638,7 @@ AR.Boss = class extends AR.Enemy {
     const pl = game.player;
     const pat = this.pattern;
     if (pat.startsWith('summon:')) {
+      this.attackPoseT = Math.max(this.attackPoseT, 0.32);
       const what = pat.split(':')[1];
       if (what === 'wisp3') {
         for (let i = 0; i < 3; i++) {
@@ -649,6 +673,7 @@ AR.Boss = class extends AR.Enemy {
         this.stompVy = -820;
         break;
       case 'rocks': case 'javelins': case 'fireballs': case 'volley': case 'flames': {
+        this.attackPoseT = Math.max(this.attackPoseT, 0.32);
         const kind = { rocks: 'rock', javelins: 'javelin', fireballs: 'fireball', volley: 'bullet', flames: 'flame' }[pat];
         const n = pat === 'flames' ? 10 : (this.phase === 2 ? 6 : 4);
         const sx = this.centerX(), sy = this.y + this.h * 0.3;
@@ -668,6 +693,7 @@ AR.Boss = class extends AR.Enemy {
         break;
       }
       case 'ring': {
+        this.attackPoseT = Math.max(this.attackPoseT, 0.32);
         const n = this.phase === 2 ? 14 : 10;
         for (let i = 0; i < n; i++) {
           const ang = (i / n) * Math.PI * 2 + this.t;
@@ -683,6 +709,7 @@ AR.Boss = class extends AR.Enemy {
         break;
       }
       case 'mortars': {
+        this.attackPoseT = Math.max(this.attackPoseT, 0.32);
         const n = this.phase === 2 ? 5 : 3;
         for (let i = 0; i < n; i++) {
           const lx = pl.x + (Math.random() - 0.5) * 340;

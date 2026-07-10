@@ -41,17 +41,19 @@ meta = {}
 total_spill = 0
 for group, rel in GROUPS.items():
     folder = os.path.join(ROOT, rel)
-    for fn in sorted(os.listdir(folder)):
-        if not fn.endswith(".png"):
-            continue
-        path = os.path.join(folder, fn)
+    paths = []
+    for current, _, files in os.walk(folder):
+        paths.extend(os.path.join(current, fn) for fn in files if fn.endswith(".png"))
+    for path in sorted(paths):
+        fn = os.path.basename(path)
         img = Image.open(path).convert("RGBA")
         n = despill(img)
         if n > 0:
             img.save(path)
             total_spill += n
         x0, y0, x1, y1 = trim_box(img)
-        key = f"{group}/{fn[:-4]}"
+        sprite_name = os.path.relpath(path, folder).replace(os.sep, "/")[:-4]
+        key = f"{group}/{sprite_name}"
         meta[key] = {"w": img.size[0], "h": img.size[1],
                      "t": [x0, y0, x1 - x0, y1 - y0]}
         print(f"{key:40s} {img.size[0]}x{img.size[1]} trim={x0},{y0},{x1-x0},{y1-y0} spill={n}")
