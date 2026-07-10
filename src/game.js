@@ -35,7 +35,7 @@ AR.Game = class {
   newRun(demo) {
     this.demo = demo;
     AR.Input.virtual = demo;
-    AR.DemoAI.reset();
+    AR.DemoAI.reset(true);
     if (!demo) this.speed = 1;
     this.ngPlus = 0;
     this.eraIdx = 0;
@@ -51,6 +51,7 @@ AR.Game = class {
     this.loadLevel();
     this.state = 'play';
     this.paused = false; this.skillOpen = false; this.shopOpen = false;
+    if (demo) AR.HUD.notify('Plan IA équilibré — affinité ' + AR.DemoAI.focusLabel(), AR.C.COLORS.spirit);
   }
 
   startNGPlus() {
@@ -166,7 +167,7 @@ AR.Game = class {
     if (In.pressed('demo') && this.state === 'play') {
       this.demo = !this.demo;
       AR.Input.virtual = this.demo;
-      AR.DemoAI.reset();
+      AR.DemoAI.reset(false);
       if (!this.demo) { this.speed = 1; AR.Input.setVirtual({}); }
       AR.HUD.notify(this.demo ? 'Mode démo : l\'IA prend les commandes' : 'Reprise en main', AR.C.COLORS.spirit);
     }
@@ -405,14 +406,57 @@ AR.Game = class {
   }
 
   shopAutoBuy() {
-    // heuristique de l'IA démo
+    // Profil équilibré : l'affinité ne change que l'ordre des achats lorsque
+    // l'or est rare. Avec un gros surplus, toute amélioration permanente est prise.
     const pl = this.player;
-    this.shopStock.forEach((item, i) => {
-      if (item.sold || this.coins < item.price) return;
-      if (item.id === 'potion' && (pl.potions < pl.potionMax)) this.buyShopItem(i);
-      else if (item.id === 'fullheal' && pl.hp < pl.maxHp * 0.5) this.buyShopItem(i);
-      else if (['swordUp', 'bowUp', 'hpUp', 'crit', 'scroll'].includes(item.id) && this.coins > item.price + 40) this.buyShopItem(i);
-    });
+    const focus = AR.DemoAI.buildFocus || 'balanced';
+    const reserve = 80 + this.eraIdx * 30;
+    const surplus = this.coins >= 500 + this.eraIdx * 120;
+    const permanent = new Set(['swordUp', 'bowUp', 'crit', 'hpUp', 'spiritUp', 'speed', 'scroll']);
+    const focusItems = {
+      melee: new Set(['swordUp', 'hpUp', 'crit']),
+      ranged: new Set(['bowUp', 'speed', 'crit']),
+      spirit: new Set(['spiritUp', 'scroll', 'hpUp']),
+    }[focus] || new Set();
+    const baseScore = {
+      scroll: 115, swordUp: 105, bowUp: 105, hpUp: 95,
+      spiritUp: 90, crit: 85, speed: 80,
+    };
+
+    // Soin urgent avant les investissements.
+    const healIdx = this.shopStock.findIndex((item) => item.id === 'fullheal' && !item.sold);
+    if (healIdx >= 0 && pl.hp < pl.maxHp * 0.65 &&
+        this.coins >= this.shopStock[healIdx].price + (surplus ? 0 : reserve / 2)) {
+      this.buyShopItem(healIdx);
+    }
+
+    // Remplir les emplacements de potion si la réserve d'or le permet.
+    const potionIdx = this.shopStock.findIndex((item) => item.id === 'potion' && !item.sold);
+    if (potionIdx >= 0 && (surplus || pl.hp < pl.maxHp * 0.8)) {
+      let guard = 0;
+      while (pl.potions < pl.potionMax && guard++ < pl.potionMax &&
+             this.coins >= this.shopStock[potionIdx].price + (surplus ? 0 : reserve)) {
+        if (!this.buyShopItem(potionIdx)) break;
+      }
+    }
+
+    const upgrades = this.shopStock.map((item, i) => ({ item, i }))
+      .filter(({ item }) => !item.sold && permanent.has(item.id) &&
+        !(item.id === 'swordUp' && pl.swordTier >= 5) &&
+        !(item.id === 'bowUp' && pl.bowTier >= 5))
+      .sort((a, b) => {
+        const score = ({ item }) => (baseScore[item.id] || 0) +
+          (focusItems.has(item.id) ? 25 : 0) +
+          (item.id === 'swordUp' && pl.swordTier < pl.bowTier ? 15 : 0) +
+          (item.id === 'bowUp' && pl.bowTier < pl.swordTier ? 15 : 0) +
+          (item.id === 'hpUp' && pl.hp < pl.maxHp * 0.7 ? 20 : 0);
+        return score(b) - score(a);
+      });
+
+    for (const { item, i } of upgrades) {
+      if (this.coins < item.price) continue;
+      if (surplus || this.coins - item.price >= reserve) this.buyShopItem(i);
+    }
     if (this.merchantPickup) this.merchantPickup.used = true;
   }
 

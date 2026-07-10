@@ -5,10 +5,197 @@ AR.DemoAI = {
   decideT: 0,          // petit délai entre certaines décisions
   bowPlan: 0,          // >0 : on maintient l'arc (charge en cours)
   swordPlan: 0,        // >0 : on maintient l'épée
+  jumpHoldT: 0,        // durée de maintien du saut (évite le saut coupé dès la 2e frame)
+  jumpReleaseT: 0,     // brève relâche entre saut et double saut pour créer un nouvel appui
+  navStuckT: 0,
+  chestTarget: null,
+  chestAttemptT: 0,
+  chestTotalT: 0,
+  chestBestD: Infinity,
+  chestRetries: new WeakMap(),
+  buildFocus: 'balanced',
   uiT: 0,
 
-  reset() {
-    this.decideT = 0; this.bowPlan = 0; this.swordPlan = 0; this.uiT = 0;
+  reset(newRun) {
+    this.decideT = 0; this.bowPlan = 0; this.swordPlan = 0;
+    this.jumpHoldT = 0; this.jumpReleaseT = 0; this.navStuckT = 0;
+    this.chestTarget = null; this.chestAttemptT = 0; this.chestTotalT = 0; this.chestBestD = Infinity;
+    this.chestRetries = new WeakMap();
+    if (newRun || !this.buildFocus) {
+      const focuses = ['melee', 'ranged', 'spirit'];
+      this.buildFocus = focuses[Math.floor(Math.random() * focuses.length)];
+    }
+    this.uiT = 0;
+  },
+
+  focusLabel() {
+    return { melee: 'mêlée', ranged: 'distance', spirit: 'pouvoirs' }[this.buildFocus] || 'équilibre';
+  },
+
+  _queueJump(holdT) {
+    if (this.jumpHoldT > 0 || this.jumpReleaseT > 0) return false;
+    this.jumpHoldT = holdT;
+    return true;
+  },
+
+  _applyJump(a, dt) {
+    if (this.jumpReleaseT > 0) {
+      this.jumpReleaseT = Math.max(0, this.jumpReleaseT - dt);
+      return;
+    }
+    if (this.jumpHoldT <= 0) return;
+    a.jump = true;
+    this.jumpHoldT = Math.max(0, this.jumpHoldT - dt);
+    if (this.jumpHoldT === 0) this.jumpReleaseT = AR.C.DT * 2;
+  },
+
+  // Le sol est prioritaire ; une plateforme ne sert de chemin que lorsqu'elle
+  // couvre réellement une fosse. Cela évite de viser les plateformes décoratives.
+  _supportYAt(level, x) {
+    const pitLimit = AR.C.WORLD_H * AR.C.TILE;
+    const groundY = level.groundYpx(x);
+    if (groundY <= pitLimit) return groundY;
+    let supportY = groundY;
+    for (const p of level.platforms) {
+      if (x >= p.tx * AR.C.TILE && x <= (p.tx + p.w) * AR.C.TILE) {
+        supportY = Math.min(supportY, p.ty * AR.C.TILE);
+      }
+    }
+    return supportY;
+  },
+
+  _scanPath(level, pl, dir) {
+    const T = AR.C.TILE;
+    const pitLimit = AR.C.WORLD_H * T;
+    const footY = pl.y + pl.h;
+    const leadX = pl.x + pl.w / 2 + dir * (pl.w / 2 + 6);
+    const horizon = AR.U.clamp(90 + Math.abs(pl.vx) * 0.28, 90, 220);
+    let gapDist = Infinity, riseDist = Infinity, maxRise = 0;
+    for (let dist = 12; dist <= horizon; dist += 12) {
+      const supportY = this._supportYAt(level, leadX + dir * dist);
+      if (supportY > pitLimit) {
+        if (gapDist === Infinity) gapDist = dist;
+        continue;
+      }
+      const rise = footY - supportY;
+      if (rise > T * 0.35 && rise > maxRise) {
+        maxRise = rise;
+        riseDist = dist;
+      }
+    }
+    return { gapDist, riseDist, maxRise, horizon };
+  },
+
+  _hasClearShot(level, x0, y0, x1, y1) {
+    const dx = x1 - x0, dy = y1 - y0;
+    const d = Math.sqrt(dx * dx + dy * dy);
+    const steps = Math.max(2, Math.ceil(d / (AR.C.TILE * 0.2)));
+    // Les projectiles ignorent les plateformes traversables mais meurent dans
+    // les tuiles solides : utiliser exactement la même notion de terrain.
+    for (let i = 1; i < steps; i++) {
+      const k = i / steps;
+      const tx = Math.floor((x0 + dx * k) / AR.C.TILE);
+      const ty = Math.floor((y0 + dy * k) / AR.C.TILE);
+      if (level.solidAt(tx, ty)) return false;
+    }
+    return true;
+  },
+
+  _currentSurfaceY(level, pl) {
+    if (pl.onGround) return pl.y + pl.h;
+    return this._supportYAt(level, pl.x + pl.w / 2);
+  },
+
+  _pickReachableChest(game, pl, pcx) {
+    const T = AR.C.TILE;
+    const surfaceY = this._currentSurfaceY(game.level, pl);
+    let best = null, bestScore = Infinity;
+    for (const p of AR.Pickups.list) {
+      if (p.type !== 'chest' || p.opened) continue;
+      const dx = p.x - pcx;
+      if (Math.abs(dx) > 600 || dx < -520) continue;
+
+      // Avec les maintiens utilisés plus bas, le double saut atteint environ
+      // quatre tuiles. Un coffre plus haut sera réévalué depuis un terrain élevé.
+      const rise = surfaceY - p.y;
+      let memory = this.chestRetries.get(p);
+      if (rise > T * 4.15) {
+        // Mémoriser également les coffres repérés mais inaccessibles depuis ici.
+        if (!memory) {
+          memory = { x: p.x, y: p.y, surfaceY, attempts: 0, abandoned: true };
+          this.chestRetries.set(p, memory);
+        }
+        continue;
+      }
+
+      if (memory && memory.abandoned) {
+        const foundHigherAccess = surfaceY < memory.surfaceY - T * 0.75;
+        const looksConnected = Math.abs(dx) < T * 9;
+        if (!foundHigherAccess || !looksConnected) continue;
+        memory.surfaceY = surfaceY;
+        memory.attempts = 0;
+        memory.abandoned = false;
+      }
+
+      const score = Math.abs(dx) + Math.max(0, rise) * 0.35;
+      if (score < bestScore) { best = p; bestScore = score; }
+    }
+    return best;
+  },
+
+  _trackChestAttempt(game, pl, chest, pcx, pcy, dt) {
+    if (this.chestTarget !== chest) {
+      this.chestTarget = chest;
+      this.chestAttemptT = 0;
+      this.chestTotalT = 0;
+      this.chestBestD = Infinity;
+    }
+    this.chestTotalT += dt;
+    const d = AR.U.dist(pcx, pcy, chest.x, chest.y - 20);
+    if (d < this.chestBestD - 8) {
+      this.chestBestD = d;
+      this.chestAttemptT = 0;
+    } else {
+      this.chestAttemptT += dt;
+    }
+    if (this.chestAttemptT < 2.2 && this.chestTotalT < 5) return false;
+
+    // Après plusieurs sauts sans progrès, continuer le niveau. Le coffre pourra
+    // être retenté plus loin ou dès qu'une surface sensiblement plus haute est atteinte.
+    const memory = this.chestRetries.get(chest) || { attempts: 0 };
+    memory.x = chest.x;
+    memory.y = chest.y;
+    memory.surfaceY = this._currentSurfaceY(game.level, pl);
+    memory.abandoned = true;
+    this.chestRetries.set(chest, memory);
+    this.chestTarget = null;
+    this.chestAttemptT = 0;
+    this.chestTotalT = 0;
+    this.chestBestD = Infinity;
+    return true;
+  },
+
+  _recordChestJump(game, pl, chest) {
+    const T = AR.C.TILE;
+    const surfaceY = this._currentSurfaceY(game.level, pl);
+    const memory = this.chestRetries.get(chest) || {
+      x: chest.x, y: chest.y, surfaceY, attempts: 0, abandoned: false,
+    };
+    if (surfaceY < memory.surfaceY - T * 0.75) {
+      memory.surfaceY = surfaceY;
+      memory.attempts = 0;
+      memory.abandoned = false;
+    }
+    memory.attempts++;
+    if (memory.attempts >= 3) memory.abandoned = true;
+    this.chestRetries.set(chest, memory);
+  },
+
+  _clearChestAttempt() {
+    this.chestTarget = null;
+    this.chestAttemptT = 0;
+    this.chestTotalT = 0;
+    this.chestBestD = Infinity;
   },
 
   // Appelé à chaque pas de simulation quand le mode démo est actif.
@@ -19,25 +206,40 @@ AR.DemoAI = {
 
     // ---------- écrans / overlays : l'IA valide toute seule
     if (game.state === 'rift') {
+      this.jumpHoldT = this.jumpReleaseT = this.navStuckT = 0;
+      this._clearChestAttempt();
       this.uiT += dt;
       if (this.uiT > 1.1) { game.riftPick(Math.floor(Math.random() * game.riftChoices.length)); this.uiT = 0; }
       AR.Input.setVirtual(a, aimX, aimY);
       return;
     }
     if (game.state === 'gameover' || game.state === 'victory') {
+      this.jumpHoldT = this.jumpReleaseT = this.navStuckT = 0;
+      this._clearChestAttempt();
       this.uiT += dt;
       if (this.uiT > 2.5) { this.uiT = 0; game.newRun(true); }
       AR.Input.setVirtual(a, aimX, aimY);
       return;
     }
-    if (game.state !== 'play') { AR.Input.setVirtual(a, aimX, aimY); return; }
+    if (game.state !== 'play') {
+      this.jumpHoldT = this.jumpReleaseT = this.navStuckT = 0;
+      this._clearChestAttempt();
+      AR.Input.setVirtual(a, aimX, aimY); return;
+    }
     if (game.shopOpen) {
+      this.jumpHoldT = this.jumpReleaseT = this.navStuckT = 0;
+      this._clearChestAttempt();
       this.uiT += dt;
-      if (this.uiT > 0.8) { game.shopAutoBuy(); game.shopOpen = false; this.uiT = 0; }
+      const thinkT = Math.max(0.12, 0.45 / Math.sqrt(game.speed || 1));
+      if (this.uiT > thinkT) { game.shopAutoBuy(); game.shopOpen = false; this.uiT = 0; }
       AR.Input.setVirtual(a, aimX, aimY);
       return;
     }
-    if (pl.dead) { AR.Input.setVirtual(a, aimX, aimY); return; }
+    if (pl.dead) {
+      this.jumpHoldT = this.jumpReleaseT = this.navStuckT = 0;
+      this._clearChestAttempt();
+      AR.Input.setVirtual(a, aimX, aimY); return;
+    }
 
     // ---------- dépense automatique des points de compétence
     if (pl.skillPoints > 0) game.buySkillAuto();
@@ -54,6 +256,9 @@ AR.DemoAI = {
       if (score < td && d < 720) { td = score; target = e; }
     }
     const realTd = target ? AR.U.dist(pcx, pcy, target.centerX(), target.centerY()) : 1e9;
+    const shotClear = !target || this._hasClearShot(game.level,
+      pcx, pl.y + pl.h * 0.38, target.centerX(), target.centerY());
+    const blockedShot = !!target && !shotClear && realTd > 110;
 
     // projectile ennemi dangereux ?
     let threat = null;
@@ -67,8 +272,7 @@ AR.DemoAI = {
     let goalX = null;
     const interactive = AR.Pickups.nearestInteractive(pl);
     const portal = AR.Pickups.list.find((p) => p.type === 'portal');
-    const chest = AR.Pickups.list.find((p) => p.type === 'chest' && !p.opened &&
-      Math.abs(p.x - pcx) < 460 && p.x > pcx - 200);
+    let chest = this._pickReachableChest(game, pl, pcx);
     const wantShop = game.merchantPickup && !game.merchantPickup.used &&
       Math.abs(game.merchantPickup.x - pcx) < 520 &&
       (pl.hp < pl.maxHp * 0.75 || game.coins > 130);
@@ -91,7 +295,7 @@ AR.DemoAI = {
     const telegraphed = target && (target.state === 'tele' || target.state === 'charge') && realTd < 230;
     if ((threat || telegraphed) && this.decideT <= 0) {
       if (Math.random() < 0.55) a.dash = true;
-      else a.jump = true;
+      else this._queueJump(pl.onGround ? 0.24 : 0.20);
       this.decideT = 0.4;
     }
 
@@ -106,9 +310,16 @@ AR.DemoAI = {
         AR.U.dist(pcx, pcy, e.centerX(), e.centerY()) < 210).length;
       if (pl.spellUnlocked(0) && nearCount >= 2 && pl.spirit > 40) a.spell1 = true;
       else if (pl.spellUnlocked(2) && target.isBoss && pl.spirit > 70 && Math.random() < 0.02) a.spell3 = true;
-      else if (pl.spellUnlocked(1) && realTd > 260 && realTd < 560 && pl.spirit > 60 && Math.random() < 0.03) a.spell2 = true;
+      else if (shotClear && pl.spellUnlocked(1) && realTd > 260 && realTd < 560 && pl.spirit > 60 && Math.random() < 0.03) a.spell2 = true;
 
-      if (realTd < 135) {
+      if (blockedShot) {
+        // Ne plus gaspiller de flèches contre une paroi. Viser au-delà de la
+        // cible force le franchissement du rebord au lieu d'un duel immobile.
+        this.bowPlan = 0;
+        this.swordPlan = 0;
+        const approachDir = AR.U.sign(dx) || pl.facing || 1;
+        goalX = ex + approachDir * AR.C.TILE * 1.5;
+      } else if (realTd < 135) {
         // corps à corps : enchaîner les coups, parfois une chargée
         if (this.swordPlan > 0) {
           this.swordPlan -= dt;
@@ -145,32 +356,83 @@ AR.DemoAI = {
       this.bowPlan = 0; this.swordPlan = 0;
     }
 
-    // ---------- navigation
-    if (goalX !== null && Math.abs(goalX - pcx) > 30) {
-      const dir = AR.U.sign(goalX - pcx);
-      if (dir > 0) a.right = true; else a.left = true;
-      // sprint si longue distance sans danger
-      if (Math.abs(goalX - pcx) > 300 && !target) a.dash = pl.dashHeld > 0 || Math.random() < 0.1 ? true : a.dash;
-
-      // sauter les trous et les marches
-      const lvl = game.level;
-      const aheadX = pcx + dir * 62;
-      const aheadG = lvl.groundYpx(aheadX);
-      const hereG = lvl.groundYpx(pcx);
-      const pit = aheadG > AR.C.WORLD_H * AR.C.TILE;      // vide devant
-      const wall = hereG - aheadG > AR.C.TILE * 0.8;      // marche montante
-      if (pl.onGround && (pit || wall)) a.jump = true;
-      // double saut de rattrapage au-dessus du vide
-      if (!pl.onGround && pl.vy > 120 && pl.jumpsUsed === 1 &&
-          lvl.groundYpx(pcx + dir * 30) > AR.C.WORLD_H * AR.C.TILE) {
-        a.jump = true;
-      }
-      // monter sur les plateformes vers un coffre
-      if (chest && goalX === chest.x && chest.y < pl.y - 40 && pl.onGround && Math.abs(chest.x - pcx) < 120) {
-        a.jump = true;
+    // Un ennemi proche de l'autre côté d'une fosse ou d'une marche ne doit pas
+    // figer l'IA en position de tir. Elle franchit d'abord le relief qui les sépare.
+    if (target && !target.isBoss) {
+      const targetDx = target.centerX() - pcx;
+      if (blockedShot) {
+        const approachDir = AR.U.sign(targetDx) || pl.facing || 1;
+        goalX = target.centerX() + approachDir * AR.C.TILE * 1.5;
+      } else if (Math.abs(targetDx) > 80) {
+        const targetDir = AR.U.sign(targetDx);
+        const route = this._scanPath(game.level, pl, targetDir);
+        const routeLimit = Math.min(route.horizon, Math.abs(targetDx) - 35);
+        if (route.gapDist < routeLimit || route.riseDist < routeLimit) goalX = target.centerX();
       }
     }
 
+    const pursuingChest = chest && goalX === chest.x;
+    if (pursuingChest) {
+      if (this._trackChestAttempt(game, pl, chest, pcx, pcy, dt)) {
+        chest = null;
+        goalX = wantShop ? game.merchantPickup.x : pl.x + 400;
+      }
+    } else {
+      this._clearChestAttempt();
+    }
+
+    // ---------- navigation
+    const goalDx = goalX === null ? 0 : goalX - pcx;
+    const chestAboveGoal = chest && goalX === chest.x && chest.y < pl.y + pl.h - AR.C.TILE &&
+      Math.abs(chest.x - pcx) < 155;
+    if (goalX !== null && (Math.abs(goalDx) > 30 || chestAboveGoal)) {
+      const dir = AR.U.sign(goalDx);
+      if (Math.abs(goalDx) > 30) {
+        if (dir > 0) a.right = true; else a.left = true;
+      }
+      const lvl = game.level;
+      const path = dir === 0 ? { gapDist: Infinity, riseDist: Infinity, maxRise: 0, horizon: 0 } :
+        this._scanPath(lvl, pl, dir);
+      const takeoffDist = AR.U.clamp(46 + Math.abs(pl.vx) * 0.22, 52, 112);
+      const gapSoon = path.gapDist <= takeoffDist;
+      const riseSoon = path.riseDist <= takeoffDist;
+      const obstacleInDashRange = path.gapDist < 170 || path.riseDist < 150;
+
+      // Le dash lance ensuite un sprint s'il reste maintenu. On le réserve aux
+      // portions de sol lisibles et on le relâche assez tôt avant un obstacle.
+      if (pl.onGround && Math.abs(goalX - pcx) > 300 && !target && !obstacleInDashRange) {
+        a.dash = true;
+      } else if (blockedShot && pl.onGround && Math.abs(goalDx) > 160 && !obstacleInDashRange) {
+        a.dash = true;
+      }
+
+      if (dir !== 0 && pl.onGround && !pl.dashing && Math.abs(pl.vx) < 12) this.navStuckT += dt;
+      else this.navStuckT = Math.max(0, this.navStuckT - dt * 3);
+
+      const chestAbove = chestAboveGoal;
+      if (pl.onGround && !pl.dashing && (gapSoon || riseSoon || chestAbove || this.navStuckT > 0.22)) {
+        const highOrWide = path.maxRise > AR.C.TILE * 1.2 || path.gapDist < 70 || chestAbove;
+        const holdT = chestAbove ? 0.34 : highOrWide ? 0.30 : 0.24;
+        if (this._queueJump(holdT)) {
+          this.navStuckT = 0;
+          if (chestAbove) this._recordChestJump(game, pl, chest);
+        }
+      }
+
+      // Second appui près de l'apex : rattrape les fosses larges et permet
+      // d'atteindre les marches ou coffres placés deux tuiles plus haut.
+      const overGap = this._supportYAt(lvl, pcx) > AR.C.WORLD_H * AR.C.TILE;
+      const airObstacle = path.gapDist < 58 ||
+        (path.riseDist < 70 && path.maxRise > AR.C.TILE * 0.55) || chestAbove;
+      if (!pl.onGround && !pl.dashing && pl.jumpsUsed === 1 && pl.vy > -80 &&
+          (overGap || airObstacle)) {
+        this._queueJump(chestAbove ? 0.30 : 0.24);
+      }
+    } else {
+      this.navStuckT = 0;
+    }
+
+    this._applyJump(a, dt);
     AR.Input.setVirtual(a, aimX, aimY);
   },
 };
