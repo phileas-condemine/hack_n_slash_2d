@@ -1,0 +1,127 @@
+{
+  "arena_id": "futuristic_cyber_ai_overlord",
+  "arena": "Futuristic Cyber Era / AI Overlord",
+  "image_file": "arène_cyberpunk_dans_la_pluie_nocturne.png",
+  "image_size_px": {
+    "width": 1672,
+    "height": 941
+  },
+  "coordinate_system": {
+    "origin": "top-left",
+    "normalized_range": [
+      0,
+      1
+    ],
+    "bbox_format": "x,y,w,h"
+  },
+  "platforms": [
+    {
+      "id": "ground_main",
+      "bbox_px": {
+        "x": 81,
+        "y": 665,
+        "w": 1513,
+        "h": 132
+      },
+      "bbox_norm": {
+        "x": 0.048445,
+        "y": 0.706695,
+        "w": 0.904904,
+        "h": 0.140276
+      },
+      "walk_surface_bbox_px": {
+        "x": 81,
+        "y": 665,
+        "w": 1513,
+        "h": 48
+      },
+      "walk_surface_bbox_norm": {
+        "x": 0.048445,
+        "y": 0.706695,
+        "w": 0.904904,
+        "h": 0.05101
+      }
+    },
+    {
+      "id": "left_platform",
+      "bbox_px": {
+        "x": 131,
+        "y": 548,
+        "w": 438,
+        "h": 153
+      },
+      "bbox_norm": {
+        "x": 0.078349,
+        "y": 0.582359,
+        "w": 0.261962,
+        "h": 0.162593
+      },
+      "walk_surface_bbox_px": {
+        "x": 132,
+        "y": 548,
+        "w": 436,
+        "h": 26
+      },
+      "walk_surface_bbox_norm": {
+        "x": 0.078947,
+        "y": 0.582359,
+        "w": 0.260766,
+        "h": 0.02763
+      }
+    },
+    {
+      "id": "center_platform",
+      "bbox_px": {
+        "x": 625,
+        "y": 447,
+        "w": 424,
+        "h": 146
+      },
+      "bbox_norm": {
+        "x": 0.373804,
+        "y": 0.475027,
+        "w": 0.253589,
+        "h": 0.155154
+      },
+      "walk_surface_bbox_px": {
+        "x": 627,
+        "y": 447,
+        "w": 420,
+        "h": 24
+      },
+      "walk_surface_bbox_norm": {
+        "x": 0.375,
+        "y": 0.475027,
+        "w": 0.251196,
+        "h": 0.025505
+      }
+    },
+    {
+      "id": "right_platform",
+      "bbox_px": {
+        "x": 1103,
+        "y": 548,
+        "w": 438,
+        "h": 153
+      },
+      "bbox_norm": {
+        "x": 0.659689,
+        "y": 0.582359,
+        "w": 0.261962,
+        "h": 0.162593
+      },
+      "walk_surface_bbox_px": {
+        "x": 1104,
+        "y": 548,
+        "w": 436,
+        "h": 26
+      },
+      "walk_surface_bbox_norm": {
+        "x": 0.660287,
+        "y": 0.582359,
+        "w": 0.260766,
+        "h": 0.02763
+      }
+    }
+  ]
+}

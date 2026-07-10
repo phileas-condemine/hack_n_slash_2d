@@ -6,23 +6,28 @@ AR.Assets = {
   ready: false,
 
   load(onDone, onProgress) {
-    const keys = Object.keys(AR.SPRITE_META);
+    const entries = Object.keys(AR.SPRITE_META).map((key) => ({
+      key, src: 'assets/' + key + '.png',
+    }));
+    for (const arena of Object.values(AR.BOSS_ARENAS || {})) {
+      entries.push({ key: arena.image, src: 'assets/' + arena.image + '.png' });
+    }
     let loaded = 0;
-    const total = keys.length;
-    keys.forEach((key) => {
+    const total = entries.length;
+    const finishOne = () => {
+      loaded++;
+      if (onProgress) onProgress(loaded / total);
+      if (loaded === total) { this.ready = true; onDone(); }
+    };
+    entries.forEach((entry) => {
       const img = new Image();
-      img.onload = () => {
-        loaded++;
-        if (onProgress) onProgress(loaded / total);
-        if (loaded === total) { this.ready = true; onDone(); }
-      };
+      img.onload = finishOne;
       img.onerror = () => {
-        console.error('Image introuvable :', key);
-        loaded++;
-        if (loaded === total) { this.ready = true; onDone(); }
+        console.error('Image introuvable :', entry.key);
+        finishOne();
       };
-      img.src = 'assets/' + key + '.png';
-      this.images[key] = img;
+      img.src = entry.src;
+      this.images[entry.key] = img;
     });
   },
 

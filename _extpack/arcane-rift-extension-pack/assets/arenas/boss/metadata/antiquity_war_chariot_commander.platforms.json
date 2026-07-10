@@ -1,0 +1,127 @@
+{
+  "arena_id": "antiquity_war_chariot_commander",
+  "arena": "Antiquity / War Chariot Commander",
+  "image_file": "arène_antique_sous_un_ciel_bleu.png",
+  "image_size_px": {
+    "width": 1672,
+    "height": 941
+  },
+  "coordinate_system": {
+    "origin": "top-left",
+    "normalized_range": [
+      0,
+      1
+    ],
+    "bbox_format": "x,y,w,h"
+  },
+  "platforms": [
+    {
+      "id": "ground_main",
+      "bbox_px": {
+        "x": 112,
+        "y": 675,
+        "w": 1448,
+        "h": 162
+      },
+      "bbox_norm": {
+        "x": 0.066986,
+        "y": 0.717322,
+        "w": 0.866029,
+        "h": 0.172157
+      },
+      "walk_surface_bbox_px": {
+        "x": 112,
+        "y": 675,
+        "w": 1448,
+        "h": 58
+      },
+      "walk_surface_bbox_norm": {
+        "x": 0.066986,
+        "y": 0.717322,
+        "w": 0.866029,
+        "h": 0.061637
+      }
+    },
+    {
+      "id": "left_pedestal",
+      "bbox_px": {
+        "x": 182,
+        "y": 611,
+        "w": 314,
+        "h": 128
+      },
+      "bbox_norm": {
+        "x": 0.108852,
+        "y": 0.649309,
+        "w": 0.187799,
+        "h": 0.136026
+      },
+      "walk_surface_bbox_px": {
+        "x": 184,
+        "y": 611,
+        "w": 311,
+        "h": 27
+      },
+      "walk_surface_bbox_norm": {
+        "x": 0.110048,
+        "y": 0.649309,
+        "w": 0.186005,
+        "h": 0.028693
+      }
+    },
+    {
+      "id": "center_dais",
+      "bbox_px": {
+        "x": 688,
+        "y": 531,
+        "w": 297,
+        "h": 169
+      },
+      "bbox_norm": {
+        "x": 0.411483,
+        "y": 0.564293,
+        "w": 0.177632,
+        "h": 0.179596
+      },
+      "walk_surface_bbox_px": {
+        "x": 690,
+        "y": 531,
+        "w": 293,
+        "h": 29
+      },
+      "walk_surface_bbox_norm": {
+        "x": 0.412679,
+        "y": 0.564293,
+        "w": 0.175239,
+        "h": 0.030818
+      }
+    },
+    {
+      "id": "right_pedestal",
+      "bbox_px": {
+        "x": 1175,
+        "y": 611,
+        "w": 315,
+        "h": 128
+      },
+      "bbox_norm": {
+        "x": 0.702751,
+        "y": 0.649309,
+        "w": 0.188397,
+        "h": 0.136026
+      },
+      "walk_surface_bbox_px": {
+        "x": 1177,
+        "y": 611,
+        "w": 311,
+        "h": 27
+      },
+      "walk_surface_bbox_norm": {
+        "x": 0.703947,
+        "y": 0.649309,
+        "w": 0.186005,
+        "h": 0.028693
+      }
+    }
+  ]
+}

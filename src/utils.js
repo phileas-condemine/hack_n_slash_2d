@@ -49,14 +49,21 @@ AR.Camera = class {
     this.lookAhead = 0;
   }
   follow(t, level, dt) {
-    this.lookAhead = AR.U.damp(this.lookAhead, t.facing * 130, 3, dt);
-    const tx = t.x + t.w / 2 + this.lookAhead - this.vw / 2;
-    const ty = t.y + t.h / 2 - this.vh * 0.58;
-    this.x = AR.U.damp(this.x, tx, 8, dt);
-    this.y = AR.U.damp(this.y, ty, 5, dt);
-    const maxX = level.tilesW * AR.C.TILE - this.vw;
-    this.x = AR.U.clamp(this.x, 0, Math.max(0, maxX));
-    this.y = AR.U.clamp(this.y, -AR.C.TILE * 6, AR.C.WORLD_H * AR.C.TILE - this.vh);
+    const arena = level.bossArena;
+    if (arena && arena.active) {
+      this.lookAhead = 0;
+      this.x = arena.x;
+      this.y = arena.y;
+    } else {
+      this.lookAhead = AR.U.damp(this.lookAhead, t.facing * 130, 3, dt);
+      const tx = t.x + t.w / 2 + this.lookAhead - this.vw / 2;
+      const ty = t.y + t.h / 2 - this.vh * 0.58;
+      this.x = AR.U.damp(this.x, tx, 8, dt);
+      this.y = AR.U.damp(this.y, ty, 5, dt);
+      const maxX = level.tilesW * AR.C.TILE - this.vw;
+      this.x = AR.U.clamp(this.x, 0, Math.max(0, maxX));
+      this.y = AR.U.clamp(this.y, -AR.C.TILE * 6, AR.C.WORLD_H * AR.C.TILE - this.vh);
+    }
     if (this.shakeT > 0) {
       this.shakeT -= dt;
       this.sx = (Math.random() * 2 - 1) * this.shakeMag * (this.shakeT * 4);

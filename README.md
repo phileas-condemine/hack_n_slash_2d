@@ -41,7 +41,7 @@ La jauge au-dessus du héros montre la **charge** de l'arme ; à pleine charge, 
 
 ## Systèmes de jeu
 
-- **6 ères procédurales** (palette, météo, parallaxe, bestiaire et boss dédiés), marchand, coffres, élites, boss de fin d'ère, choix de faille entre les mondes, NG+.
+- **6 ères procédurales** (palette, météo, parallaxe, bestiaire et boss dédiés), marchand, coffres, élites, arène illustrée propre à chaque boss de fin d'ère, choix de faille entre les mondes, NG+.
 - **36 ennemis, 9 comportements** : mêlée, brute, tireur, artillerie, invocateur, assassin téléporteur, porte-bouclier, charge, volant.
 - **Combat réactif** :
   - les porte-boucliers **bloquent les flèches** (« BLOQUÉ ») et protègent les alliés derrière eux ;

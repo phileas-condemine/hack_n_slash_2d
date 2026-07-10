@@ -1,0 +1,19 @@
+{
+  "description": "Refined and visually checked boss arena platform metadata.",
+  "files": [
+    "stone_age_mammoth_chief.platforms.json",
+    "antiquity_war_chariot_commander.platforms.json",
+    "medieval_japan_yokai_lord.platforms.json",
+    "renaissance_war_engineer.platforms.json",
+    "diesel_war_diesel_behemoth.platforms.json",
+    "futuristic_cyber_ai_overlord.platforms.json"
+  ],
+  "overlay_files": [
+    "overlays/stone_age_mammoth_chief.overlay.png",
+    "overlays/antiquity_war_chariot_commander.overlay.png",
+    "overlays/medieval_japan_yokai_lord.overlay.png",
+    "overlays/renaissance_war_engineer.overlay.png",
+    "overlays/diesel_war_diesel_behemoth.overlay.png",
+    "overlays/futuristic_cyber_ai_overlord.overlay.png"
+  ]
+}

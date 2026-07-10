@@ -1,0 +1,154 @@
+{
+  "arena_id": "renaissance_war_engineer",
+  "arena": "Renaissance / War Engineer",
+  "image_file": "cour_des_machines_médiévales_steampunk.png",
+  "image_size_px": {
+    "width": 1672,
+    "height": 941
+  },
+  "coordinate_system": {
+    "origin": "top-left",
+    "normalized_range": [
+      0,
+      1
+    ],
+    "bbox_format": "x,y,w,h"
+  },
+  "platforms": [
+    {
+      "id": "ground_main",
+      "bbox_px": {
+        "x": 158,
+        "y": 706,
+        "w": 1357,
+        "h": 107
+      },
+      "bbox_norm": {
+        "x": 0.094498,
+        "y": 0.750266,
+        "w": 0.811603,
+        "h": 0.113709
+      },
+      "walk_surface_bbox_px": {
+        "x": 158,
+        "y": 706,
+        "w": 1357,
+        "h": 50
+      },
+      "walk_surface_bbox_norm": {
+        "x": 0.094498,
+        "y": 0.750266,
+        "w": 0.811603,
+        "h": 0.053135
+      }
+    },
+    {
+      "id": "left_upper",
+      "bbox_px": {
+        "x": 249,
+        "y": 410,
+        "w": 382,
+        "h": 146
+      },
+      "bbox_norm": {
+        "x": 0.148923,
+        "y": 0.435707,
+        "w": 0.228469,
+        "h": 0.155154
+      },
+      "walk_surface_bbox_px": {
+        "x": 251,
+        "y": 410,
+        "w": 378,
+        "h": 27
+      },
+      "walk_surface_bbox_norm": {
+        "x": 0.15012,
+        "y": 0.435707,
+        "w": 0.226077,
+        "h": 0.028693
+      }
+    },
+    {
+      "id": "center_bridge",
+      "bbox_px": {
+        "x": 660,
+        "y": 358,
+        "w": 349,
+        "h": 153
+      },
+      "bbox_norm": {
+        "x": 0.394737,
+        "y": 0.380446,
+        "w": 0.208732,
+        "h": 0.162593
+      },
+      "walk_surface_bbox_px": {
+        "x": 662,
+        "y": 358,
+        "w": 345,
+        "h": 24
+      },
+      "walk_surface_bbox_norm": {
+        "x": 0.395933,
+        "y": 0.380446,
+        "w": 0.20634,
+        "h": 0.025505
+      }
+    },
+    {
+      "id": "right_upper",
+      "bbox_px": {
+        "x": 1041,
+        "y": 410,
+        "w": 383,
+        "h": 146
+      },
+      "bbox_norm": {
+        "x": 0.622608,
+        "y": 0.435707,
+        "w": 0.229067,
+        "h": 0.155154
+      },
+      "walk_surface_bbox_px": {
+        "x": 1043,
+        "y": 410,
+        "w": 379,
+        "h": 27
+      },
+      "walk_surface_bbox_norm": {
+        "x": 0.623804,
+        "y": 0.435707,
+        "w": 0.226675,
+        "h": 0.028693
+      }
+    },
+    {
+      "id": "center_hanging",
+      "bbox_px": {
+        "x": 709,
+        "y": 255,
+        "w": 252,
+        "h": 112
+      },
+      "bbox_norm": {
+        "x": 0.424043,
+        "y": 0.270988,
+        "w": 0.150718,
+        "h": 0.119022
+      },
+      "walk_surface_bbox_px": {
+        "x": 717,
+        "y": 255,
+        "w": 236,
+        "h": 25
+      },
+      "walk_surface_bbox_norm": {
+        "x": 0.428828,
+        "y": 0.270988,
+        "w": 0.141148,
+        "h": 0.026567
+      }
+    }
+  ]
+}

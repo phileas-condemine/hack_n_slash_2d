@@ -1,0 +1,100 @@
+{
+  "arena_id": "diesel_war_diesel_behemoth",
+  "arena": "Diesel War / Diesel Behemoth",
+  "image_file": "champ_de_bataille_industriel_dévasté.png",
+  "image_size_px": {
+    "width": 1672,
+    "height": 941
+  },
+  "coordinate_system": {
+    "origin": "top-left",
+    "normalized_range": [
+      0,
+      1
+    ],
+    "bbox_format": "x,y,w,h"
+  },
+  "platforms": [
+    {
+      "id": "ground_main",
+      "bbox_px": {
+        "x": 211,
+        "y": 588,
+        "w": 1250,
+        "h": 168
+      },
+      "bbox_norm": {
+        "x": 0.126196,
+        "y": 0.624867,
+        "w": 0.747608,
+        "h": 0.178533
+      },
+      "walk_surface_bbox_px": {
+        "x": 211,
+        "y": 588,
+        "w": 1250,
+        "h": 48
+      },
+      "walk_surface_bbox_norm": {
+        "x": 0.126196,
+        "y": 0.624867,
+        "w": 0.747608,
+        "h": 0.05101
+      }
+    },
+    {
+      "id": "left_bunker_top",
+      "bbox_px": {
+        "x": 101,
+        "y": 476,
+        "w": 416,
+        "h": 149
+      },
+      "bbox_norm": {
+        "x": 0.060407,
+        "y": 0.505845,
+        "w": 0.248804,
+        "h": 0.158342
+      },
+      "walk_surface_bbox_px": {
+        "x": 104,
+        "y": 476,
+        "w": 410,
+        "h": 24
+      },
+      "walk_surface_bbox_norm": {
+        "x": 0.062201,
+        "y": 0.505845,
+        "w": 0.245215,
+        "h": 0.025505
+      }
+    },
+    {
+      "id": "right_bunker_top",
+      "bbox_px": {
+        "x": 1154,
+        "y": 476,
+        "w": 416,
+        "h": 149
+      },
+      "bbox_norm": {
+        "x": 0.690191,
+        "y": 0.505845,
+        "w": 0.248804,
+        "h": 0.158342
+      },
+      "walk_surface_bbox_px": {
+        "x": 1157,
+        "y": 476,
+        "w": 410,
+        "h": 24
+      },
+      "walk_surface_bbox_norm": {
+        "x": 0.691986,
+        "y": 0.505845,
+        "w": 0.245215,
+        "h": 0.025505
+      }
+    }
+  ]
+}

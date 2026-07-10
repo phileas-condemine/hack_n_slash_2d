@@ -43,6 +43,9 @@ AR.Projectiles = {
     const lvl = game.level;
     for (let i = this.list.length - 1; i >= 0; i--) {
       const p = this.list[i];
+      // Un projectile peut en détruire un autre pendant cette même boucle
+      // (parade, bouclier, onde), ce qui décale les indices restants.
+      if (!p) continue;
       p.t += dt;
       if (p.t >= p.life) { this._expire(p, game); this.list.splice(i, 1); continue; }
 

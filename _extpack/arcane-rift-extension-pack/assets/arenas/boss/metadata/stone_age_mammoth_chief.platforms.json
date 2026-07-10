@@ -1,0 +1,181 @@
+{
+  "arena_id": "stone_age_mammoth_chief",
+  "arena": "Stone Age / Mammoth Chief",
+  "image_file": "arène_tribale_dans_un_canyon_rocheux.png",
+  "image_size_px": {
+    "width": 1672,
+    "height": 941
+  },
+  "coordinate_system": {
+    "origin": "top-left",
+    "normalized_range": [
+      0,
+      1
+    ],
+    "bbox_format": "x,y,w,h"
+  },
+  "platforms": [
+    {
+      "id": "ground_main",
+      "bbox_px": {
+        "x": 104,
+        "y": 660,
+        "w": 1464,
+        "h": 182
+      },
+      "bbox_norm": {
+        "x": 0.062201,
+        "y": 0.701382,
+        "w": 0.875598,
+        "h": 0.193411
+      },
+      "walk_surface_bbox_px": {
+        "x": 104,
+        "y": 660,
+        "w": 1464,
+        "h": 69
+      },
+      "walk_surface_bbox_norm": {
+        "x": 0.062201,
+        "y": 0.701382,
+        "w": 0.875598,
+        "h": 0.073326
+      }
+    },
+    {
+      "id": "left_front_low",
+      "bbox_px": {
+        "x": 0,
+        "y": 574,
+        "w": 324,
+        "h": 129
+      },
+      "bbox_norm": {
+        "x": 0.0,
+        "y": 0.609989,
+        "w": 0.19378,
+        "h": 0.137088
+      },
+      "walk_surface_bbox_px": {
+        "x": 0,
+        "y": 574,
+        "w": 307,
+        "h": 23
+      },
+      "walk_surface_bbox_norm": {
+        "x": 0.0,
+        "y": 0.609989,
+        "w": 0.183612,
+        "h": 0.024442
+      }
+    },
+    {
+      "id": "left_mid",
+      "bbox_px": {
+        "x": 206,
+        "y": 421,
+        "w": 283,
+        "h": 174
+      },
+      "bbox_norm": {
+        "x": 0.123206,
+        "y": 0.447396,
+        "w": 0.169258,
+        "h": 0.18491
+      },
+      "walk_surface_bbox_px": {
+        "x": 207,
+        "y": 421,
+        "w": 281,
+        "h": 28
+      },
+      "walk_surface_bbox_norm": {
+        "x": 0.123804,
+        "y": 0.447396,
+        "w": 0.168062,
+        "h": 0.029756
+      }
+    },
+    {
+      "id": "center_back_small",
+      "bbox_px": {
+        "x": 695,
+        "y": 618,
+        "w": 119,
+        "h": 43
+      },
+      "bbox_norm": {
+        "x": 0.41567,
+        "y": 0.656748,
+        "w": 0.071172,
+        "h": 0.045696
+      },
+      "walk_surface_bbox_px": {
+        "x": 696,
+        "y": 618,
+        "w": 117,
+        "h": 16
+      },
+      "walk_surface_bbox_norm": {
+        "x": 0.416268,
+        "y": 0.656748,
+        "w": 0.069976,
+        "h": 0.017003
+      }
+    },
+    {
+      "id": "right_mid",
+      "bbox_px": {
+        "x": 1186,
+        "y": 420,
+        "w": 282,
+        "h": 175
+      },
+      "bbox_norm": {
+        "x": 0.70933,
+        "y": 0.446334,
+        "w": 0.16866,
+        "h": 0.185972
+      },
+      "walk_surface_bbox_px": {
+        "x": 1187,
+        "y": 420,
+        "w": 280,
+        "h": 28
+      },
+      "walk_surface_bbox_norm": {
+        "x": 0.709928,
+        "y": 0.446334,
+        "w": 0.167464,
+        "h": 0.029756
+      }
+    },
+    {
+      "id": "right_front_low",
+      "bbox_px": {
+        "x": 1345,
+        "y": 579,
+        "w": 327,
+        "h": 124
+      },
+      "bbox_norm": {
+        "x": 0.804426,
+        "y": 0.615303,
+        "w": 0.195574,
+        "h": 0.131775
+      },
+      "walk_surface_bbox_px": {
+        "x": 1346,
+        "y": 579,
+        "w": 326,
+        "h": 23
+      },
+      "walk_surface_bbox_norm": {
+        "x": 0.805024,
+        "y": 0.615303,
+        "w": 0.194976,
+        "h": 0.024442
+      }
+    }
+  ]
+}

@@ -22,6 +22,8 @@ AR.Game = class {
     this.level = null;
     this.enemies = [];
     this.boss = null;
+    this.arena = null;
+    this.arenaTransitionT = 0;
     this.coins = 0;
     this.mods = {};
     this.stats = { kills: 0, time: 0, coinsEarned: 0, bosses: 0 };
@@ -87,6 +89,8 @@ AR.Game = class {
     AR.Particles.clear();
     this.enemies = [];
     this.boss = null;
+    this.arena = null;
+    this.arenaTransitionT = 0;
     this.deathT = 0;
     this.veilT = 0;
     this.bossTriggered = false;
@@ -205,6 +209,7 @@ AR.Game = class {
 
   // ================================================== PAS DE SIMULATION
   step(dt) {
+    this.arenaTransitionT = Math.max(0, this.arenaTransitionT - dt);
     if (this.hitStopT > 0) { this.hitStopT -= dt; return; }
     this.stats.time += dt;
     this.veilT = Math.max(0, this.veilT - dt);
@@ -234,19 +239,7 @@ AR.Game = class {
     this.camera.follow(pl, lvl, dt);
 
     // ---- déclenchement de l'arène du boss
-    if (!this.bossTriggered && pl.x > (lvl.arenaStartTx + 3) * AR.C.TILE) {
-      this.bossTriggered = true;
-      lvl.gateClosed = true;
-      this.arena = { x0: (lvl.gateTx + 1) * AR.C.TILE, x1: (lvl.tilesW - 1) * AR.C.TILE };
-      const bossId = lvl.era.boss;
-      this.boss = new AR.Boss(bossId, lvl.bossX, lvl.arenaGy * AR.C.TILE, this);
-      this.boss.active = true;
-      this.enemies.push(this.boss);
-      AR.HUD.banner(this.boss.name, 'Le gardien de l\'ère vous attend...');
-      AR.Audio.sfx('gate');
-      AR.Audio.sfx('bossRoar');
-      this.camera.shake(6, 0.5);
-    }
+    if (!this.bossTriggered && pl.x > lvl.arenaStartTx * AR.C.TILE) this._startBossFight();
 
     // ---- interactions
     this.interactPrompt = AR.Pickups.nearestInteractive(pl);
@@ -274,6 +267,43 @@ AR.Game = class {
   }
 
   // ================================================== COMBAT
+  _startBossFight() {
+    const lvl = this.level, pl = this.player;
+    const scene = lvl.activateBossArena();
+    this.bossTriggered = true;
+    lvl.gateClosed = true;
+
+    if (scene) {
+      // Isole la scène de boss du contenu encore vivant sur la carte d'approche.
+      this.enemies.length = 0;
+      AR.Projectiles.clear();
+      AR.Particles.clear();
+      this.arena = { x0: scene.bounds.x0, x1: scene.bounds.x1 };
+      const ground = scene.ground;
+      pl.x = ground.x + ground.w * 0.22 - pl.w / 2;
+      pl.y = ground.y - pl.h - 0.01;
+      pl.vx = 0; pl.vy = 0; pl.kvx = 0;
+      pl.onGround = true; pl.dashing = false; pl.jumpsUsed = 0;
+      pl.lastSafe = { x: pl.x, y: pl.y };
+      this.camera.x = scene.x;
+      this.camera.y = scene.y;
+      this.camera.lookAhead = 0;
+      this.arenaTransitionT = 0.7;
+    } else {
+      this.arena = { x0: (lvl.gateTx + 1) * AR.C.TILE, x1: (lvl.tilesW - 1) * AR.C.TILE };
+    }
+
+    const bossId = lvl.era.boss;
+    const footY = scene ? scene.ground.y : lvl.arenaGy * AR.C.TILE;
+    this.boss = new AR.Boss(bossId, lvl.bossX, footY, this);
+    this.boss.active = true;
+    this.enemies.push(this.boss);
+    AR.HUD.banner(this.boss.name, 'Le gardien de l\'ère vous attend...');
+    AR.Audio.sfx('gate');
+    AR.Audio.sfx('bossRoar');
+    this.camera.shake(6, 0.5);
+  }
+
   meleeHit(rect, dmg, opts) {
     let hits = 0;
     for (const e of this.enemies) {
@@ -547,7 +577,9 @@ AR.Game = class {
   onBossDeath() {
     this.level.gateClosed = false;
     this.stats.bosses++;
-    AR.Pickups.spawn({ type: 'portal', x: this.level.portalX, y: this.level.arenaGy * AR.C.TILE });
+    const footY = this.level.bossArena && this.level.bossArena.active
+      ? this.level.bossArena.ground.y : this.level.arenaGy * AR.C.TILE;
+    AR.Pickups.spawn({ type: 'portal', x: this.level.portalX, y: footY });
     AR.HUD.banner('GARDIEN VAINCU', 'La faille vers l\'ère suivante s\'ouvre...');
     AR.Audio.sfx('portal');
     const rec = AR.Save.data.records;
@@ -605,9 +637,13 @@ AR.Game = class {
 
     // monde
     const cam = this.camera, lvl = this.level;
-    lvl.drawBackground(ctx, cam);
-    lvl.drawTerrain(ctx, cam);
-    lvl.drawProps(ctx, cam, this.time);
+    const inBossArena = lvl.bossArena && lvl.bossArena.active;
+    if (inBossArena) lvl.drawBossArena(ctx, cam);
+    else {
+      lvl.drawBackground(ctx, cam);
+      lvl.drawTerrain(ctx, cam);
+      lvl.drawProps(ctx, cam, this.time);
+    }
     AR.Pickups.draw(ctx, cam, this.time, lvl.era);
     for (const e of this.enemies) e.draw(ctx, cam, this.time);
     if (this.boss && this.boss.drawBeam) this.boss.drawBeam(ctx, cam);
@@ -631,6 +667,10 @@ AR.Game = class {
     // flash de dégâts au bord de l'écran
     if (this.player.flash > 0.3) {
       ctx.fillStyle = 'rgba(232,69,69,' + this.player.flash * 0.18 + ')';
+      ctx.fillRect(0, 0, AR.C.VIEW_W, AR.C.VIEW_H);
+    }
+    if (this.arenaTransitionT > 0) {
+      ctx.fillStyle = 'rgba(0,0,0,' + Math.min(1, this.arenaTransitionT / 0.45) + ')';
       ctx.fillRect(0, 0, AR.C.VIEW_W, AR.C.VIEW_H);
     }
 

@@ -86,6 +86,7 @@ AR.Level = class {
     this.arenaGy = agy;
     this.bossX = (this.arenaStartTx + arenaLen * 0.62) * T;
     this.portalX = (this.arenaStartTx + arenaLen * 0.5) * T;
+    this._buildBossArena();
 
     // ----- tours à coffres : parcours de plateformes exigeants mais réalisables
     // (enchaînements double saut / dash / frappe éclair ; le zigzag oblige souvent
@@ -174,6 +175,36 @@ AR.Level = class {
     for (let i = 0; i < 70; i++) this.ambient.push(this._newAmbient(true));
   }
 
+  _buildBossArena() {
+    const def = AR.BOSS_ARENAS[this.era.boss];
+    if (!def) { this.bossArena = null; return; }
+    const width = AR.C.VIEW_W, height = AR.C.VIEW_H;
+    const viewX = (this.arenaStartTx + 2) * AR.C.TILE;
+    const viewY = 0;
+    const platforms = def.platforms.map((p) => ({
+      id: p.id,
+      x: viewX + p.x * width,
+      y: viewY + p.y * height,
+      w: p.w * width,
+      h: Math.max(2, p.h * height),
+      ground: !!p.ground,
+    }));
+    const ground = platforms.find((p) => p.ground);
+    this.bossArena = {
+      id: def.id, image: def.image, active: false,
+      x: viewX, y: viewY, width, height, platforms, ground,
+      bounds: { x0: ground.x, x1: ground.x + ground.w },
+    };
+    this.bossX = ground.x + ground.w * 0.72;
+    this.portalX = ground.x + ground.w * 0.5;
+  }
+
+  activateBossArena() {
+    if (!this.bossArena) return null;
+    this.bossArena.active = true;
+    return this.bossArena;
+  }
+
   // ==================================================== COLLISIONS
   solidAt(tx, ty) {
     if (tx < 0 || tx >= this.tilesW) return true;
@@ -183,6 +214,8 @@ AR.Level = class {
   }
 
   groundYpx(x) {
+    const arena = this.bossArena;
+    if (arena && arena.active && x >= arena.x && x <= arena.x + arena.width) return arena.ground.y;
     const tx = Math.floor(x / AR.C.TILE);
     if (tx < 0 || tx >= this.tilesW) return AR.C.WORLD_H * AR.C.TILE;
     const h = this.heights[tx];
@@ -211,6 +244,12 @@ AR.Level = class {
         }
       }
     }
+    const arena = this.bossArena;
+    if (arena && arena.active) {
+      const minX = arena.bounds.x0, maxX = arena.bounds.x1 - e.w;
+      if (e.x < minX) { e.x = minX; res.hitWall = true; }
+      if (e.x > maxX) { e.x = maxX; res.hitWall = true; }
+    }
     // --- axe Y
     remaining = dy;
     while (Math.abs(remaining) > 0.0001) {
@@ -231,6 +270,18 @@ AR.Level = class {
             if (prevBottom <= py + 1 && bottom >= py &&
                 e.x + e.w > p.tx * T && e.x < (p.tx + p.w) * T) {
               e.y = py - e.h - 0.01; landed = true; break;
+            }
+          }
+        }
+        // Les surfaces de l'arène suivent au pixel près les métadonnées du fond.
+        // Le sol principal reste solide pendant une chute volontaire ; les autres
+        // plateformes conservent le comportement traversable du niveau.
+        if (!landed && arena && arena.active) {
+          for (const p of arena.platforms) {
+            if (ignorePlatforms && !p.ground) continue;
+            if (prevBottom <= p.y + 1 && bottom >= p.y &&
+                e.x + e.w > p.x && e.x < p.x + p.w) {
+              e.y = p.y - e.h - 0.01; landed = true; break;
             }
           }
         }
@@ -348,6 +399,21 @@ AR.Level = class {
     // brume
     ctx.fillStyle = era.fog;
     ctx.fillRect(0, C.VIEW_H * 0.45, C.VIEW_W, C.VIEW_H * 0.55);
+  }
+
+  drawBossArena(ctx, cam) {
+    const arena = this.bossArena;
+    const img = arena && AR.Assets.images[arena.image];
+    if (img && img.complete && img.naturalWidth) {
+      ctx.fillStyle = this.era.sky[0];
+      ctx.fillRect(0, 0, AR.C.VIEW_W, AR.C.VIEW_H);
+      // Le fond appartient au monde : il suit exactement le tremblement de
+      // caméra, comme les surfaces de collision et les combattants.
+      ctx.drawImage(img, arena.x - cam.cx(), arena.y - cam.cy(), arena.width, arena.height);
+      return;
+    }
+    ctx.fillStyle = this.era.sky[0];
+    ctx.fillRect(0, 0, AR.C.VIEW_W, AR.C.VIEW_H);
   }
 
   _tileLayer(ctx, layer, cam, factor, yTop) {

@@ -1,0 +1,181 @@
+{
+  "arena_id": "medieval_japan_yokai_lord",
+  "arena": "Medieval Japan / Yokai Lord",
+  "image_file": "cour_d_un_temple_japonais_lunaire.png",
+  "image_size_px": {
+    "width": 1672,
+    "height": 941
+  },
+  "coordinate_system": {
+    "origin": "top-left",
+    "normalized_range": [
+      0,
+      1
+    ],
+    "bbox_format": "x,y,w,h"
+  },
+  "platforms": [
+    {
+      "id": "ground_main",
+      "bbox_px": {
+        "x": 190,
+        "y": 661,
+        "w": 1289,
+        "h": 152
+      },
+      "bbox_norm": {
+        "x": 0.113636,
+        "y": 0.702444,
+        "w": 0.770933,
+        "h": 0.16153
+      },
+      "walk_surface_bbox_px": {
+        "x": 190,
+        "y": 661,
+        "w": 1289,
+        "h": 58
+      },
+      "walk_surface_bbox_norm": {
+        "x": 0.113636,
+        "y": 0.702444,
+        "w": 0.770933,
+        "h": 0.061637
+      }
+    },
+    {
+      "id": "left_upper",
+      "bbox_px": {
+        "x": 132,
+        "y": 392,
+        "w": 255,
+        "h": 162
+      },
+      "bbox_norm": {
+        "x": 0.078947,
+        "y": 0.416578,
+        "w": 0.152512,
+        "h": 0.172157
+      },
+      "walk_surface_bbox_px": {
+        "x": 134,
+        "y": 392,
+        "w": 252,
+        "h": 24
+      },
+      "walk_surface_bbox_norm": {
+        "x": 0.080144,
+        "y": 0.416578,
+        "w": 0.150718,
+        "h": 0.025505
+      }
+    },
+    {
+      "id": "left_lower",
+      "bbox_px": {
+        "x": 155,
+        "y": 575,
+        "w": 311,
+        "h": 118
+      },
+      "bbox_norm": {
+        "x": 0.092703,
+        "y": 0.611052,
+        "w": 0.186005,
+        "h": 0.125399
+      },
+      "walk_surface_bbox_px": {
+        "x": 157,
+        "y": 575,
+        "w": 308,
+        "h": 23
+      },
+      "walk_surface_bbox_norm": {
+        "x": 0.0939,
+        "y": 0.611052,
+        "w": 0.184211,
+        "h": 0.024442
+      }
+    },
+    {
+      "id": "center_mid",
+      "bbox_px": {
+        "x": 741,
+        "y": 487,
+        "w": 198,
+        "h": 182
+      },
+      "bbox_norm": {
+        "x": 0.443182,
+        "y": 0.517535,
+        "w": 0.118421,
+        "h": 0.193411
+      },
+      "walk_surface_bbox_px": {
+        "x": 743,
+        "y": 487,
+        "w": 194,
+        "h": 20
+      },
+      "walk_surface_bbox_norm": {
+        "x": 0.444378,
+        "y": 0.517535,
+        "w": 0.116029,
+        "h": 0.021254
+      }
+    },
+    {
+      "id": "right_lower",
+      "bbox_px": {
+        "x": 1206,
+        "y": 575,
+        "w": 311,
+        "h": 118
+      },
+      "bbox_norm": {
+        "x": 0.721292,
+        "y": 0.611052,
+        "w": 0.186005,
+        "h": 0.125399
+      },
+      "walk_surface_bbox_px": {
+        "x": 1208,
+        "y": 575,
+        "w": 308,
+        "h": 23
+      },
+      "walk_surface_bbox_norm": {
+        "x": 0.722488,
+        "y": 0.611052,
+        "w": 0.184211,
+        "h": 0.024442
+      }
+    },
+    {
+      "id": "right_upper",
+      "bbox_px": {
+        "x": 1286,
+        "y": 372,
+        "w": 254,
+        "h": 181
+      },
+      "bbox_norm": {
+        "x": 0.769139,
+        "y": 0.395324,
+        "w": 0.151914,
+        "h": 0.192349
+      },
+      "walk_surface_bbox_px": {
+        "x": 1288,
+        "y": 372,
+        "w": 250,
+        "h": 24
+      },
+      "walk_surface_bbox_norm": {
+        "x": 0.770335,
+        "y": 0.395324,
+        "w": 0.149522,
+        "h": 0.025505
+      }
+    }
+  ]
+}
