@@ -13,6 +13,8 @@ AR.DemoAI = {
   chestTotalT: 0,
   chestBestD: Infinity,
   chestRetries: new WeakMap(),
+  blockerMemory: new WeakMap(),
+  avoidedEnemies: new WeakSet(),
   buildFocus: 'balanced',
   traversal: null,
   uiT: 0,
@@ -22,6 +24,8 @@ AR.DemoAI = {
     this.jumpHoldT = 0; this.jumpReleaseT = 0; this.navStuckT = 0;
     this.chestTarget = null; this.chestAttemptT = 0; this.chestTotalT = 0; this.chestBestD = Infinity;
     this.chestRetries = new WeakMap();
+    this.blockerMemory = new WeakMap();
+    this.avoidedEnemies = new WeakSet();
     this.traversal = null;
     if (newRun || !this.buildFocus) {
       const focuses = ['melee', 'ranged', 'spirit'];
@@ -135,6 +139,61 @@ AR.DemoAI = {
       if (level.solidAt(tx, ty)) return false;
     }
     return true;
+  },
+
+  _isProjectileBlocker(enemy) {
+    return !!enemy && !enemy.isBoss && enemy.def && enemy.def.behavior === 'shield';
+  },
+
+  _guardingBlockerInLine(game, pcx, pcy, target) {
+    if (!target) return null;
+    const tx = target.centerX(), ty = target.centerY();
+    const dx = tx - pcx, dir = AR.U.sign(dx);
+    if (!dir) return null;
+    let best = null, bestAlong = Infinity;
+    for (const e of game.enemies) {
+      if (e.dead || !e.active || !this._isProjectileBlocker(e)) continue;
+      if (['attack', 'stunned', 'dash'].includes(e.state)) continue;
+      const ex = e.centerX(), along = (ex - pcx) * dir;
+      if (along < -e.w * 0.5 || along > Math.abs(dx) + e.w * 0.5) continue;
+      // Même test d'orientation que Enemy.blocksArrow : le bouclier doit faire
+      // face à la provenance du projectile.
+      if (e.facing !== -dir) continue;
+      const k = AR.U.clamp(along / Math.max(1, Math.abs(dx)), 0, 1);
+      const lineY = pcy + (ty - pcy) * k;
+      if (Math.abs(e.centerY() - lineY) > Math.max(90, e.h * 0.8)) continue;
+      if (along < bestAlong) { best = e; bestAlong = along; }
+    }
+    return best;
+  },
+
+  _canCast(pl, i, spiritReserve) {
+    if (!pl.spellUnlocked(i) || pl.spellCds[i] > 0) return false;
+    const cost = AR.SPELLS[i].cost * pl.stats.spellCostMult;
+    return pl.spirit >= cost + (spiritReserve || 0);
+  },
+
+  _shouldAvoidBlocker(enemy, pl, distance, dt) {
+    let memory = this.blockerMemory.get(enemy);
+    if (!memory) {
+      memory = { engageT: 0, noProgressT: 0, startHp: enemy.hp, lastHp: enemy.hp };
+      this.blockerMemory.set(enemy, memory);
+    }
+    if (distance > 540) return false;
+
+    memory.engageT += dt;
+    if (enemy.hp < memory.lastHp - 0.5) memory.noProgressT = 0;
+    else memory.noProgressT += dt;
+    memory.lastHp = enemy.hp;
+
+    const progress = (memory.startHp - enemy.hp) / Math.max(1, enemy.maxHp);
+    const remainingSwordHits = enemy.hp / Math.max(1, pl.stats.swordDmg);
+    const dangerous = enemy.dmg >= pl.maxHp * 0.16;
+    const losingAttrition = pl.hp < pl.maxHp * 0.48 && enemy.hp > enemy.maxHp * 0.5;
+    const overmatchedElite = enemy.elite && dangerous && remainingSwordHits > 9 &&
+      pl.hp < pl.maxHp * 0.7 && memory.engageT > 2.4;
+    const stalled = memory.engageT > 5.5 && memory.noProgressT > 2.8 && progress < 0.2;
+    return losingAttrition || overmatchedElite || stalled;
   },
 
   _currentSurfaceY(level, pl) {
@@ -299,13 +358,40 @@ AR.DemoAI = {
 
     // ---------- perception
     let target = null, td = 1e9;
+    let avoidedThreat = null, avoidedTd = 1e9;
     for (const e of game.enemies) {
       if (e.dead || !e.active) continue;
       const d = AR.U.dist(pcx, pcy, e.centerX(), e.centerY());
-      const score = d - (e.isBoss ? 250 : 0);
+      if (this.avoidedEnemies.has(e)) {
+        if (d < avoidedTd) { avoidedTd = d; avoidedThreat = e; }
+        continue;
+      }
+      // Si plusieurs adversaires sont disponibles, éliminer d'abord ceux qui
+      // ne neutralisent pas l'arme à distance.
+      const blockerPenalty = this._isProjectileBlocker(e) ? 130 : 0;
+      const behindPenalty = !e.isBoss && e.centerX() < pcx - 140 ? 260 : 0;
+      const score = d + blockerPenalty + behindPenalty - (e.isBoss ? 250 : 0);
       if (score < td && d < 720) { td = score; target = e; }
     }
-    const realTd = target ? AR.U.dist(pcx, pcy, target.centerX(), target.centerY()) : 1e9;
+    const lineBlocker = this._guardingBlockerInLine(game, pcx, pcy, target);
+    if (lineBlocker && lineBlocker !== target) {
+      if (this.avoidedEnemies.has(lineBlocker)) {
+        avoidedThreat = lineBlocker;
+        avoidedTd = AR.U.dist(pcx, pcy, lineBlocker.centerX(), lineBlocker.centerY());
+        target = null;
+      } else {
+        target = lineBlocker;
+      }
+    }
+    let realTd = target ? AR.U.dist(pcx, pcy, target.centerX(), target.centerY()) : 1e9;
+    let projectileBlocker = this._isProjectileBlocker(target);
+    if (projectileBlocker && this._shouldAvoidBlocker(target, pl, realTd, dt)) {
+      this.avoidedEnemies.add(target);
+      this.bowPlan = 0; this.swordPlan = 0;
+      AR.HUD.notify('IA : adversaire trop résistant, contournement', AR.C.COLORS.textDim);
+      avoidedThreat = target; avoidedTd = realTd;
+      target = null; realTd = 1e9; projectileBlocker = false;
+    }
     const shotClear = !target || this._hasClearShot(game.level,
       pcx, pl.y + pl.h * 0.38, target.centerX(), target.centerY());
     const blockedShot = !!target && !shotClear && realTd > 110;
@@ -328,6 +414,7 @@ AR.DemoAI = {
       (pl.hp < pl.maxHp * 0.75 || game.coins > 130);
 
     if (portal) goalX = portal.x;
+    else if (projectileBlocker) goalX = target.centerX() + AR.C.TILE * 2.2;
     else if (target && (target.isBoss || realTd < 520)) goalX = null; // on combat sur place
     else if (chest) goalX = chest.x;
     else if (wantShop) goalX = game.merchantPickup.x;
@@ -342,7 +429,9 @@ AR.DemoAI = {
     if (pl.hp < pl.maxHp * 0.35 && pl.potions > 0) a.potion = true;
 
     // esquive : menace proche ou télégraphe adverse
-    const telegraphed = target && (target.state === 'tele' || target.state === 'charge') && realTd < 230;
+    const targetTelegraph = target && ['tele', 'charge', 'attack'].includes(target.state) && realTd < 230;
+    const bypassTelegraph = avoidedThreat && ['tele', 'charge', 'attack', 'dash'].includes(avoidedThreat.state) && avoidedTd < 210;
+    const telegraphed = targetTelegraph || bypassTelegraph;
     if ((threat || telegraphed) && this.decideT <= 0) {
       if (Math.random() < 0.55) a.dash = true;
       else this._queueJump(pl.onGround ? 0.24 : 0.20);
@@ -355,12 +444,19 @@ AR.DemoAI = {
       aimX = ex + (target.vx || 0) * 0.15; aimY = ey;
       const dx = ex - pcx;
 
+      // Un bouclier change complètement le plan : aucun arc ; Vague ou Frappe
+      // éclair percent la garde, puis le sabre prend le relais dans son dos.
+      if (projectileBlocker) this.bowPlan = 0;
+
       // sorts si disponibles
       const nearCount = game.enemies.filter((e) => !e.dead && e.active &&
         AR.U.dist(pcx, pcy, e.centerX(), e.centerY()) < 210).length;
-      if (pl.spellUnlocked(0) && nearCount >= 2 && pl.spirit > 40) a.spell1 = true;
+      if (projectileBlocker && realTd > 105 && realTd < 285 && this._canCast(pl, 2, 8)) a.spell3 = true;
+      else if (projectileBlocker && realTd < 185 && this._canCast(pl, 0, 6)) a.spell1 = true;
+      else if (projectileBlocker && target.elite && realTd < 260 && this._canCast(pl, 3, 12)) a.spell4 = true;
+      else if (pl.spellUnlocked(0) && nearCount >= 2 && pl.spirit > 40) a.spell1 = true;
       else if (pl.spellUnlocked(2) && target.isBoss && pl.spirit > 70 && Math.random() < 0.02) a.spell3 = true;
-      else if (shotClear && pl.spellUnlocked(1) && realTd > 260 && realTd < 560 && pl.spirit > 60 && Math.random() < 0.03) a.spell2 = true;
+      else if (!projectileBlocker && shotClear && pl.spellUnlocked(1) && realTd > 260 && realTd < 560 && pl.spirit > 60 && Math.random() < 0.03) a.spell2 = true;
 
       if (blockedShot) {
         // Ne plus gaspiller de flèches contre une paroi. Viser au-delà de la
@@ -369,7 +465,7 @@ AR.DemoAI = {
         this.swordPlan = 0;
         const approachDir = AR.U.sign(dx) || pl.facing || 1;
         goalX = ex + approachDir * AR.C.TILE * 1.5;
-      } else if (realTd < 135) {
+      } else if (realTd < (projectileBlocker ? 175 : 135)) {
         // corps à corps : enchaîner les coups, parfois une chargée
         if (this.swordPlan > 0) {
           this.swordPlan -= dt;
@@ -380,6 +476,15 @@ AR.DemoAI = {
         }
         // s'écarter des gros bras pendant leur attaque
         if (target.state === 'attack' && Math.random() < 0.3) a.dash = true;
+      } else if (projectileBlocker) {
+        this.bowPlan = 0;
+        this.swordPlan = 0;
+        // Dépasser le porteur de bouclier le force à se retourner et ouvre son dos.
+        goalX = ex + AR.C.TILE * 2.2;
+        if (pl.onGround && realTd < 260 && this.decideT <= 0) {
+          a.dash = true;
+          this.decideT = 0.35;
+        }
       } else if (realTd < 700) {
         // à distance : arc, chargé si on a le temps
         if (this.bowPlan > 0) {
@@ -472,7 +577,7 @@ AR.DemoAI = {
       // portions de sol lisibles et on le relâche assez tôt avant un obstacle.
       if (pl.onGround && Math.abs(goalX - pcx) > 300 && !target && !obstacleInDashRange) {
         a.dash = true;
-      } else if (blockedShot && pl.onGround && Math.abs(goalDx) > 160 && !obstacleInDashRange) {
+      } else if ((blockedShot || projectileBlocker) && pl.onGround && Math.abs(goalDx) > 160 && !obstacleInDashRange) {
         a.dash = true;
       }
 

@@ -49,7 +49,8 @@ AR.Level = class {
         for (let i = 0; i < gap && tx < len; i++, tx++) this.heights[tx] = this.PIT;
         lastGapEnd = tx;
         if (gap >= 3 || rng() < 0.5) {
-          this.platforms.push({ tx: tx - gap, ty: gy - 1 - Math.floor(rng() * 2), w: gap });
+          const platform = this._fitPlatform({ tx: tx - gap, ty: gy - 1 - Math.floor(rng() * 2), w: gap, kind: 'bridge' });
+          if (platform) this.platforms.push(platform);
         }
       } else if (roll < 0.34) {
         // plateau surélevé avec marches
@@ -75,8 +76,11 @@ AR.Level = class {
         const pw = 3 + Math.floor(rng() * 3);
         const py = this.heights[Math.min(tx, len - 1)] - 3 - Math.floor(rng() * 3);
         if (py > 8) {
-          this.platforms.push({ tx: tx - pw - 1, ty: py, w: pw });
-          if (rng() < 0.35) this.chestSpots.push({ x: (tx - pw - 1 + pw / 2) * T, y: py * T });
+          const platform = this._fitPlatform({ tx: tx - pw - 1, ty: py, w: pw, kind: 'floating' }, 3);
+          if (platform) {
+            this.platforms.push(platform);
+            if (rng() < 0.35) this.chestSpots.push({ x: (platform.tx + pw / 2) * T, y: platform.ty * T });
+          }
         }
       }
     }
@@ -100,13 +104,22 @@ AR.Level = class {
       const floors = 2 + Math.floor(rng() * 2);   // 2-3 relais avant le sommet
       let dir = rng() < 0.5 ? -1 : 1;             // -1 : la grimpe se fait de droite à gauche
       let px = base, py = this.heights[base] - 3;
+      let previousSupportTy = this.heights[base];
       for (let f = 0; f <= floors; f++) {
         if (py < 6) break;
         const pw = 2 + Math.floor(rng() * 2);
         const ptx = AR.U.clamp(px - Math.floor(pw / 2), 3, len - 4);
-        this.platforms.push({ tx: ptx, ty: py, w: pw });
+        const platform = this._fitPlatform({ tx: ptx, ty: py, w: pw, kind: 'tower', tower: ti, floor: f });
+        if (!platform) break;
+        // Si le terrain local oblige à remonter ce relais de plus de trois
+        // tuiles, la chaîne n'est plus atteignable : arrêter la tour ici.
+        if (platform.ty < previousSupportTy - 3) break;
+        platform.supportTy = previousSupportTy;
+        py = platform.ty;
+        previousSupportTy = platform.ty;
+        this.platforms.push(platform);
         if (f === floors) {
-          this.chestSpots.push({ x: (ptx + pw / 2) * T, y: py * T, high: true });
+          this.chestSpots.push({ x: (ptx + pw / 2) * T, y: platform.ty * T, high: true });
         } else {
           // bond suivant : 3-5 tuiles de côté, 2-3 tuiles de montée
           px += dir * (3 + Math.floor(rng() * 3));
@@ -139,6 +152,7 @@ AR.Level = class {
     }
     // archers embusqués sur certaines plateformes
     for (const p of this.platforms) {
+      if (!this._platformIsExposed(p)) continue;
       if (rng() < 0.22 && p.tx > 18 && p.tx < len - 12) {
         const ranged = pool.filter((id) => ['ranged', 'caster', 'artillery'].includes(AR.ENEMIES[id].behavior));
         if (ranged.length) {
@@ -173,6 +187,34 @@ AR.Level = class {
     // ----- météo ambiante
     this.ambient = [];
     for (let i = 0; i < 70; i++) this.ambient.push(this._newAmbient(true));
+  }
+
+  // Remonte une plateforme au-dessus du terrain le plus haut qu'elle recouvre.
+  // Les colonnes sont générées progressivement : sans cette normalisation, une
+  // hauteur encore vierge peut placer la plateforme à l'intérieur du sol voisin.
+  _fitPlatform(platform, maxRiseFromGround) {
+    const tx0 = Math.max(0, Math.floor(platform.tx));
+    const tx1 = Math.min(this.tilesW - 1, Math.ceil(platform.tx + platform.w) - 1);
+    let highestGround = Infinity;
+    for (let tx = tx0; tx <= tx1; tx++) {
+      const h = this.heights[tx];
+      if (h !== this.PIT) highestGround = Math.min(highestGround, h);
+    }
+    if (highestGround !== Infinity) {
+      platform.ty = Math.min(platform.ty, highestGround - 1);
+      if (maxRiseFromGround) platform.ty = Math.max(platform.ty, highestGround - maxRiseFromGround);
+    }
+    return platform.ty >= 4 ? platform : null;
+  }
+
+  _platformIsExposed(platform) {
+    const tx0 = Math.max(0, Math.floor(platform.tx));
+    const tx1 = Math.min(this.tilesW - 1, Math.ceil(platform.tx + platform.w) - 1);
+    for (let tx = tx0; tx <= tx1; tx++) {
+      const h = this.heights[tx];
+      if (h !== this.PIT && platform.ty >= h) return false;
+    }
+    return true;
   }
 
   _buildBossArena() {

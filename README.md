@@ -51,7 +51,7 @@ La jauge au-dessus du héros montre la **charge** de l'arme ; à pleine charge, 
 - **3 difficultés** : Normal, Difficile (esquives, dashs, parades fréquentes, or/XP -20%), Cauchemar (téléportation télégraphiée, double saut, or/XP -35%).
 - **Progression** : XP, arbre de 16 compétences en 4 voies, 4 sorts illustrés, 6 crans d'armes, reliques, potions.
 - **Tours à coffres** : plateformes exigeantes (double saut, dash, Frappe éclair), souvent à grimper de droite à gauche — butin garanti au sommet.
-- **Mode démo** : l'IA joue seule (déplacements, combats, achats, choix de faille), accélérable ×2/×4/×8 — idéal pour tester l'équilibrage.
+- **Mode démo** : l'IA joue seule (déplacements, combats, achats, choix de faille), adapte son arsenal aux boucliers et contourne les combats trop coûteux ; accélérable ×2/×4/×8 — idéal pour tester l'équilibrage.
 - **Capture** : enregistrement WebM du canvas et captures PNG intégrés.
 
 ## Structure
