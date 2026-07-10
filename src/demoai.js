@@ -142,6 +142,22 @@ AR.DemoAI = {
     return this._supportYAt(level, pl.x + pl.w / 2);
   },
 
+  _abandonChestCluster(game, pl, chest) {
+    const T = AR.C.TILE;
+    const surfaceY = this._currentSurfaceY(game.level, pl);
+    for (const p of AR.Pickups.list) {
+      if (p.type !== 'chest' || p.opened || Math.abs(p.x - chest.x) > T * 10) continue;
+      // Ne pas sacrifier les coffres au sol à cause d'un groupe de plateformes.
+      if (surfaceY - p.y <= T * 1.25) continue;
+      const memory = this.chestRetries.get(p) || { attempts: 0 };
+      memory.x = p.x;
+      memory.y = p.y;
+      memory.surfaceY = surfaceY;
+      memory.abandoned = true;
+      this.chestRetries.set(p, memory);
+    }
+  },
+
   _pickReachableChest(game, pl, pcx) {
     const T = AR.C.TILE;
     const surfaceY = this._currentSurfaceY(game.level, pl);
@@ -156,22 +172,17 @@ AR.DemoAI = {
       const rise = surfaceY - p.y;
       let memory = this.chestRetries.get(p);
       if (rise > T * 4.15) {
-        // Mémoriser également les coffres repérés mais inaccessibles depuis ici.
+        // Les coffres sont optionnels : s'il n'est pas atteignable maintenant,
+        // ne jamais interrompre à nouveau la progression pour celui-ci.
         if (!memory) {
           memory = { x: p.x, y: p.y, surfaceY, attempts: 0, abandoned: true };
           this.chestRetries.set(p, memory);
         }
+        this._abandonChestCluster(game, pl, p);
         continue;
       }
 
-      if (memory && memory.abandoned) {
-        const foundHigherAccess = surfaceY < memory.surfaceY - T * 0.75;
-        const looksConnected = Math.abs(dx) < T * 9;
-        if (!foundHigherAccess || !looksConnected) continue;
-        memory.surfaceY = surfaceY;
-        memory.attempts = 0;
-        memory.abandoned = false;
-      }
+      if (memory && memory.abandoned) continue;
 
       const score = Math.abs(dx) + Math.max(0, rise) * 0.35;
       if (score < bestScore) { best = p; bestScore = score; }
@@ -196,14 +207,14 @@ AR.DemoAI = {
     }
     if (this.chestAttemptT < 2.2 && this.chestTotalT < 5) return false;
 
-    // Après plusieurs sauts sans progrès, continuer le niveau. Le coffre pourra
-    // être retenté plus loin ou dès qu'une surface sensiblement plus haute est atteinte.
+    // Après plusieurs sauts sans progrès, continuer le niveau définitivement.
     const memory = this.chestRetries.get(chest) || { attempts: 0 };
     memory.x = chest.x;
     memory.y = chest.y;
     memory.surfaceY = this._currentSurfaceY(game.level, pl);
     memory.abandoned = true;
     this.chestRetries.set(chest, memory);
+    this._abandonChestCluster(game, pl, chest);
     this.chestTarget = null;
     this.chestAttemptT = 0;
     this.chestTotalT = 0;
@@ -212,18 +223,15 @@ AR.DemoAI = {
   },
 
   _recordChestJump(game, pl, chest) {
-    const T = AR.C.TILE;
     const surfaceY = this._currentSurfaceY(game.level, pl);
     const memory = this.chestRetries.get(chest) || {
       x: chest.x, y: chest.y, surfaceY, attempts: 0, abandoned: false,
     };
-    if (surfaceY < memory.surfaceY - T * 0.75) {
-      memory.surfaceY = surfaceY;
-      memory.attempts = 0;
-      memory.abandoned = false;
-    }
     memory.attempts++;
-    if (memory.attempts >= 3) memory.abandoned = true;
+    if (memory.attempts >= 2) {
+      memory.abandoned = true;
+      this._abandonChestCluster(game, pl, chest);
+    }
     this.chestRetries.set(chest, memory);
   },
 
