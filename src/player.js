@@ -378,6 +378,9 @@ AR.Player = class {
     if (this.spirit < cost) { AR.Audio.sfx('error'); return; }
     this.spirit -= cost;
     this.spellCds[i] = 1.2;
+    // pose d'incantation dédiée (assets/hero/spells)
+    this.attackAnim = spell.cast;
+    this.attackAnimT = spell.id === 'veil' ? 0.5 : 0.35;
     const dmg = spell.dmg * this.stats.spellDmgMult;
     const cx = this.x + this.w / 2, cy = this.y + this.h / 2;
     AR.Audio.sfx(spell.id === 'veil' ? 'spellVeil' : 'spell');

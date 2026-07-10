@@ -95,6 +95,40 @@ AR.UI = {
     if (this.button(ctx, bx, 390, bw, 46, '❓  AIDE & CONTRÔLES  [H]') || AR.Input.keys['KeyH']) {
       game.state = 'help';
     }
+
+    // ---- sélecteur de difficulté
+    ctx.save();
+    ctx.textAlign = 'center';
+    ctx.fillStyle = AR.C.COLORS.textDim;
+    ctx.font = 'bold 14px "Segoe UI", sans-serif';
+    ctx.fillText('— DIFFICULTÉ —', W / 2, 466);
+    ctx.restore();
+    const dbw = 150, dgap = 14;
+    const dtotal = AR.DIFFICULTIES.length * dbw + (AR.DIFFICULTIES.length - 1) * dgap;
+    AR.DIFFICULTIES.forEach((d, i) => {
+      const dx = W / 2 - dtotal / 2 + i * (dbw + dgap);
+      const selected = game.diffIdx === i;
+      const r = { x: dx, y: 478, w: dbw, h: 38 };
+      ctx.save();
+      ctx.fillStyle = selected ? 'rgba(53,224,192,0.14)' : 'rgba(10,14,18,0.85)';
+      ctx.fillRect(r.x, r.y, r.w, r.h);
+      ctx.strokeStyle = selected ? d.color : (this._hover(r) ? '#fff' : AR.C.COLORS.uiEdge);
+      ctx.lineWidth = selected ? 2.5 : 1;
+      ctx.strokeRect(r.x, r.y, r.w, r.h);
+      ctx.fillStyle = selected ? d.color : AR.C.COLORS.textDim;
+      ctx.font = 'bold 15px "Segoe UI", sans-serif';
+      ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+      ctx.fillText((selected ? '● ' : '') + d.name, r.x + r.w / 2, r.y + r.h / 2 + 1);
+      ctx.restore();
+      if (this._click(r)) { game.setDifficulty(i); AR.Audio.sfx('ui'); }
+    });
+    ctx.save();
+    ctx.textAlign = 'center';
+    ctx.fillStyle = AR.DIFFICULTIES[game.diffIdx].color;
+    ctx.font = 'italic 13px "Segoe UI", sans-serif';
+    ctx.fillText(AR.DIFFICULTIES[game.diffIdx].desc, W / 2, 536);
+    ctx.restore();
+
     // records
     const rec = AR.Save.data.records;
     ctx.save();
@@ -104,7 +138,7 @@ AR.UI = {
     if (rec.runs > 0) {
       ctx.fillText('Meilleure ère : ' + (rec.bestEra + 1) + '/6' +
         (rec.wins > 0 ? '  •  Victoires : ' + rec.wins : '') +
-        '  •  Ennemis vaincus : ' + rec.totalKills + '  •  Runs : ' + rec.runs, W / 2, 470);
+        '  •  Ennemis vaincus : ' + rec.totalKills + '  •  Runs : ' + rec.runs, W / 2, 566);
     }
     ctx.fillText('Sabre : clic gauche (maintenir = frappe traversante) • Arc : clic droit (maintenir = tir perçant)', W / 2, H - 46);
     ctx.fillText('ZQSD/WASD + Espace • Maj : dash / sprint • v' + AR.VERSION, W / 2, H - 26);
@@ -343,7 +377,7 @@ AR.UI = {
     ctx.font = '17px "Segoe UI", sans-serif';
     const lines = [
       'Ère atteinte : ' + (game.eraIdx + 1) + '/6 — ' + game.level.era.name + (game.ngPlus > 0 ? '  (NG+' + game.ngPlus + ')' : ''),
-      'Temps : ' + AR.U.fmtTime(s.time) + '    Ennemis vaincus : ' + s.kills + '    Boss : ' + s.bosses,
+      'Difficulté : ' + game.diff.name + '    Temps : ' + AR.U.fmtTime(s.time) + '    Ennemis vaincus : ' + s.kills + '    Boss : ' + s.bosses,
       'Niveau ' + game.player.level + '    Or amassé : ' + s.coinsEarned,
     ];
     lines.forEach((l, i) => ctx.fillText(l, W / 2, 268 + i * 32));

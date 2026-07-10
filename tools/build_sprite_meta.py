@@ -8,7 +8,57 @@ import json, os, sys
 from PIL import Image
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-GROUPS = {"hero": "assets/hero", "enemies": "assets/enemies"}
+GROUPS = {"hero": "assets/hero", "enemies": "assets/enemies", "spells": "assets/spells"}
+
+# Downscale caps (max dimension in px) by path fragment: keeps the repo light,
+# the game never draws these bigger anyway.
+MAX_DIM = {"spells/icons": 128, "hero/spells": 380}
+
+# Certaines générations laissent un cadre résiduel sur les bords : on l'efface
+# pour que la boîte de découpe colle au personnage.
+BORDER_CLEAR = {"hero/spells": 6}
+
+
+def clear_border(img, margin):
+    w, h = img.size
+    p = img.load()
+    n = 0
+    for y in range(h):
+        for x in range(w):
+            if x < margin or y < margin or x >= w - margin or y >= h - margin:
+                r, g, b, a = p[x, y]
+                if a:
+                    p[x, y] = (r, g, b, 0)
+                    n += 1
+    return n
+
+
+def is_green(px):
+    r, g, b, a = px
+    return a > 200 and g > 100 and g > r * 1.35 and g > b * 1.35
+
+
+def chroma_key(img):
+    """Remove an opaque green-screen background (detected via corner pixels)."""
+    w, h = img.size
+    p = img.load()
+    corners = [p[0, 0], p[w - 1, 0], p[0, h - 1], p[w - 1, h - 1]]
+    if sum(1 for c in corners if is_green(c)) < 3:
+        return 0
+    n = 0
+    for y in range(h):
+        for x in range(w):
+            r, g, b, a = p[x, y]
+            if a == 0:
+                continue
+            if g > 100 and g > r * 1.35 and g > b * 1.35:
+                p[x, y] = (r, g, b, 0)
+                n += 1
+            elif g > max(r, b) * 1.15:
+                # despill : ramener le vert au niveau des autres canaux
+                p[x, y] = (r, int(max(r, b) * 1.1), b, a)
+                n += 1
+    return n
 
 def despill(img):
     """Remove residual green-screen spill: greenish semi-transparent fringes."""
@@ -47,10 +97,26 @@ for group, rel in GROUPS.items():
     for path in sorted(paths):
         fn = os.path.basename(path)
         img = Image.open(path).convert("RGBA")
-        n = despill(img)
+        dirty = False
+        n = chroma_key(img)
+        n += despill(img)
         if n > 0:
-            img.save(path)
+            dirty = True
             total_spill += n
+        # redimensionnement éventuel
+        rel = os.path.relpath(path, ROOT).replace(os.sep, "/")
+        for frag, cap in MAX_DIM.items():
+            if frag in rel and max(img.size) > cap:
+                ratio = cap / max(img.size)
+                img = img.resize((max(1, round(img.size[0] * ratio)),
+                                  max(1, round(img.size[1] * ratio))), Image.LANCZOS)
+                dirty = True
+        for frag, margin in BORDER_CLEAR.items():
+            if frag in rel:
+                if clear_border(img, margin) > 0:
+                    dirty = True
+        if dirty:
+            img.save(path)
         x0, y0, x1, y1 = trim_box(img)
         sprite_name = os.path.relpath(path, folder).replace(os.sep, "/")[:-4]
         key = f"{group}/{sprite_name}"

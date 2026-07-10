@@ -6,13 +6,37 @@ AR.Projectiles = {
   clear() { this.list.length = 0; },
 
   spawn(o) {
-    // o: {x,y,vx,vy,g,dmg,friendly,pierce,kind,life,r,explodeR,homing,knock,slow}
+    // o: {x,y,vx,vy,g,dmg,friendly,pierce,kind,life,r,explodeR,homing,knock,slow,owner}
     o.t = 0;
     o.life = o.life || 3;
     o.r = o.r || 6;
     o.hitSet = o.pierce ? new Set() : null;
     this.list.push(o);
     return o;
+  },
+
+  // Destruction d'un projectile par une lame ou un bouclier (parade / blocage)
+  destroy(p, style) {
+    const i = this.list.indexOf(p);
+    if (i < 0) return false;
+    this.list.splice(i, 1);
+    AR.Particles.burst(p.x, p.y, 8, {
+      color: ['#fff', '#ffe9a3'], speed: 210, size: 2.5, life: 0.3, type: 'spark',
+    });
+    AR.Particles.text(p.x, p.y - 10, style === 'block' ? 'BLOQUÉ' : 'PARÉ !', AR.C.COLORS.impact);
+    AR.Audio.sfx(style === 'block' ? 'block' : 'parry');
+    return true;
+  },
+
+  // Les boucliers ne cassent que les projectiles "physiques" du joueur,
+  // pas l'onde de la frappe chargée (qui traverse les lignes).
+  _blockable(p) {
+    return p.friendly && p.kind !== 'wave';
+  },
+
+  // Projectiles ennemis qu'un bouclier allié peut aussi intercepter (tir ami)
+  _blockableAlly(p) {
+    return !p.friendly && ['earrow', 'arrow', 'bullet', 'rock', 'javelin', 'plasma'].includes(p.kind);
   },
 
   update(dt, game) {
@@ -63,9 +87,28 @@ AR.Projectiles = {
       // cibles
       let dead = false;
       if (p.friendly) {
+        // l'onde de la frappe chargée fauche les projectiles ennemis
+        if (p.kind === 'wave') {
+          for (const q of this.list.slice()) {
+            if (!q.friendly && AR.U.dist(p.x, p.y, q.x, q.y) < p.r + q.r + 6) this.destroy(q, 'parry');
+          }
+        }
         for (const e of game.enemies) {
-          if (e.dead || (p.hitSet && p.hitSet.has(e))) continue;
+          if (e.dead || !e.active || (p.hitSet && p.hitSet.has(e))) continue;
           if (this._hits(p, e)) {
+            // blocage au bouclier : la flèche est cassée et n'atteint pas les alliés derrière
+            if (this._blockable(p) && e.blocksArrow && e.blocksArrow(p)) {
+              const idx = this.list.indexOf(p);
+              if (idx >= 0) this.list.splice(idx, 1);
+              AR.Particles.burst(p.x, p.y, 8, {
+                color: ['#fff', '#ffe9a3'], speed: 210, size: 2.5, life: 0.3, type: 'spark',
+              });
+              AR.Particles.text(e.centerX(), e.y - 14, 'BLOQUÉ', AR.C.COLORS.impact);
+              AR.Audio.sfx('block');
+              e.onBlockArrow && e.onBlockArrow(game);
+              dead = false; // déjà retiré de la liste
+              break;
+            }
             game.hitEnemy(e, p.dmg, { knockX: AR.U.sign(p.vx) * (p.knock || 160), proj: p });
             if (p.explodeR) { this._explode(p, game); dead = true; break; }
             if (p.hitSet) p.hitSet.add(e);
@@ -79,9 +122,31 @@ AR.Projectiles = {
           game.hitPlayer(p.dmg, p.x);
           if (p.explodeR) this._explode(p, game);
           dead = true;
+        } else if (p.t > 0.08) {
+          // tir ami : les projectiles ennemis blessent aussi les autres monstres
+          for (const e of game.enemies) {
+            if (e.dead || !e.active || e === p.owner) continue;
+            if (this._hits(p, e)) {
+              if (this._blockableAlly(p) && e.blocksArrow && e.blocksArrow(p, true)) {
+                AR.Particles.text(e.centerX(), e.y - 14, 'BLOQUÉ', AR.C.COLORS.impact);
+                AR.Audio.sfx('block');
+              } else {
+                const dealt = e.takeDamage(Math.max(1, Math.round(p.dmg * 0.8)),
+                  { fromX: p.x - AR.U.sign(p.vx || 1) * 20 }, game);
+                if (dealt > 0) {
+                  AR.Particles.text(e.centerX(), e.y - 6, String(dealt), '#ffb35c');
+                  AR.Audio.sfx('hit');
+                }
+              }
+              if (p.explodeR) this._explode(p, game);
+              dead = true;
+              break;
+            }
+          }
         }
       }
       if (dead) { this.list.splice(i, 1); continue; }
+      if (this.list[i] !== p) continue; // retiré pendant un blocage
     }
   },
 
@@ -114,6 +179,15 @@ AR.Projectiles = {
       const pl = game.player;
       const d = AR.U.dist(p.x, p.y, pl.x + pl.w / 2, pl.y + pl.h / 2);
       if (!pl.dead && d < r + 30) game.hitPlayer(p.dmg * 0.8, p.x);
+      // les explosions ennemies n'épargnent pas leurs alliés
+      for (const e of game.enemies) {
+        if (e.dead || !e.active || e === p.owner) continue;
+        const ed = AR.U.dist(p.x, p.y, e.centerX(), e.centerY());
+        if (ed < r + Math.max(e.w, e.h) / 2) {
+          const dealt = e.takeDamage(Math.max(1, Math.round(p.dmg * 0.6)), { fromX: p.x }, game);
+          if (dealt > 0) AR.Particles.text(e.centerX(), e.y - 6, String(dealt), '#ffb35c');
+        }
+      }
     }
   },
 

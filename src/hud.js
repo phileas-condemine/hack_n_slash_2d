@@ -71,25 +71,59 @@ AR.HUD = {
       ctx.globalAlpha = 1;
     }
 
-    // ---------------- sorts (si débloqués)
+    // ---------------- sorts : 4 emplacements illustrés (verrouillés ou prêts)
     let sx = bx;
+    const slot = 48, sy = AR.C.VIEW_H - 66;
     for (let i = 0; i < 4; i++) {
-      if (!pl.spellUnlocked(i)) continue;
       const sp = AR.SPELLS[i];
+      const unlocked = pl.spellUnlocked(i);
       const cost = sp.cost * pl.stats.spellCostMult;
-      const ok = pl.spirit >= cost;
-      ctx.fillStyle = 'rgba(10,14,18,0.7)';
-      ctx.fillRect(sx, AR.C.VIEW_H - 58, 40, 40);
-      ctx.strokeStyle = ok ? C.magic : '#333';
-      ctx.lineWidth = 2; ctx.strokeRect(sx, AR.C.VIEW_H - 58, 40, 40);
-      ctx.fillStyle = ok ? C.text : C.textDim;
-      ctx.font = 'bold 16px "Segoe UI", sans-serif'; ctx.textAlign = 'center';
-      ctx.fillText(sp.key, sx + 20, AR.C.VIEW_H - 32);
-      ctx.font = '9px "Segoe UI", sans-serif';
-      ctx.fillText(Math.round(cost), sx + 20, AR.C.VIEW_H - 22);
-      sx += 48;
+      const ready = unlocked && pl.spirit >= cost && pl.spellCds[i] <= 0;
+      // fond + icône
+      ctx.fillStyle = 'rgba(10,14,18,0.78)';
+      ctx.fillRect(sx, sy, slot, slot);
+      AR.Assets.drawIcon(ctx, sp.icon, sx + 3, sy + 3, slot - 6, unlocked ? (ready ? 1 : 0.45) : 0.18);
+      // liseré
+      ctx.strokeStyle = ready ? C.magic : unlocked ? '#4a3a5e' : '#2a2f33';
+      ctx.lineWidth = ready ? 2 : 1.5;
+      ctx.strokeRect(sx, sy, slot, slot);
+      // halo quand le sort est prêt
+      if (ready) {
+        ctx.save();
+        ctx.globalAlpha = 0.35 + Math.sin(game.time * 4 + i) * 0.15;
+        ctx.shadowColor = C.magic; ctx.shadowBlur = 10;
+        ctx.strokeStyle = C.magic; ctx.lineWidth = 1;
+        ctx.strokeRect(sx - 1.5, sy - 1.5, slot + 3, slot + 3);
+        ctx.restore();
+      }
+      // touche (coin haut-gauche)
+      ctx.fillStyle = 'rgba(0,0,0,0.75)';
+      ctx.fillRect(sx, sy, 15, 15);
+      ctx.fillStyle = unlocked ? C.text : C.textDim;
+      ctx.font = 'bold 11px "Segoe UI", sans-serif'; ctx.textAlign = 'center';
+      ctx.fillText(sp.key, sx + 7.5, sy + 11.5);
+      if (unlocked) {
+        // coût en esprit (coin bas-droit)
+        ctx.fillStyle = 'rgba(0,0,0,0.75)';
+        ctx.fillRect(sx + slot - 19, sy + slot - 14, 19, 14);
+        ctx.fillStyle = pl.spirit >= cost ? C.spirit : C.danger;
+        ctx.font = 'bold 10px "Segoe UI", sans-serif';
+        ctx.fillText(Math.round(cost), sx + slot - 9.5, sy + slot - 3.5);
+      } else {
+        // cadenas
+        ctx.fillStyle = 'rgba(0,0,0,0.45)';
+        ctx.fillRect(sx, sy, slot, slot);
+        ctx.font = '17px "Segoe UI", sans-serif';
+        ctx.fillStyle = '#8a8f94';
+        ctx.fillText('🔒', sx + slot / 2, sy + slot / 2 + 6);
+      }
+      sx += slot + 8;
       ctx.textAlign = 'left';
     }
+    // nom du sort survolé... au cast : petit rappel sous les slots
+    ctx.fillStyle = C.textDim;
+    ctx.font = '10px "Segoe UI", sans-serif';
+    ctx.fillText(pl.spellUnlocked(0) || pl.spellUnlocked(2) ? 'Sorts [1-4]' : 'Sorts : arbre [T], voie de l\'Esprit', bx, AR.C.VIEW_H - 8);
 
     // ---------------- infos de droite : ère, temps, kills
     ctx.textAlign = 'right';
@@ -97,24 +131,26 @@ AR.HUD = {
     ctx.fillText((game.eraIdx + 1) + '/6 — ' + game.level.era.name + (game.ngPlus > 0 ? '  (NG+' + game.ngPlus + ')' : ''), AR.C.VIEW_W - 22, 34);
     ctx.fillStyle = C.textDim; ctx.font = '13px "Segoe UI", sans-serif';
     ctx.fillText(AR.U.fmtTime(game.stats.time) + '   ⚔ ' + game.stats.kills, AR.C.VIEW_W - 22, 54);
+    ctx.fillStyle = game.diff.color; ctx.font = 'bold 12px "Segoe UI", sans-serif';
+    ctx.fillText(game.diff.name.toUpperCase(), AR.C.VIEW_W - 22, 72);
 
     // mode démo
     if (game.demo) {
       ctx.fillStyle = C.spirit; ctx.font = 'bold 14px "Segoe UI", sans-serif';
-      ctx.fillText('● MODE DÉMO (IA)  ×' + game.speed + '   [G] quitter  [+/-] vitesse', AR.C.VIEW_W - 22, 78);
+      ctx.fillText('● MODE DÉMO (IA)  ×' + game.speed + '   [G] quitter  [+/-] vitesse', AR.C.VIEW_W - 22, 92);
     }
     // enregistrement
     if (AR.Recorder.recording) {
       ctx.fillStyle = C.danger;
       ctx.globalAlpha = 0.6 + Math.sin(game.time * 6) * 0.4;
-      ctx.beginPath(); ctx.arc(AR.C.VIEW_W - 150, 96, 6, 0, Math.PI * 2); ctx.fill();
+      ctx.beginPath(); ctx.arc(AR.C.VIEW_W - 150, 110, 6, 0, Math.PI * 2); ctx.fill();
       ctx.globalAlpha = 1;
       ctx.font = 'bold 13px "Segoe UI", sans-serif';
-      ctx.fillText('REC ' + AR.U.fmtTime(AR.Recorder.elapsed()), AR.C.VIEW_W - 22, 100);
+      ctx.fillText('REC ' + AR.U.fmtTime(AR.Recorder.elapsed()), AR.C.VIEW_W - 22, 114);
     }
     if (AR.Recorder.error) {
       ctx.fillStyle = C.danger; ctx.font = '12px "Segoe UI", sans-serif';
-      ctx.fillText(AR.Recorder.error, AR.C.VIEW_W - 22, 118);
+      ctx.fillText(AR.Recorder.error, AR.C.VIEW_W - 22, 132);
     }
     ctx.textAlign = 'left';
 

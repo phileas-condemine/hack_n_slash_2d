@@ -50,4 +50,18 @@ AR.Assets = {
     if (!meta) return targetH;
     return meta.t[2] * (targetH / meta.t[3]);
   },
+
+  // Icône carrée ajustée dans une boîte (HUD : sorts, boutique...)
+  drawIcon(ctx, key, x, y, size, alpha) {
+    const img = this.images[key];
+    const meta = AR.SPRITE_META[key];
+    if (!img || !img.complete || !meta) return;
+    const [tx, ty, tw, th] = meta.t;
+    const scale = size / Math.max(tw, th);
+    const dw = tw * scale, dh = th * scale;
+    ctx.save();
+    if (alpha !== undefined) ctx.globalAlpha = alpha;
+    ctx.drawImage(img, tx, ty, tw, th, x + (size - dw) / 2, y + (size - dh) / 2, dw, dh);
+    ctx.restore();
+  },
 };

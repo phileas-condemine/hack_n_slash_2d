@@ -36,6 +36,14 @@ AR.Enemy = class {
     this.patrolDir = Math.random() < 0.5 ? -1 : 1;
     this.isBoss = false;
     this.onPlatform = false;
+    // réactivité (rage, parade, esquive, mobilité avancée selon la difficulté)
+    this.rageT = 0;
+    this.parryCd = 0;
+    this.dodgeCd = 0;
+    this.dashCd = 1.5 + Math.random() * 2;
+    this.tpCd = 5 + Math.random() * 4;
+    this.tpTarget = null;
+    this.airJumped = false;
   }
 
   centerX() { return this.x + this.w / 2; }
@@ -51,11 +59,21 @@ AR.Enemy = class {
     this.atkTimer -= dt;
     this.blinkTimer -= dt;
     this.kvx *= Math.pow(0.02, dt);
+    this.rageT = Math.max(0, this.rageT - dt);
+    this.parryCd -= dt;
+    this.dodgeCd -= dt;
+    this.dashCd -= dt;
+    this.tpCd -= dt;
 
     const pl = game.player;
     const d = AR.U.dist(this.centerX(), this.centerY(), pl.x + pl.w / 2, pl.y + pl.h / 2);
     const def = this.def;
     const flying = def.behavior === 'flyer' || def.float;
+    // profil de difficulté : vitesse, agressivité, cadence
+    const diff = game.diff || AR.DIFFICULTIES[0];
+    const spd = def.speed * diff.speedMult * (this.rageT > 0 ? 1.45 : 1);
+    const aggroR = def.aggro * diff.aggroMult;
+    const isShooter = ['ranged', 'caster', 'artillery'].includes(def.behavior);
 
     // rafales en cours (tireurs à burst)
     if (this.burstN > 0) {
@@ -63,9 +81,31 @@ AR.Enemy = class {
       if (this.burstT <= 0) { this._fire(game); this.burstN--; this.burstT = 0.13; }
     }
 
+    // ---- réaction aux projectiles du joueur : parade (mêlée rapide) ou esquive (tireurs)
+    if (!pl.dead && !['charge', 'dive', 'stunned', 'tpWindup', 'dash'].includes(this.state)) {
+      const threat = this._incomingProjectile();
+      if (threat) {
+        if (def.parry && this.parryCd <= 0) {
+          if (Math.random() < diff.parryChance + (this.elite ? 0.15 : 0)) {
+            // coup sec parfaitement synchronisé : le projectile est détruit
+            this.parryCd = 1.0;
+            this.facing = -AR.U.sign(threat.vx || 1) || this.facing;
+            this.attackPoseT = 0.24;
+            AR.Particles.slashArc(this.centerX() + this.facing * 30, this.centerY(), this.facing, false, '#ffce6a');
+            AR.Projectiles.destroy(threat, 'parry');
+            if (this.state === 'idle') { this.state = 'chase'; this.t = 0; }
+            this.rageT = Math.max(this.rageT, 4);
+          } else this.parryCd = 0.45; // tentative manquée : petite latence
+        } else if (isShooter && this.dodgeCd <= 0 && this.onGround &&
+                   Math.random() < diff.dodgeChance) {
+          this._dodgeHop(AR.U.sign(this.centerX() - threat.x) || 1);
+        }
+      }
+    }
+
     switch (this.state) {
       case 'idle': {
-        if (d < def.aggro && Math.abs(pl.y - this.y) < 380 && !pl.dead) { this.state = 'chase'; this.t = 0; break; }
+        if (d < aggroR && Math.abs(pl.y - this.y) < 380 && !pl.dead) { this.state = 'chase'; this.t = 0; break; }
         // petite patrouille autour du point d'origine
         if (!flying && !this.onPlatform) {
           if (Math.abs(this.x - this.homeX) > 70) this.patrolDir = AR.U.sign(this.homeX - this.x);
@@ -79,6 +119,35 @@ AR.Enemy = class {
         if (pl.dead) { this.state = 'idle'; break; }
         this.facing = AR.U.sign(pl.x - this.x || 1);
         const b = def.behavior;
+
+        // ---- mobilité avancée (difficulté) : rejoindre un joueur perché
+        const playerAbove = (this.y - pl.y) > AR.C.TILE * 1.8 && Math.abs(pl.x - this.x) < 300;
+        if (!flying && playerAbove && this.onGround && Math.random() < 0.05) this.vy = -650;
+        if (!flying && diff.canDoubleJump && !this.onGround && !this.airJumped &&
+            this.vy > 40 && (this.y - pl.y) > AR.C.TILE * 2) {
+          this.airJumped = true;
+          this.vy = -540;
+          AR.Particles.burst(this.centerX(), this.y + this.h, 8,
+            { color: '#cfd8d4', speed: 120, size: 3, life: 0.3, spread: 1.2, angle: Math.PI / 2 });
+        }
+        // ---- téléportation (Cauchemar) : trait de visée puis transfert
+        if (diff.canTeleport && this.tpCd <= 0 && !flying &&
+            (d > 380 || (playerAbove && this.onGround))) {
+          this.state = 'tpWindup'; this.t = 0;
+          const side = Math.random() < 0.5 ? -1 : 1;
+          this.tpTarget = { x: pl.x + pl.w / 2 + side * 90, y: pl.y + pl.h };
+          AR.Audio.sfx('tpWindup');
+          break;
+        }
+        // ---- dash de fermeture (Difficile+) pour les combattants au contact
+        if (diff.canDash && this.dashCd <= 0 && this.onGround &&
+            ['melee', 'brute', 'shield', 'assassin'].includes(b) && d > 170 && d < 430) {
+          this.state = 'dash'; this.t = 0;
+          this.dashDir = this.facing;
+          this.dashCd = 2.8;
+          AR.Audio.sfx('dash');
+          break;
+        }
         if (b === 'assassin' && this.blinkTimer <= 0 && d > 130) {
           // disparition -> réapparition dans le dos du joueur
           AR.Particles.burst(this.centerX(), this.centerY(), 14, { color: '#8a8aff', speed: 160, size: 3, life: 0.4 });
@@ -94,35 +163,70 @@ AR.Enemy = class {
         }
         if (b === 'charger') {
           if (d < def.range && this.atkTimer <= 0) { this.state = 'tele'; this.t = 0; AR.Audio.sfx('telegraph'); }
-          else { this.vx = this.facing * def.speed; if (!this._groundAhead(game.level)) this.vx = 0; }
+          else { this.vx = this.facing * spd; if (!this._groundAhead(game.level)) this.vx = 0; }
           break;
         }
-        if (b === 'ranged' || b === 'caster' || b === 'artillery') {
+        if (isShooter) {
           const keep = def.keep || 300;
-          if (d < keep - 70) { this.vx = -this.facing * def.speed; if (!this._groundAhead(game.level, -this.facing)) this.vx = 0; }
-          else if (d > keep + 90 && d < def.aggro) { this.vx = this.facing * def.speed; if (!this._groundAhead(game.level)) this.vx = 0; }
+          if (d < keep - 70) { this.vx = -this.facing * spd; if (!this._groundAhead(game.level, -this.facing)) this.vx = 0; }
+          else if (d > keep + 90 && d < aggroR) { this.vx = this.facing * spd; if (!this._groundAhead(game.level)) this.vx = 0; }
           else this.vx = 0;
           if (d < def.range && this.atkTimer <= 0) { this.state = 'tele'; this.t = 0; }
-          if (d > def.aggro * 1.3) this.state = 'idle';
+          if (d > aggroR * 1.3 && this.rageT <= 0) this.state = 'idle';
           break;
         }
         if (b === 'flyer') {
           const keep = def.keep || 80;
           const targetX = pl.x + (d < keep - 50 ? -this.facing * 120 : 0);
-          this.vx = AR.U.clamp((targetX - this.x) * 2.2, -def.speed, def.speed);
+          this.vx = AR.U.clamp((targetX - this.x) * 2.2, -spd, spd);
           const ty = pl.y - (def.flyH || 120) + Math.sin(this.t * 2 + this.bobPhase) * 18;
           this.vy = AR.U.clamp((ty - this.y) * 2.4, -160, 160);
           if (this.atkTimer <= 0 && (def.dive ? d < 320 : d < def.range)) { this.state = 'tele'; this.t = 0; }
           break;
         }
-        // mêlée / brute / bouclier
-        this.vx = this.facing * def.speed;
-        if (!this._groundAhead(game.level)) this.vx = 0;
+        // mêlée / brute / bouclier : au contact, vite
+        this.vx = this.facing * spd;
+        if (!this._groundAhead(game.level)) {
+          // enragé, on saute par-dessus les fosses plutôt que de renoncer
+          if (this.rageT > 0 && this.onGround) this.vy = -560;
+          else this.vx = 0;
+        }
         if (d < def.range + this.w / 2 && this.atkTimer <= 0) {
           this.state = 'tele'; this.t = 0;
           if (d < 260) AR.Audio.sfx('telegraph');
         }
-        if (d > def.aggro * 1.4) this.state = 'idle';
+        if (d > aggroR * 1.4 && this.rageT <= 0) this.state = 'idle';
+        break;
+      }
+      case 'dash': {
+        // fermeture rapide de la distance, avec traînée
+        this.vx = this.dashDir * def.speed * 4.4;
+        if (Math.random() < 0.7) AR.Particles.spawn({
+          x: this.centerX(), y: this.centerY(), vx: 0, vy: 0,
+          life: 0.22, size: this.w * 0.4, color: 'rgba(200,210,215,0.5)', type: 'glow',
+        });
+        if (this.t > 0.2 || Math.abs(pl.x - this.x) < def.range) { this.state = 'chase'; this.t = 0; }
+        break;
+      }
+      case 'tpWindup': {
+        // trait d'énergie vers la zone cible, puis transfert
+        this.vx = 0;
+        if (this.t >= 0.55) {
+          const lvl = game.level;
+          const gx = AR.U.clamp(this.tpTarget.x, AR.C.TILE * 2, (lvl.tilesW - 2) * AR.C.TILE);
+          const gy = lvl.groundYpx(gx);
+          AR.Particles.burst(this.centerX(), this.centerY(), 16, { color: '#c05cff', speed: 200, size: 3.5, life: 0.4 });
+          if (gy < AR.C.WORLD_H * AR.C.TILE) {
+            this.x = gx - this.w / 2;
+            this.y = gy - this.h - 2;
+            this.vy = 0;
+          }
+          AR.Particles.burst(this.centerX(), this.centerY(), 16, { color: '#c05cff', speed: 200, size: 3.5, life: 0.4 });
+          AR.Audio.sfx('spell');
+          this.tpCd = 6 + Math.random() * 3;
+          this.tpTarget = null;
+          this.state = 'tele'; this.t = 0; // enchaîne directement un télégraphe d'attaque
+        }
         break;
       }
       case 'tele': {
@@ -140,7 +244,7 @@ AR.Enemy = class {
             this.state = 'recover';
             if (def.burst) { this.burstN = def.burst; this.burstT = 0; }
             else this._fire(game);
-            this.atkTimer = def.atkCd;
+            this.atkTimer = def.atkCd * diff.atkCdMult;
           } else if (def.dive) {
             this.state = 'dive';
             const ang = AR.U.angle(this.centerX(), this.centerY(), pl.x + pl.w / 2, pl.y + pl.h / 2);
@@ -162,7 +266,7 @@ AR.Enemy = class {
           } else {
             this.didCombo = false;
             this.state = 'recover'; this.t = 0;
-            this.atkTimer = def.atkCd;
+            this.atkTimer = def.atkCd * diff.atkCdMult;
           }
         }
         break;
@@ -187,15 +291,15 @@ AR.Enemy = class {
       case 'dive': {
         if (!pl.dead && AR.U.rectsOverlap(this.getRect(), pl.getRect())) {
           game.hitPlayer(this.dmg, this.centerX());
-          this.state = 'recover'; this.t = 0; this.atkTimer = def.atkCd;
+          this.state = 'recover'; this.t = 0; this.atkTimer = def.atkCd * diff.atkCdMult;
           this.vx = 0; this.vy = -140;
         }
-        if (this.t > 0.8) { this.state = 'recover'; this.t = 0; this.atkTimer = def.atkCd; this.vx = 0; }
+        if (this.t > 0.8) { this.state = 'recover'; this.t = 0; this.atkTimer = def.atkCd * diff.atkCdMult; this.vx = 0; }
         break;
       }
       case 'stunned': {
         this.vx = 0;
-        if (this.t > 0.9) { this.state = 'chase'; this.t = 0; this.atkTimer = def.atkCd; }
+        if (this.t > 0.9) { this.state = 'chase'; this.t = 0; this.atkTimer = def.atkCd * diff.atkCdMult; }
         break;
       }
     }
@@ -213,7 +317,7 @@ AR.Enemy = class {
       this.vy = Math.min(this.vy, 900);
       const res = game.level.moveRect(this, (this.vx + this.kvx) * dt, this.vy * dt, !this.onPlatform);
       this.onGround = res.onGround;
-      if (res.onGround) this.vy = 0;
+      if (res.onGround) { this.vy = 0; this.airJumped = false; }
       if (res.hitWall && this.state === 'charge') {
         this.state = 'stunned'; this.t = 0;
         game.camera.shake(6, 0.3); AR.Audio.sfx('boom');
@@ -238,6 +342,61 @@ AR.Enemy = class {
     const px = this.x + (d > 0 ? this.w + 10 : -10);
     const gy = level.groundYpx(px);
     return gy - (this.y + this.h) < AR.C.TILE * 3.5;
+  }
+
+  // projectile du joueur qui fonce sur nous (fenêtre de parade / d'esquive)
+  _incomingProjectile() {
+    for (const p of AR.Projectiles.list) {
+      if (!p.friendly || p.kind === 'wave') continue;
+      const dx = this.centerX() - p.x, dy = this.centerY() - p.y;
+      const dd = Math.sqrt(dx * dx + dy * dy);
+      if (dd > 150) continue;
+      if (p.vx * dx + p.vy * dy > 0) return p;
+    }
+    return null;
+  }
+
+  // un allié se trouve-t-il sur la trajectoire de tir ?
+  _allyInLine(game, x0, y0, x1, y1) {
+    const dx = x1 - x0, dy = y1 - y0;
+    const dist = Math.sqrt(dx * dx + dy * dy) || 1;
+    const steps = Math.min(30, Math.ceil(dist / 30));
+    for (const e of game.enemies) {
+      if (e === this || e.dead || !e.active) continue;
+      const r = e.getRect();
+      for (let k = 1; k < steps; k++) {
+        const px = x0 + dx * k / steps, py = y0 + dy * k / steps;
+        if (px > r.x - 6 && px < r.x + r.w + 6 && py > r.y - 6 && py < r.y + r.h + 6) return true;
+      }
+    }
+    return false;
+  }
+
+  // petit bond de côté (tireurs) suivi d'une riposte rapide
+  _dodgeHop(dir) {
+    this.dodgeCd = 1.5;
+    this.vy = -500;
+    this.kvx = dir * (180 + Math.random() * 120);
+    this.atkTimer = Math.min(this.atkTimer, 0.3 + Math.random() * 0.3);
+    if (this.state === 'idle') { this.state = 'chase'; this.t = 0; }
+    AR.Audio.sfx('jump');
+    AR.Particles.burst(this.centerX(), this.y + this.h, 6,
+      { color: '#cfd8d4', speed: 100, size: 2.5, life: 0.3, up: 40 });
+  }
+
+  // le bouclier casse-t-il ce projectile ? (frontal, hors attaque/étourdissement)
+  blocksArrow(p) {
+    if (this.dead) return false;
+    if (this.def.behavior !== 'shield') return false;
+    if (['attack', 'stunned', 'dash'].includes(this.state)) return false;
+    return AR.U.sign(p.x - this.centerX() || 1) === this.facing;
+  }
+
+  // après un blocage : le porteur de bouclier avance sur le tireur
+  onBlockArrow(game) {
+    this.rageT = Math.max(this.rageT, 4);
+    if (this.state === 'idle') { this.state = 'chase'; this.t = 0; }
+    this.flash = 0.3;
   }
 
   // coup de mêlée : zone devant l'ennemi
@@ -269,36 +428,53 @@ AR.Enemy = class {
     const sy = this.y + this.h * 0.35;
     const txx = pl.x + pl.w / 2, tyy = pl.y + pl.h / 2;
     const ang = AR.U.angle(sx, sy, txx, tyy);
+    // conscience du tir ami : ne pas arroser ses propres rangs
+    const diff = game.diff || AR.DIFFICULTIES[0];
+    if (Math.random() < diff.ffAware) {
+      const splash = (def.proj === 'bomb' || def.proj === 'mortar');
+      const friendlyRisk = splash
+        ? game.enemies.some((e) => e !== this && !e.dead && e.active &&
+            AR.U.dist(txx, tyy, e.centerX(), e.centerY()) < 110)
+        : this._allyInLine(game, sx, sy, txx, tyy);
+      if (friendlyRisk) {
+        // on se replace au lieu de tirer dans le dos d'un allié
+        this.atkTimer = 0.5;
+        this.kvx = (Math.random() < 0.5 ? -1 : 1) * 200;
+        if (this.onGround && Math.random() < 0.5) this.vy = -430;
+        return;
+      }
+    }
+    const shoot = (o) => { o.owner = this; return AR.Projectiles.spawn(o); };
     AR.Audio.sfx(def.proj === 'laser' ? 'laser' : def.proj === 'flame' ? 'flame' : 'enemyShoot');
     switch (def.proj) {
       case 'rock': {
         const t = 0.9;
-        AR.Projectiles.spawn({
+        shoot({
           x: sx, y: sy, kind: 'rock', friendly: false, dmg: this.dmg, g: 900, r: 7,
           vx: (txx - sx) / t, vy: (tyy - sy) / t - 0.5 * 900 * t, life: 3,
         });
         break;
       }
       case 'arrow':
-        AR.Projectiles.spawn({
+        shoot({
           x: sx, y: sy, kind: 'earrow', friendly: false, dmg: this.dmg, r: 6,
           vx: Math.cos(ang) * 520, vy: Math.sin(ang) * 520, g: 60, life: 2.2,
         });
         break;
       case 'bullet':
-        AR.Projectiles.spawn({
+        shoot({
           x: sx, y: sy, kind: 'bullet', friendly: false, dmg: this.dmg, r: 5,
           vx: Math.cos(ang) * 780, vy: Math.sin(ang) * 780, life: 1.6,
         });
         break;
       case 'plasma':
-        AR.Projectiles.spawn({
+        shoot({
           x: sx, y: sy, kind: 'plasma', friendly: false, dmg: this.dmg, r: 7,
           vx: Math.cos(ang) * 620, vy: Math.sin(ang) * 620, life: 1.8, color: '#e35cff',
         });
         break;
       case 'laser':
-        AR.Projectiles.spawn({
+        shoot({
           x: sx, y: sy, kind: 'laser', friendly: false, dmg: this.dmg, r: 6,
           vx: Math.cos(ang) * 1500, vy: Math.sin(ang) * 1500, life: 0.9,
         });
@@ -306,7 +482,7 @@ AR.Enemy = class {
       case 'flame':
         for (let i = 0; i < 8; i++) {
           const a = ang + (Math.random() - 0.5) * 0.35;
-          AR.Projectiles.spawn({
+          shoot({
             x: sx, y: sy, kind: 'flame', friendly: false, dmg: this.dmg, r: 12,
             vx: Math.cos(a) * (260 + i * 30), vy: Math.sin(a) * (260 + i * 30),
             life: 0.5 + i * 0.03, g: -40,
@@ -315,7 +491,7 @@ AR.Enemy = class {
         break;
       case 'bomb': {
         const t = 1.0;
-        AR.Projectiles.spawn({
+        shoot({
           x: sx, y: sy, kind: 'bomb', friendly: false, dmg: this.dmg, g: 800, r: 7, explodeR: 62,
           vx: (txx - sx) / t, vy: (tyy - sy) / t - 0.5 * 800 * t, life: 3,
         });
@@ -326,7 +502,7 @@ AR.Enemy = class {
         const lx = txx + (Math.random() - 0.5) * 90;
         const gy = game.level.groundYpx(lx);
         AR.Particles.telegraphCircle(lx, gy, 66, t, AR.C.COLORS.danger);
-        AR.Projectiles.spawn({
+        shoot({
           x: sx, y: sy, kind: 'mortar', friendly: false, dmg: this.dmg, g: 1000, r: 8, explodeR: 66,
           vx: (lx - sx) / t, vy: (gy - sy) / t - 0.5 * 1000 * t, life: t + 0.1,
         });
@@ -334,7 +510,7 @@ AR.Enemy = class {
       }
       case 'wisp':
         for (let i = 0; i < 2; i++) {
-          AR.Projectiles.spawn({
+          shoot({
             x: sx + (i - 0.5) * 30, y: sy - 20, kind: 'wisp', friendly: false, dmg: this.dmg, r: 8,
             vx: Math.cos(ang + (i - 0.5)) * 220, vy: Math.sin(ang + (i - 0.5)) * 220 - 80,
             homing: 2.6, life: 4, color: this.id === 'war_shaman' ? '#7ee8c8' : '#c05cff',
@@ -370,7 +546,17 @@ AR.Enemy = class {
     this.hp -= dmg;
     this.flash = 1; this.hurtT = 3;
     if (opts.knockX && !this.isBoss && def.behavior !== 'charger') this.kvx = opts.knockX;
-    if (this.hp <= 0) this.die(game);
+    if (this.hp <= 0) { this.die(game); return dmg; }
+
+    // ---- riposte : un monstre attaqué traque son agresseur...
+    this.rageT = 5;
+    if (this.state === 'idle') { this.state = 'chase'; this.t = 0; }
+    // ...et un tireur esquive d'un bond puis riposte à distance
+    if (['ranged', 'caster', 'artillery'].includes(def.behavior) &&
+        this.onGround && this.dodgeCd <= 0) {
+      this._dodgeHop(opts.fromX !== undefined ? (AR.U.sign(this.centerX() - opts.fromX) || 1)
+        : (Math.random() < 0.5 ? -1 : 1));
+    }
     return dmg;
   }
 
@@ -395,7 +581,7 @@ AR.Enemy = class {
 
   _visualState() {
     if (this.dead) return 'neutral';
-    if (this.state === 'tele') return 'windup';
+    if (this.state === 'tele' || this.state === 'tpWindup') return 'windup';
     if (this.state === 'beam') return this.beam && this.beam.active ? 'attack' : 'windup';
     if (this.attackPoseT > 0 || ['attack', 'charge', 'dive', 'stomp'].includes(this.state)) return 'attack';
     return 'neutral';
@@ -452,6 +638,26 @@ AR.Enemy = class {
     else if (visualState === 'windup') tint = (Math.sin(time * 26) > 0) ? 'brightness(1.6) saturate(1.6)' : undefined;
     AR.Assets.draw(ctx, key, fx, fy + bob, this.drawH, flip, alpha, tint);
 
+    // télégraphe de téléportation : trait d'énergie vers la zone cible
+    if (this.state === 'tpWindup' && this.tpTarget) {
+      const prog = AR.U.clamp(this.t / 0.55, 0, 1);
+      const txp = this.tpTarget.x - cx, typ = this.tpTarget.y - cy - 20;
+      ctx.save();
+      ctx.globalAlpha = 0.35 + prog * 0.55;
+      ctx.strokeStyle = '#c05cff';
+      ctx.shadowColor = '#c05cff'; ctx.shadowBlur = 10;
+      ctx.setLineDash([10, 8]);
+      ctx.lineDashOffset = -time * 60;
+      ctx.lineWidth = 2 + prog * 2.5;
+      ctx.beginPath();
+      ctx.moveTo(fx, fy - this.h / 2);
+      ctx.lineTo(txp, typ);
+      ctx.stroke();
+      ctx.setLineDash([]);
+      ctx.beginPath(); ctx.arc(txp, typ, 6 + prog * 16, 0, Math.PI * 2); ctx.stroke();
+      ctx.restore();
+    }
+
     // barre de vie (si récemment touché)
     if (this.hurtT > 0 && !this.dead && !this.isBoss) {
       const bw = Math.max(40, this.w);
@@ -479,10 +685,12 @@ AR.Boss = class extends AR.Enemy {
     this.bdef = bdef;
     this.isBoss = true;
     this.name = bdef.name;
-    const ng = 1 + game.ngPlus * 0.5;
+    const diff = game.diff || AR.DIFFICULTIES[0];
+    const ng = (1 + game.ngPlus * 0.5) * diff.hpMult;
     this.maxHp = Math.round(bdef.hp * ng);
     this.hp = this.maxHp;
-    this.dmg = Math.round(bdef.dmg * Math.sqrt(ng));
+    // les dégâts de la difficulté passent par game.mods.enemyDmg (pas ici, sinon double compte)
+    this.dmg = Math.round(bdef.dmg * Math.sqrt(1 + game.ngPlus * 0.5));
     this.drawH = bdef.h;
     this.h = this.drawH * 0.8;
     const neutralKey = 'enemies/states/' + id + '_neutral';
@@ -642,7 +850,7 @@ AR.Boss = class extends AR.Enemy {
       const what = pat.split(':')[1];
       if (what === 'wisp3') {
         for (let i = 0; i < 3; i++) {
-          AR.Projectiles.spawn({
+          AR.Projectiles.spawn({ owner: this,
             x: this.centerX() + (i - 1) * 40, y: this.y + 20, kind: 'wisp', friendly: false,
             dmg: Math.round(this.dmg * 0.5), r: 8, vx: (i - 1) * 160, vy: -160, homing: 2.8, life: 5, color: '#c05cff',
           });
@@ -650,7 +858,7 @@ AR.Boss = class extends AR.Enemy {
       } else if (game.enemies.filter((e) => !e.dead && !e.isBoss).length < 4) {
         for (let i = 0; i < 2; i++) {
           const mx = this.centerX() + (i === 0 ? -140 : 140);
-          const m = new AR.Enemy(what, mx, game.level.groundYpx(mx), false, AR.ERA_SCALE[game.eraIdx] * 0.8);
+          const m = new AR.Enemy(what, mx, game.level.groundYpx(mx), false, AR.ERA_SCALE[game.eraIdx] * 0.8 * (game.diff ? game.diff.hpMult : 1));
           m.active = true;
           game.enemies.push(m);
           AR.Particles.burst(mx, m.y + m.h / 2, 12, { color: AR.C.COLORS.magic, speed: 180, size: 4, life: 0.5 });
@@ -680,7 +888,7 @@ AR.Boss = class extends AR.Enemy {
         for (let i = 0; i < n; i++) {
           const ang = AR.U.angle(sx, sy, pl.x + pl.w / 2, pl.y + pl.h / 2) + (i - (n - 1) / 2) * 0.16;
           const sp = kind === 'bullet' ? 700 : kind === 'flame' ? 300 + i * 20 : 460;
-          AR.Projectiles.spawn({
+          AR.Projectiles.spawn({ owner: this,
             x: sx, y: sy, kind, friendly: false, dmg: Math.round(this.dmg * 0.6),
             r: kind === 'flame' ? 12 : 7,
             vx: Math.cos(ang) * sp, vy: Math.sin(ang) * sp,
@@ -697,7 +905,7 @@ AR.Boss = class extends AR.Enemy {
         const n = this.phase === 2 ? 14 : 10;
         for (let i = 0; i < n; i++) {
           const ang = (i / n) * Math.PI * 2 + this.t;
-          AR.Projectiles.spawn({
+          AR.Projectiles.spawn({ owner: this,
             x: this.centerX(), y: this.centerY(), kind: 'plasma', friendly: false,
             dmg: Math.round(this.dmg * 0.5), r: 7,
             vx: Math.cos(ang) * 300, vy: Math.sin(ang) * 300, life: 2.2,
@@ -716,7 +924,7 @@ AR.Boss = class extends AR.Enemy {
           const gy = game.level.groundYpx(lx);
           const t = 1.1 + i * 0.22;
           AR.Particles.telegraphCircle(lx, gy, 70, t, AR.C.COLORS.danger);
-          AR.Projectiles.spawn({
+          AR.Projectiles.spawn({ owner: this,
             x: this.centerX(), y: this.y, kind: 'mortar', friendly: false,
             dmg: Math.round(this.dmg * 0.7), g: 1000, r: 8, explodeR: 70,
             vx: (lx - this.centerX()) / t, vy: (gy - this.y) / t - 0.5 * 1000 * t, life: t + 0.1,

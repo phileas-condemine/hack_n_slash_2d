@@ -29,6 +29,16 @@ AR.Game = class {
     this.deathT = 0;
     this.merchantPickup = null;
     this.runSeed = (Math.random() * 1e9) | 0;
+    // difficulté (persistée entre les sessions)
+    this.diffIdx = AR.U.clamp(AR.Save.data.settings.difficulty | 0, 0, AR.DIFFICULTIES.length - 1);
+    this.diff = AR.DIFFICULTIES[this.diffIdx];
+  }
+
+  setDifficulty(i) {
+    this.diffIdx = AR.U.clamp(i, 0, AR.DIFFICULTIES.length - 1);
+    this.diff = AR.DIFFICULTIES[this.diffIdx];
+    AR.Save.data.settings.difficulty = this.diffIdx;
+    AR.Save.save();
   }
 
   // ================================================== CYCLE DE VIE D'UNE RUN
@@ -42,7 +52,12 @@ AR.Game = class {
     this.runSeed = (Math.random() * 1e9) | 0;
     this.player = new AR.Player(0, 0);
     this.coins = 60;
-    this.mods = { dmgMult: 1, hpMult: 1, chargeMult: 1, goldMult: 1, enemyDmg: 1, shopDiscount: 1, spiritBonus: 0 };
+    this.diff = AR.DIFFICULTIES[this.diffIdx];
+    this.mods = {
+      dmgMult: 1, hpMult: 1, chargeMult: 1,
+      goldMult: this.diff.goldMult, enemyDmg: this.diff.dmgMult,
+      shopDiscount: 1, spiritBonus: 0,
+    };
     this.player.recalcStats(this);
     this.player.hp = this.player.maxHp;
     this.stats = { kills: 0, time: 0, coinsEarned: 0, bosses: 0 };
@@ -76,15 +91,15 @@ AR.Game = class {
     this.veilT = 0;
     this.bossTriggered = false;
 
-    // multiplicateur de difficulté (ère + NG+)
-    const scale = AR.ERA_SCALE[this.eraIdx] * (1 + this.ngPlus * 0.55);
+    // multiplicateur de difficulté (ère + NG+ + niveau de difficulté choisi)
+    const scale = AR.ERA_SCALE[this.eraIdx] * (1 + this.ngPlus * 0.55) * this.diff.hpMult;
     for (const s of lvl.spawns) {
       const e = new AR.Enemy(s.id, s.x, s.y, s.elite, scale);
       e.onPlatform = !!s.onPlatform;
       this.enemies.push(e);
     }
     for (const c of lvl.chestSpots) {
-      AR.Pickups.spawn({ type: 'chest', x: c.x, y: c.y, opened: false });
+      AR.Pickups.spawn({ type: 'chest', x: c.x, y: c.y, opened: false, high: !!c.high });
     }
     this.merchantPickup = AR.Pickups.spawn({ type: 'merchant', x: lvl.merchantX, y: lvl.groundYpx(lvl.merchantX), used: false });
 
@@ -268,6 +283,17 @@ AR.Game = class {
         hits++;
       }
     }
+    // bien synchronisé, un coup de sabre détruit les projectiles ennemis
+    for (const p of AR.Projectiles.list.slice()) {
+      if (p.friendly) continue;
+      if (p.x > rect.x - p.r && p.x < rect.x + rect.w + p.r &&
+          p.y > rect.y - p.r && p.y < rect.y + rect.h + p.r) {
+        if (AR.Projectiles.destroy(p, 'parry')) {
+          this.player.spirit = Math.min(this.player.stats.maxSpirit, this.player.spirit + 5);
+          this.hitStop(0.04);
+        }
+      }
+    }
     return hits;
   }
 
@@ -313,6 +339,7 @@ AR.Game = class {
   }
 
   awardXP(amount, x, y) {
+    amount = Math.max(1, Math.round(amount * (this.diff.xpMult || 1)));
     this.player.addXP(amount, this);
     AR.Particles.text(x, y, '+' + amount + ' XP', AR.C.COLORS.xp);
     if (this.demo && this.player.skillPoints > 0) this.buySkillAuto();
@@ -328,10 +355,38 @@ AR.Game = class {
     chest.opened = true;
     AR.Audio.sfx('chest');
     const gm = this.mods.goldMult || 1;
-    AR.Pickups.coinBurst(chest.x, chest.y - 14, Math.round((10 + Math.random() * 10) * gm), 2);
+    AR.Pickups.coinBurst(chest.x, chest.y - 14, Math.round((10 + Math.random() * 10) * gm * (chest.high ? 1.8 : 1)), 2);
     AR.Particles.burst(chest.x, chest.y - 16, 16, { color: [AR.C.COLORS.gold, '#fff'], speed: 200, size: 3, life: 0.6, up: 160 });
-    const r = Math.random();
     const pl = this.player;
+    // coffres perchés : le butin récompense toujours l'escalade
+    if (chest.high) {
+      const r2 = Math.random();
+      if (r2 < 0.45 && (pl.swordTier < 5 || pl.bowTier < 5)) {
+        if ((Math.random() < 0.5 && pl.swordTier < 5) || pl.bowTier >= 5) {
+          pl.swordTier++;
+          AR.HUD.notify('⚔ Nouvelle lame : ' + AR.WEAPONS.sword[pl.swordTier].name + ' !', AR.C.COLORS.impact);
+        } else {
+          pl.bowTier++;
+          AR.HUD.notify('🏹 Nouvel arc : ' + AR.WEAPONS.bow[pl.bowTier].name + ' !', AR.C.COLORS.spirit);
+        }
+      } else if (r2 < 0.75) {
+        pl.skillPoints++;
+        AR.HUD.notify('📜 Parchemin ancien : +1 point de compétence !', AR.C.COLORS.xp);
+      } else {
+        const trinkets = [
+          ['crit', 'Amulette du prédateur : critique +10%'],
+          ['speed', 'Bottes de célérité : vitesse +10%'],
+          ['hpUp', 'Cœur robuste : PV max +25'],
+          ['spiritUp', 'Talisman spirituel : esprit max +30'],
+        ];
+        const [k, label] = trinkets[Math.floor(Math.random() * trinkets.length)];
+        pl.buffs[k]++;
+        AR.HUD.notify('✨ ' + label, AR.C.COLORS.magic);
+      }
+      pl.recalcStats(this);
+      return;
+    }
+    const r = Math.random();
     if (r < 0.22) {
       AR.Pickups.drop('potionDrop', chest.x, chest.y - 10);
     } else if (r < 0.42) {

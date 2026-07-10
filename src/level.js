@@ -87,6 +87,34 @@ AR.Level = class {
     this.bossX = (this.arenaStartTx + arenaLen * 0.62) * T;
     this.portalX = (this.arenaStartTx + arenaLen * 0.5) * T;
 
+    // ----- tours à coffres : parcours de plateformes exigeants mais réalisables
+    // (enchaînements double saut / dash / frappe éclair ; le zigzag oblige souvent
+    // à dépasser la tour puis à grimper en revenant vers la gauche)
+    for (let ti = 0; ti < 2; ti++) {
+      let base = Math.floor(len * (0.22 + ti * 0.38 + rng() * 0.12));
+      let guard = 0;
+      while (guard++ < 40 && base < len - 16 &&
+             (this.heights[base] === this.PIT || Math.abs(base * T - this.merchantX) < 12 * T)) base++;
+      if (base >= len - 16 || this.heights[base] === this.PIT) continue;
+      const floors = 2 + Math.floor(rng() * 2);   // 2-3 relais avant le sommet
+      let dir = rng() < 0.5 ? -1 : 1;             // -1 : la grimpe se fait de droite à gauche
+      let px = base, py = this.heights[base] - 3;
+      for (let f = 0; f <= floors; f++) {
+        if (py < 6) break;
+        const pw = 2 + Math.floor(rng() * 2);
+        const ptx = AR.U.clamp(px - Math.floor(pw / 2), 3, len - 4);
+        this.platforms.push({ tx: ptx, ty: py, w: pw });
+        if (f === floors) {
+          this.chestSpots.push({ x: (ptx + pw / 2) * T, y: py * T, high: true });
+        } else {
+          // bond suivant : 3-5 tuiles de côté, 2-3 tuiles de montée
+          px += dir * (3 + Math.floor(rng() * 3));
+          if (rng() < 0.65) dir *= -1;            // zigzag, parfois deux bonds du même côté
+          py -= 2 + Math.floor(rng() * 2);
+        }
+      }
+    }
+
     // ----- ennemis : paquets réguliers, densité croissante selon l'ère
     const pool = this.era.enemies;
     let ex = 20;

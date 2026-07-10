@@ -66,7 +66,7 @@ AR.ENEMIES = {
   // --- Âge de pierre
   stone_spear:    { name: 'Lancier tribal', hp: 26, dmg: 10, speed: 95, xp: 12, coins: 4, h: 78, behavior: 'melee', range: 62, aggro: 420, atkCd: 1.3, tele: 0.45 },
   stone_slinger:  { name: 'Frondeur', hp: 20, dmg: 8, speed: 80, xp: 14, coins: 5, h: 80, behavior: 'ranged', range: 460, keep: 300, aggro: 520, atkCd: 1.9, tele: 0.55, proj: 'rock' },
-  beast_hunter:   { name: 'Chasseur de bêtes', hp: 30, dmg: 12, speed: 150, xp: 16, coins: 6, h: 82, behavior: 'melee', range: 58, aggro: 480, atkCd: 0.95, tele: 0.3, facing: 'l' },
+  beast_hunter:   { name: 'Chasseur de bêtes', hp: 30, dmg: 12, speed: 150, xp: 16, coins: 6, h: 82, behavior: 'melee', range: 58, aggro: 480, atkCd: 0.95, tele: 0.3, facing: 'l', parry: true },
   stone_brute:    { name: 'Brute au gourdin', hp: 62, dmg: 18, speed: 65, xp: 24, coins: 9, h: 92, behavior: 'brute', range: 92, aggro: 400, atkCd: 1.9, tele: 0.6, facing: 'l', knock: 320 },
   war_shaman:     { name: 'Chaman de guerre', hp: 34, dmg: 9, speed: 55, xp: 26, coins: 10, h: 96, behavior: 'caster', range: 560, keep: 340, aggro: 600, atkCd: 2.6, tele: 0.7, proj: 'wisp' },
   mammoth_rider:  { name: 'Monteur de mammouth', hp: 150, dmg: 22, speed: 70, xp: 60, coins: 25, h: 128, behavior: 'charger', range: 480, aggro: 560, atkCd: 2.6, tele: 0.75, chargeSpeed: 420, knock: 380, elite: true },
@@ -74,13 +74,13 @@ AR.ENEMIES = {
   // --- Antiquité
   hoplite:        { name: 'Hoplite', hp: 40, dmg: 12, speed: 90, xp: 16, coins: 6, h: 82, behavior: 'shield', range: 64, aggro: 430, atkCd: 1.4, tele: 0.45, block: 0.6 },
   archer_auxilia: { name: 'Archer auxiliaire', hp: 24, dmg: 10, speed: 85, xp: 16, coins: 6, h: 84, behavior: 'ranged', range: 560, keep: 360, aggro: 620, atkCd: 1.7, tele: 0.5, proj: 'arrow' },
-  desert_raider:  { name: 'Pillard du désert', hp: 34, dmg: 13, speed: 160, xp: 18, coins: 8, h: 84, behavior: 'melee', range: 60, aggro: 500, atkCd: 0.9, tele: 0.28, facing: 'l' },
+  desert_raider:  { name: 'Pillard du désert', hp: 34, dmg: 13, speed: 160, xp: 18, coins: 8, h: 84, behavior: 'melee', range: 60, aggro: 500, atkCd: 0.9, tele: 0.28, facing: 'l', parry: true },
   elephant_guard: { name: 'Garde à éléphant', hp: 170, dmg: 24, speed: 60, xp: 55, coins: 20, h: 132, behavior: 'charger', range: 460, aggro: 540, atkCd: 2.8, tele: 0.8, chargeSpeed: 380, knock: 400 },
   temple_guardian:{ name: 'Gardien du temple', hp: 130, dmg: 20, speed: 45, xp: 50, coins: 22, h: 118, behavior: 'shield', range: 88, aggro: 380, atkCd: 2.1, tele: 0.65, block: 0.85, knock: 340, elite: true },
 
   // --- Japon médiéval
-  ronin:          { name: 'Rônin', hp: 44, dmg: 15, speed: 130, xp: 22, coins: 9, h: 80, behavior: 'melee', range: 78, aggro: 480, atkCd: 1.0, tele: 0.32, combo2: true },
-  ninja_assassin: { name: 'Assassin ninja', hp: 30, dmg: 14, speed: 190, xp: 26, coins: 11, h: 78, behavior: 'assassin', range: 58, aggro: 560, atkCd: 1.6, tele: 0.3, facing: 'l', blinkCd: 3.2 },
+  ronin:          { name: 'Rônin', hp: 44, dmg: 15, speed: 130, xp: 22, coins: 9, h: 80, behavior: 'melee', range: 78, aggro: 480, atkCd: 1.0, tele: 0.32, combo2: true, parry: true },
+  ninja_assassin: { name: 'Assassin ninja', hp: 30, dmg: 14, speed: 190, xp: 26, coins: 11, h: 78, behavior: 'assassin', range: 58, aggro: 560, atkCd: 1.6, tele: 0.3, facing: 'l', blinkCd: 3.2, parry: true },
   tengu_archer:   { name: 'Archer tengu', hp: 34, dmg: 12, speed: 100, xp: 24, coins: 10, h: 92, behavior: 'ranged', range: 600, keep: 380, aggro: 660, atkCd: 1.5, tele: 0.45, proj: 'arrow', hop: true },
   spirit_caster:  { name: 'Invocateur d\'esprits', hp: 40, dmg: 11, speed: 60, xp: 30, coins: 13, h: 100, behavior: 'caster', range: 620, keep: 380, aggro: 680, atkCd: 2.4, tele: 0.65, proj: 'wisp', float: true },
   oni_brute:      { name: 'Brute oni', hp: 130, dmg: 24, speed: 75, xp: 55, coins: 22, h: 108, behavior: 'brute', range: 100, aggro: 420, atkCd: 1.7, tele: 0.55, knock: 380, elite: true, facing: 'l' },
@@ -104,7 +104,7 @@ AR.ENEMIES = {
   hover_gunner:   { name: 'Mitrailleur hover', hp: 65, dmg: 14, speed: 140, xp: 38, coins: 16, h: 74, behavior: 'flyer', range: 480, keep: 300, aggro: 640, atkCd: 1.7, tele: 0.45, proj: 'plasma', flyH: 130 },
   drone_swarm:    { name: 'Nuée de drones', hp: 45, dmg: 12, speed: 170, xp: 30, coins: 12, h: 84, behavior: 'flyer', range: 60, aggro: 640, atkCd: 1.9, tele: 0.4, dive: true, flyH: 150 },
   shield_drone:   { name: 'Drone bouclier', hp: 90, dmg: 10, speed: 100, xp: 42, coins: 18, h: 86, behavior: 'flyer', range: 420, keep: 260, aggro: 600, atkCd: 2.2, tele: 0.5, proj: 'plasma', flyH: 110, shielded: 40 },
-  mech_assassin:  { name: 'Assassin mécanisé', hp: 120, dmg: 22, speed: 220, xp: 65, coins: 28, h: 94, behavior: 'assassin', range: 70, aggro: 700, atkCd: 1.3, tele: 0.26, blinkCd: 2.4, elite: true },
+  mech_assassin:  { name: 'Assassin mécanisé', hp: 120, dmg: 22, speed: 220, xp: 65, coins: 28, h: 94, behavior: 'assassin', range: 70, aggro: 700, atkCd: 1.3, tele: 0.26, blinkCd: 2.4, elite: true, parry: true },
 };
 
 // ------------------------------------------------------------------ LES BOSS
@@ -204,10 +204,14 @@ AR.SKILLS = [
 
 // ------------------------------------------------------------------- SORTS
 AR.SPELLS = [
-  { id: 'wave', name: 'Vague spirituelle', key: '1', cost: 25, dmg: 30, desc: 'Onde de choc à 360° qui repousse les ennemis' },
-  { id: 'kunai', name: 'Nuée de kunaïs', key: '2', cost: 30, dmg: 14, desc: '5 kunaïs perforants en éventail' },
-  { id: 'blink', name: 'Frappe éclair', key: '3', cost: 35, dmg: 40, desc: 'Traverse les ennemis en éclair, blessant tout sur le passage' },
-  { id: 'veil', name: 'Voile temporel', key: '4', cost: 45, dmg: 0, desc: 'Ralentit tous les ennemis de 50% pendant 5 s' },
+  { id: 'wave', name: 'Vague spirituelle', key: '1', cost: 25, dmg: 30, desc: 'Onde de choc à 360° qui repousse les ennemis',
+    icon: 'spells/icons/wave', cast: 'spells/wave_cast' },
+  { id: 'kunai', name: 'Nuée de kunaïs', key: '2', cost: 30, dmg: 14, desc: '5 kunaïs perforants en éventail',
+    icon: 'spells/icons/kunai', cast: 'spells/kunai_cast' },
+  { id: 'blink', name: 'Frappe éclair', key: '3', cost: 35, dmg: 40, desc: 'Traverse les ennemis en éclair, blessant tout sur le passage',
+    icon: 'spells/icons/blink', cast: 'spells/blink_cast' },
+  { id: 'veil', name: 'Voile temporel', key: '4', cost: 45, dmg: 0, desc: 'Ralentit tous les ennemis de 50% pendant 5 s',
+    icon: 'spells/icons/veil', cast: 'spells/veil_cast' },
 ];
 
 // ---------------------------------------------------------------- BOUTIQUE
@@ -237,3 +241,33 @@ AR.RIFTS = [
 
 // Multiplicateurs de difficulté par ère (HP / dégâts des ennemis)
 AR.ERA_SCALE = [1.0, 1.25, 1.55, 1.9, 2.3, 2.8];
+
+// ---------------------------------------------------- NIVEAUX DE DIFFICULTÉ
+// Le mode Normal correspond à l'équilibrage historique. Les modes supérieurs
+// réduisent l'or/XP et débloquent des capacités d'IA supplémentaires.
+AR.DIFFICULTIES = [
+  {
+    id: 'normal', name: 'Normal', color: '#5cc9a8',
+    desc: 'Les monstres ripostent et vous traquent une fois attaqués.',
+    hpMult: 1, dmgMult: 1, goldMult: 1, xpMult: 1,
+    speedMult: 1, aggroMult: 1, atkCdMult: 1,
+    parryChance: 0.15, dodgeChance: 0.30, ffAware: 0.55,
+    canDoubleJump: false, canDash: false, canTeleport: false,
+  },
+  {
+    id: 'hard', name: 'Difficile', color: '#e8a545',
+    desc: 'Or/XP -20%. Ennemis véloces : esquives, dashs, parades fréquentes.',
+    hpMult: 1.35, dmgMult: 1.25, goldMult: 0.8, xpMult: 0.8,
+    speedMult: 1.15, aggroMult: 1.4, atkCdMult: 0.8,
+    parryChance: 0.45, dodgeChance: 0.6, ffAware: 0.85,
+    canDoubleJump: true, canDash: true, canTeleport: false,
+  },
+  {
+    id: 'nightmare', name: 'Cauchemar', color: '#ff3d6e',
+    desc: 'Or/XP -35%. Réflexes implacables, doubles sauts et téléportation.',
+    hpMult: 1.8, dmgMult: 1.55, goldMult: 0.65, xpMult: 0.65,
+    speedMult: 1.3, aggroMult: 1.9, atkCdMult: 0.65,
+    parryChance: 0.7, dodgeChance: 0.85, ffAware: 1,
+    canDoubleJump: true, canDash: true, canTeleport: true,
+  },
+];

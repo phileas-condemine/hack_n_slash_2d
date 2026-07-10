@@ -97,6 +97,9 @@ AR.Audio = {
       case 'flame': this._noise(0.25, 0.2, 900, 500); break;
       case 'ui': this._osc('sine', 700, 0.05, 0.1); break;
       case 'error': this._osc('square', 160, 0.15, 0.14, 110); break;
+      case 'block': this._noise(0.08, 0.3, 2600, 900); this._osc('square', 520, 0.1, 0.16, 260); break;
+      case 'parry': this._osc('triangle', 1600, 0.07, 0.22, 900); this._noise(0.06, 0.2, 4200, 1800, 'highpass'); break;
+      case 'tpWindup': this._osc('sine', 240, 0.5, 0.14, 720); break;
     }
   },
 
