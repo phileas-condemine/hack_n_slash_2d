@@ -14,6 +14,7 @@ AR.DemoAI = {
   chestBestD: Infinity,
   chestRetries: new WeakMap(),
   buildFocus: 'balanced',
+  traversal: null,
   uiT: 0,
 
   reset(newRun) {
@@ -21,6 +22,7 @@ AR.DemoAI = {
     this.jumpHoldT = 0; this.jumpReleaseT = 0; this.navStuckT = 0;
     this.chestTarget = null; this.chestAttemptT = 0; this.chestTotalT = 0; this.chestBestD = Infinity;
     this.chestRetries = new WeakMap();
+    this.traversal = null;
     if (newRun || !this.buildFocus) {
       const focuses = ['melee', 'ranged', 'spirit'];
       this.buildFocus = focuses[Math.floor(Math.random() * focuses.length)];
@@ -84,6 +86,40 @@ AR.DemoAI = {
       }
     }
     return { gapDist, riseDist, maxRise, horizon };
+  },
+
+  _gapPlan(level, pl, dir) {
+    if (!dir) return null;
+    const T = AR.C.TILE;
+    const pitLimit = AR.C.WORLD_H * T;
+    const leadX = pl.x + pl.w / 2 + dir * (pl.w / 2 + 6);
+    let startDist = Infinity;
+    for (let dist = 0; dist <= T * 9; dist += T / 4) {
+      const overPit = this._supportYAt(level, leadX + dir * dist) > pitLimit;
+      if (overPit && startDist === Infinity) startDist = dist;
+      else if (!overPit && startDist !== Infinity) {
+        return {
+          startDist,
+          endDist: dist,
+          width: dist - startDist,
+          landingX: leadX + dir * (dist + T * 0.55),
+        };
+      }
+    }
+    return null;
+  },
+
+  _updateTraversal(game, pl, pcx, dt) {
+    if (!this.traversal) return;
+    const T = AR.C.TILE;
+    this.traversal.t += dt;
+    const crossed = this.traversal.dir > 0 ?
+      pcx >= this.traversal.landingX - T * 0.7 :
+      pcx <= this.traversal.landingX + T * 0.7;
+    const safeGround = this._supportYAt(game.level, pcx) <= AR.C.WORLD_H * T;
+    if ((pl.onGround && crossed && safeGround && this.traversal.t > 0.15) || this.traversal.t > 3.2) {
+      this.traversal = null;
+    }
   },
 
   _hasClearShot(level, x0, y0, x1, y1) {
@@ -207,6 +243,7 @@ AR.DemoAI = {
     // ---------- écrans / overlays : l'IA valide toute seule
     if (game.state === 'rift') {
       this.jumpHoldT = this.jumpReleaseT = this.navStuckT = 0;
+      this.traversal = null;
       this._clearChestAttempt();
       this.uiT += dt;
       if (this.uiT > 1.1) { game.riftPick(Math.floor(Math.random() * game.riftChoices.length)); this.uiT = 0; }
@@ -215,6 +252,7 @@ AR.DemoAI = {
     }
     if (game.state === 'gameover' || game.state === 'victory') {
       this.jumpHoldT = this.jumpReleaseT = this.navStuckT = 0;
+      this.traversal = null;
       this._clearChestAttempt();
       this.uiT += dt;
       if (this.uiT > 2.5) { this.uiT = 0; game.newRun(true); }
@@ -223,11 +261,13 @@ AR.DemoAI = {
     }
     if (game.state !== 'play') {
       this.jumpHoldT = this.jumpReleaseT = this.navStuckT = 0;
+      this.traversal = null;
       this._clearChestAttempt();
       AR.Input.setVirtual(a, aimX, aimY); return;
     }
     if (game.shopOpen) {
       this.jumpHoldT = this.jumpReleaseT = this.navStuckT = 0;
+      this.traversal = null;
       this._clearChestAttempt();
       this.uiT += dt;
       const thinkT = Math.max(0.12, 0.45 / Math.sqrt(game.speed || 1));
@@ -237,6 +277,7 @@ AR.DemoAI = {
     }
     if (pl.dead) {
       this.jumpHoldT = this.jumpReleaseT = this.navStuckT = 0;
+      this.traversal = null;
       this._clearChestAttempt();
       AR.Input.setVirtual(a, aimX, aimY); return;
     }
@@ -246,6 +287,7 @@ AR.DemoAI = {
 
     this.decideT -= dt;
     const pcx = pl.x + pl.w / 2, pcy = pl.y + pl.h / 2;
+    this._updateTraversal(game, pl, pcx, dt);
 
     // ---------- perception
     let target = null, td = 1e9;
@@ -300,7 +342,7 @@ AR.DemoAI = {
     }
 
     // ---------- combat
-    if (target) {
+    if (target && !this.traversal) {
       const ex = target.centerX(), ey = target.centerY();
       aimX = ex + (target.vx || 0) * 0.15; aimY = ey;
       const dx = ex - pcx;
@@ -371,6 +413,25 @@ AR.DemoAI = {
       }
     }
 
+    // Une fosse devient un objectif prioritaire, même si un ennemi proche avait
+    // annulé le déplacement pour engager un duel à distance.
+    if (!this.traversal) {
+      const travelDir = goalX !== null && Math.abs(goalX - pcx) > 20 ? AR.U.sign(goalX - pcx) :
+        target ? AR.U.sign(target.centerX() - pcx) : 0;
+      const gap = this._gapPlan(game.level, pl, travelDir);
+      const takeoffDist = AR.U.clamp(52 + Math.abs(pl.vx) * 0.24, 58, 125);
+      if (gap && gap.startDist <= takeoffDist) {
+        this.traversal = { ...gap, dir: travelDir, t: 0, airDashUsed: !!pl.airDashed };
+        this.bowPlan = 0;
+        this.swordPlan = 0;
+      }
+    }
+    if (this.traversal) {
+      goalX = this.traversal.landingX;
+      chest = null;
+      this._clearChestAttempt();
+    }
+
     const pursuingChest = chest && goalX === chest.x;
     if (pursuingChest) {
       if (this._trackChestAttempt(game, pl, chest, pcx, pcy, dt)) {
@@ -385,6 +446,7 @@ AR.DemoAI = {
     const goalDx = goalX === null ? 0 : goalX - pcx;
     const chestAboveGoal = chest && goalX === chest.x && chest.y < pl.y + pl.h - AR.C.TILE &&
       Math.abs(chest.x - pcx) < 155;
+    let traversalDash = false;
     if (goalX !== null && (Math.abs(goalDx) > 30 || chestAboveGoal)) {
       const dir = AR.U.sign(goalDx);
       if (Math.abs(goalDx) > 30) {
@@ -412,7 +474,7 @@ AR.DemoAI = {
       const chestAbove = chestAboveGoal;
       if (pl.onGround && !pl.dashing && (gapSoon || riseSoon || chestAbove || this.navStuckT > 0.22)) {
         const highOrWide = path.maxRise > AR.C.TILE * 1.2 || path.gapDist < 70 || chestAbove;
-        const holdT = chestAbove ? 0.34 : highOrWide ? 0.30 : 0.24;
+        const holdT = this.traversal ? 0.34 : chestAbove ? 0.34 : highOrWide ? 0.30 : 0.24;
         if (this._queueJump(holdT)) {
           this.navStuckT = 0;
           if (chestAbove) this._recordChestJump(game, pl, chest);
@@ -426,10 +488,36 @@ AR.DemoAI = {
         (path.riseDist < 70 && path.maxRise > AR.C.TILE * 0.55) || chestAbove;
       if (!pl.onGround && !pl.dashing && pl.jumpsUsed === 1 && pl.vy > -80 &&
           (overGap || airObstacle)) {
-        this._queueJump(chestAbove ? 0.30 : 0.24);
+        this._queueJump(this.traversal ? 0.30 : chestAbove ? 0.30 : 0.24);
+      }
+
+      // Le dash aérien vient après le double saut : il prolonge la suspension
+      // et fournit l'impulsion horizontale nécessaire aux fosses de 3-4 tuiles.
+      if (this.traversal && !pl.onGround && !pl.dashing && !this.traversal.airDashUsed &&
+          pl.dashCharges > 0 && !pl.airDashed) {
+        const remaining = this.traversal.dir * (this.traversal.landingX - pcx);
+        const readyAfterDouble = pl.jumpsUsed >= 2 && pl.vy > -70;
+        const fallingWithoutJump = pl.jumpsUsed === 0 && pl.vy > 80;
+        if (remaining > AR.C.TILE * 0.8 && (readyAfterDouble || fallingWithoutJump)) {
+          traversalDash = true;
+          this.traversal.airDashUsed = true;
+        }
       }
     } else {
       this.navStuckT = 0;
+    }
+
+    if (this.traversal) {
+      // Traverser vivant vaut plus qu'une attaque : aucune charge d'arme ni sort
+      // ne peut ralentir ou détourner le personnage pendant cette courte phase.
+      a.left = this.traversal.dir < 0;
+      a.right = this.traversal.dir > 0;
+      a.sword = false;
+      a.bow = false;
+      a.spell1 = a.spell2 = a.spell3 = a.spell4 = false;
+      a.dash = traversalDash;
+      this.bowPlan = 0;
+      this.swordPlan = 0;
     }
 
     this._applyJump(a, dt);

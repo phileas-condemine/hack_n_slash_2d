@@ -70,6 +70,7 @@ AR.Pickups = {
     for (const p of this.list) {
       if (p.type !== 'chest' && p.type !== 'portal' && p.type !== 'merchant') continue;
       if (p.type === 'chest' && p.opened) continue;
+      if (p.type === 'merchant' && p.used) continue;
       const d = AR.U.dist(p.x, p.y - 20, pl.x + pl.w / 2, pl.y + pl.h / 2);
       if (d < bd) { bd = d; best = p; }
     }
