@@ -1,0 +1,22 @@
+# OS
+Thumbs.db
+.DS_Store
+desktop.ini
+
+# Editors
+.vscode/
+.idea/
+
+# Python
+__pycache__/
+*.pyc
+
+# Node (if tooling is added later)
+node_modules/
+
+# Distribution archives
+dist/
+*.zip
+
+# Captures & recordings (generated at runtime)
+captures/

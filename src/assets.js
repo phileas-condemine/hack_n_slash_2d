@@ -1,0 +1,53 @@
+// Arcane Rift - chargement des images + rendu de sprites (trim précalculé)
+window.AR = window.AR || {};
+
+AR.Assets = {
+  images: {},
+  ready: false,
+
+  load(onDone, onProgress) {
+    const keys = Object.keys(AR.SPRITE_META);
+    let loaded = 0;
+    const total = keys.length;
+    keys.forEach((key) => {
+      const img = new Image();
+      img.onload = () => {
+        loaded++;
+        if (onProgress) onProgress(loaded / total);
+        if (loaded === total) { this.ready = true; onDone(); }
+      };
+      img.onerror = () => {
+        console.error('Image introuvable :', key);
+        loaded++;
+        if (loaded === total) { this.ready = true; onDone(); }
+      };
+      img.src = 'assets/' + key + '.png';
+      this.images[key] = img;
+    });
+  },
+
+  // Dessine un sprite ancré bas-centre (aux pieds), hauteur cible en px monde.
+  // flip=true => miroir horizontal. Utilise la boîte de découpe précalculée.
+  draw(ctx, key, footX, footY, targetH, flip, alpha, tint) {
+    const img = this.images[key];
+    const meta = AR.SPRITE_META[key];
+    if (!img || !img.complete || !meta) return;
+    const [tx, ty, tw, th] = meta.t;
+    const scale = targetH / th;
+    const dw = tw * scale, dh = th * scale;
+    ctx.save();
+    if (alpha !== undefined && alpha < 1) ctx.globalAlpha = alpha;
+    ctx.translate(footX, footY);
+    if (flip) ctx.scale(-1, 1);
+    if (tint) ctx.filter = tint; // ex: 'brightness(2.4)' pour le flash de dégâts
+    ctx.drawImage(img, tx, ty, tw, th, -dw / 2, -dh, dw, dh);
+    ctx.restore();
+  },
+
+  // Largeur affichée pour une hauteur cible (utile pour les hitbox visuelles)
+  drawnW(key, targetH) {
+    const meta = AR.SPRITE_META[key];
+    if (!meta) return targetH;
+    return meta.t[2] * (targetH / meta.t[3]);
+  },
+};
