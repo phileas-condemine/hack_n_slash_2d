@@ -548,15 +548,20 @@ AR.Game = class {
   // ================================================== COMPÉTENCES
   buySkill(nodeId) {
     const pl = this.player;
-    if (pl.skillPoints <= 0 || pl.skills.has(nodeId)) return;
-    pl.skillPoints--;
+    const branch = AR.SKILLS.find((b) => b.nodes.some((n) => n.id === nodeId));
+    if (!branch || pl.skills.has(nodeId)) return false;
+    const idx = branch.nodes.findIndex((n) => n.id === nodeId);
+    const node = branch.nodes[idx];
+    if (idx > 0 && !pl.skills.has(branch.nodes[idx - 1].id)) return false;
+    if (pl.skillPoints < node.cost) return false;
+    pl.skillPoints -= node.cost;
     pl.skills.add(nodeId);
     pl.recalcStats(this);
     AR.Audio.sfx('skill');
-    const node = AR.SKILLS.flatMap((b) => b.nodes).find((n) => n.id === nodeId);
-    AR.HUD.notify('★ Compétence : ' + node.name, AR.C.COLORS.xp);
+    AR.HUD.notify('★ Compétence : ' + node.name + ' (-' + node.cost + ' pt' + (node.cost > 1 ? 's' : '') + ')', AR.C.COLORS.xp);
     if (nodeId === 'spirit1') AR.HUD.notify('Sorts 1 et 2 débloqués !', AR.C.COLORS.magic);
     if (nodeId === 'spirit3') AR.HUD.notify('Sorts 3 et 4 débloqués !', AR.C.COLORS.magic);
+    return true;
   }
 
   buySkillAuto() {
@@ -569,6 +574,7 @@ AR.Game = class {
       const branch = AR.SKILLS.find((b) => b.nodes.some((n) => n.id === id));
       const idx = branch.nodes.findIndex((n) => n.id === id);
       if (idx > 0 && !this.player.skills.has(branch.nodes[idx - 1].id)) continue;
+      if (this.player.skillPoints < branch.nodes[idx].cost) continue;
       this.buySkill(id);
     }
   }

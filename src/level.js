@@ -264,6 +264,43 @@ AR.Level = class {
     return h === this.PIT ? AR.C.WORLD_H * AR.C.TILE * 2 : h * AR.C.TILE;
   }
 
+  // Cherche un segment de terrain assez long à gauche du dernier point connu
+  // et replace le héros cinq tuiles avant son bord droit. Cela laisse le temps
+  // de reprendre le contrôle ou de relancer un saut avant le précipice.
+  findSafeRespawn(anchorX, entityW, entityH) {
+    const T = AR.C.TILE, runway = 5;
+    const arena = this.bossArena;
+    if (arena && arena.active) {
+      const x = AR.U.clamp(anchorX, arena.ground.x + T, arena.ground.x + arena.ground.w - entityW - T);
+      return { x, y: arena.ground.y - entityH - 2 };
+    }
+
+    let cursor = AR.U.clamp(Math.floor((anchorX + entityW / 2) / T), 0, this.tilesW - 1);
+    while (cursor >= 0) {
+      while (cursor >= 0 && this.heights[cursor] === this.PIT) cursor--;
+      if (cursor < 0) break;
+
+      let start = cursor, end = cursor;
+      while (start > 0 && this.heights[start - 1] !== this.PIT) start--;
+      while (end + 1 < this.tilesW && this.heights[end + 1] !== this.PIT) end++;
+
+      if (end - start + 1 >= runway + 2) {
+        const tx = Math.max(start + 1, end - runway);
+        return {
+          x: (tx + 0.5) * T - entityW / 2,
+          y: this.heights[tx] * T - entityH - 2,
+        };
+      }
+      cursor = start - 1;
+    }
+
+    const fallbackTx = AR.U.clamp(Math.floor(this.spawnX / T), 0, this.tilesW - 1);
+    return {
+      x: (fallbackTx + 0.5) * T - entityW / 2,
+      y: this.heights[fallbackTx] * T - entityH - 2,
+    };
+  }
+
   // Déplace une AABB {x,y,w,h} et résout les collisions avec le terrain.
   // ignorePlatforms : traverser les plateformes (chute volontaire)
   moveRect(e, dx, dy, ignorePlatforms) {

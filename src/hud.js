@@ -139,18 +139,23 @@ AR.HUD = {
       ctx.fillStyle = C.spirit; ctx.font = 'bold 14px "Segoe UI", sans-serif';
       ctx.fillText('● MODE DÉMO (IA)  ×' + game.speed + '   [G] quitter  [+/-] vitesse', AR.C.VIEW_W - 22, 92);
     }
+    // Caractéristiques calculées : niveaux, compétences, armes, objets et failles.
+    const statsY = game.demo ? 108 : 88;
+    this._drawStats(ctx, game, statsY);
+
     // enregistrement
+    const recorderY = statsY + 204;
     if (AR.Recorder.recording) {
       ctx.fillStyle = C.danger;
       ctx.globalAlpha = 0.6 + Math.sin(game.time * 6) * 0.4;
-      ctx.beginPath(); ctx.arc(AR.C.VIEW_W - 150, 110, 6, 0, Math.PI * 2); ctx.fill();
+      ctx.beginPath(); ctx.arc(AR.C.VIEW_W - 150, recorderY, 6, 0, Math.PI * 2); ctx.fill();
       ctx.globalAlpha = 1;
       ctx.font = 'bold 13px "Segoe UI", sans-serif';
-      ctx.fillText('REC ' + AR.U.fmtTime(AR.Recorder.elapsed()), AR.C.VIEW_W - 22, 114);
+      ctx.fillText('REC ' + AR.U.fmtTime(AR.Recorder.elapsed()), AR.C.VIEW_W - 22, recorderY + 4);
     }
     if (AR.Recorder.error) {
       ctx.fillStyle = C.danger; ctx.font = '12px "Segoe UI", sans-serif';
-      ctx.fillText(AR.Recorder.error, AR.C.VIEW_W - 22, 132);
+      ctx.fillText(AR.Recorder.error, AR.C.VIEW_W - 22, recorderY + 22);
     }
     ctx.textAlign = 'left';
 
@@ -227,6 +232,47 @@ AR.HUD = {
       ctx.globalAlpha = 1;
     }
 
+    ctx.restore();
+  },
+
+  _drawStats(ctx, game, y) {
+    const C = AR.C.COLORS, pl = game.player, st = pl.stats, P = AR.C.PLAYER;
+    const w = 300, x = AR.C.VIEW_W - 22 - w;
+    const bowCount = pl.skills.has('bow4') ? 3 : 1;
+    const bowNormal = st.bowDmg * (bowCount > 1 ? 0.7 : 1);
+    const levelBonus = (st.levelMult - 1) * 100;
+    const fmt = (value) => value.toFixed(1);
+
+    ctx.save();
+    ctx.textAlign = 'left';
+    ctx.fillStyle = 'rgba(10,14,18,0.72)';
+    ctx.fillRect(x, y, w, 184);
+    ctx.strokeStyle = 'rgba(126,200,255,0.35)';
+    ctx.lineWidth = 1;
+    ctx.strokeRect(x, y, w, 184);
+
+    ctx.fillStyle = C.xp;
+    ctx.font = 'bold 11px "Segoe UI", sans-serif';
+    ctx.fillText('CARACTÉRISTIQUES', x + 10, y + 17);
+    ctx.textAlign = 'right';
+    ctx.fillText('niveau +' + fmt(levelBonus) + '%', x + w - 10, y + 17);
+
+    ctx.font = '11px "Segoe UI", sans-serif';
+    ctx.fillStyle = C.text;
+    ctx.textAlign = 'left';
+    ctx.fillText('PV ' + st.maxHp + '   Esprit ' + st.maxSpirit + '  (+' + fmt(st.spiritRegen) + '/s)', x + 10, y + 38);
+    ctx.fillText('Sabre  ' + fmt(st.swordDmg) + ' normal   ' + fmt(st.swordDmg * st.chargedSwordMult) + ' chargé', x + 10, y + 57);
+    ctx.fillStyle = C.textDim;
+    ctx.fillText('          recharge ' + st.swordCooldown.toFixed(2) + 's   charge ' + st.swordChargeTime.toFixed(2) + 's', x + 10, y + 74);
+    ctx.fillStyle = C.text;
+    ctx.fillText('Arc     ' + fmt(bowNormal) + (bowCount > 1 ? ' ×' + bowCount : '') + ' normal   ' + fmt(st.bowDmg * P.CHARGED_BOW_MULT) + ' chargé' + (pl.skills.has('bow3') ? ' explosif' : ''), x + 10, y + 94);
+    ctx.fillStyle = C.textDim;
+    ctx.fillText('          recharge ' + st.bowCooldown.toFixed(2) + 's   charge ' + st.bowChargeTime.toFixed(2) + 's', x + 10, y + 111);
+    ctx.fillStyle = C.text;
+    ctx.fillText('Vitesse  ' + Math.round(P.WALK * st.speed) + ' marche   ' + Math.round(P.SPRINT * st.speed) + ' sprint', x + 10, y + 131);
+    ctx.fillStyle = C.textDim;
+    ctx.fillText('Dash     recharge ' + st.dashCd.toFixed(2) + 's   charges ' + st.dashMax, x + 10, y + 150);
+    ctx.fillText('Critique ' + Math.round(st.crit * 100) + '%   réduction dégâts ' + Math.round((1 - st.armor) * 100) + '%', x + 10, y + 169);
     ctx.restore();
   },
 

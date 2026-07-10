@@ -50,15 +50,19 @@ AR.Player = class {
   recalcStats(game) {
     const P = AR.C.PLAYER, S = this.skills, m = game.mods || {};
     const prevMax = this.stats.maxHp;
+    const levelMult = Math.pow(1 + P.LEVEL_STAT_GROWTH, Math.max(0, this.level - 1));
     this.stats = {
-      maxHp: Math.round((P.HP + (S.has('body1') ? 30 : 0) + this.buffs.hpUp * 25) * (m.hpMult || 1)),
-      maxSpirit: P.SPIRIT + (S.has('spirit2') ? 50 : 0) + this.buffs.spiritUp * 30 + (m.spiritBonus || 0),
-      spiritRegen: P.SPIRIT_REGEN * (S.has('spirit2') ? 2 : 1),
-      swordDmg: P.SWORD_DMG * AR.WEAPONS.sword[this.swordTier].mult * (S.has('blade1') ? 1.25 : 1) * (m.dmgMult || 1),
-      bowDmg: P.BOW_DMG * AR.WEAPONS.bow[this.bowTier].mult * (S.has('bow1') ? 1.25 : 1) * (m.dmgMult || 1),
+      levelMult,
+      maxHp: Math.round((P.HP + (S.has('body1') ? 30 : 0) + this.buffs.hpUp * 25) * (m.hpMult || 1) * levelMult),
+      maxSpirit: Math.round((P.SPIRIT + (S.has('spirit2') ? 50 : 0) + this.buffs.spiritUp * 30 + (m.spiritBonus || 0)) * levelMult),
+      spiritRegen: P.SPIRIT_REGEN * (S.has('spirit2') ? 2 : 1) * levelMult,
+      swordDmg: P.SWORD_DMG * AR.WEAPONS.sword[this.swordTier].mult * (S.has('blade1') ? 1.25 : 1) * (m.dmgMult || 1) * levelMult,
+      bowDmg: P.BOW_DMG * AR.WEAPONS.bow[this.bowTier].mult * (S.has('bow1') ? 1.25 : 1) * (m.dmgMult || 1) * levelMult,
       swordChargeTime: P.SWORD_CHARGE_TIME * (S.has('blade3') ? 0.65 : 1) * (m.chargeMult || 1),
       bowChargeTime: P.BOW_CHARGE_TIME * (S.has('bow2') ? 0.65 : 1) * (m.chargeMult || 1),
-      speed: (S.has('body3') ? 1.15 : 1) * (1 + this.buffs.speed * 0.10),
+      swordCooldown: P.SWORD_CD,
+      bowCooldown: P.BOW_CD,
+      speed: (S.has('body3') ? 1.15 : 1) * (1 + this.buffs.speed * 0.10) * levelMult,
       crit: P.CRIT + this.buffs.crit * 0.10,
       armor: S.has('body4') ? 0.8 : 1,
       potionMax: P.POTION_MAX + (S.has('body3') ? 1 : 0),
@@ -206,9 +210,16 @@ AR.Player = class {
 
     // chute dans le vide
     if (this.y > AR.C.WORLD_H * AR.C.TILE + 60) {
-      this.x = this.lastSafe.x; this.y = this.lastSafe.y - 4;
-      this.vx = 0; this.vy = 0;
-      game.hitPlayer(Math.round(this.stats.maxHp * 0.12), this.x, true);
+      const safe = game.level.findSafeRespawn(this.lastSafe.x, this.w, this.h);
+      this.x = safe.x; this.y = safe.y;
+      // Les dégâts environnementaux n'ont pas de provenance : passer undefined
+      // évite le recul artificiel vers la droite qui renvoyait dans le trou.
+      game.hitPlayer(Math.round(this.stats.maxHp * 0.12), undefined, true);
+      this.vx = 0; this.vy = 0; this.kvx = 0;
+      this.dashing = false; this.dashT = 0; this.dropThrough = 0;
+      this.jumpsUsed = 0; this.airDashed = false;
+      this.trail.length = 0;
+      this.lastSafe = { x: safe.x, y: safe.y };
       this.invulnT = 1.2;
     }
 
@@ -282,7 +293,7 @@ AR.Player = class {
   // --------------------------------------------------------- attaques
   _swordLight(game) {
     const st = this.stats;
-    this.swordCd = AR.C.PLAYER.SWORD_CD;
+    this.swordCd = st.swordCooldown;
     this.comboIdx = this.comboT > 0 ? (this.comboIdx + 1) % 3 : 0;
     this.comboT = AR.C.PLAYER.COMBO_WINDOW;
     const finisher = this.comboIdx === 2;
@@ -335,7 +346,7 @@ AR.Player = class {
 
   _bowQuick(game, aim) {
     const st = this.stats;
-    this.bowCd = AR.C.PLAYER.BOW_CD;
+    this.bowCd = st.bowCooldown;
     this.attackAnim = 'bow'; this.attackAnimT = 0.22;
     const sx = this.x + this.w / 2, sy = this.y + this.h * 0.38;
     const ang = AR.U.angle(sx, sy, aim.x, aim.y);
@@ -468,6 +479,7 @@ AR.Player = class {
       this.xp -= next;
       this.level++;
       this.skillPoints++;
+      this.recalcStats(game);
       this.heal(Math.round(this.stats.maxHp * 0.15));
       AR.Audio.sfx('levelup');
       AR.Particles.shockwave(this.x + this.w / 2, this.y + this.h / 2, 90, AR.C.COLORS.xp);

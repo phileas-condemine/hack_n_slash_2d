@@ -205,10 +205,10 @@ AR.Projectiles = {
       switch (p.kind) {
         case 'arrow': case 'earrow':
           ctx.rotate(ang);
-          ctx.strokeStyle = p.kind === 'arrow' ? '#d8ccae' : '#b09a7a';
+          ctx.strokeStyle = p.color || (p.kind === 'arrow' ? '#d8ccae' : '#b09a7a');
           ctx.lineWidth = 2.5;
           ctx.beginPath(); ctx.moveTo(-13, 0); ctx.lineTo(9, 0); ctx.stroke();
-          ctx.fillStyle = '#e8e2d4';
+          ctx.fillStyle = p.color || '#e8e2d4';
           ctx.beginPath(); ctx.moveTo(13, 0); ctx.lineTo(6, -3.5); ctx.lineTo(6, 3.5); ctx.closePath(); ctx.fill();
           break;
         case 'parrow': // flèche chargée perçante

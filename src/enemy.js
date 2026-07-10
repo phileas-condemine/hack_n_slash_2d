@@ -709,6 +709,7 @@ AR.Boss = class extends AR.Enemy {
     this.beam = null;      // laser de l'IA suprême
     this.baseY = footY;
     this.speed = bdef.speed;
+    this.platformLeapCd = 0;
   }
 
   update(dt, game) {
@@ -717,6 +718,7 @@ AR.Boss = class extends AR.Enemy {
     this.t += dt;
     this.flash = Math.max(0, this.flash - dt * 6);
     this.attackPoseT = Math.max(0, this.attackPoseT - dt);
+    this.platformLeapCd = Math.max(0, this.platformLeapCd - dt);
     const pl = game.player;
     const bdef = this.bdef;
     this.kvx = 0;
@@ -746,6 +748,13 @@ AR.Boss = class extends AR.Enemy {
         this.facing = AR.U.sign(pl.x - this.x || 1);
         const d = Math.abs(pl.x + pl.w / 2 - this.centerX());
         this.vx = d > 140 ? this.facing * this.speed : 0;
+        if (bdef.platformChase && this.onGround && this.platformLeapCd <= 0) {
+          const support = this._playerSupport(game);
+          if (support && !support.ground && support.y < this.y + this.h - 45) {
+            this._startPlatformLeap(game, support);
+            break;
+          }
+        }
         if (this.t > 1.4) {
           this.t = 0;
           this.pattern = this.patterns[this.patIdx % this.patterns.length];
@@ -776,8 +785,9 @@ AR.Boss = class extends AR.Enemy {
           this.x += this.stompVx * dt;
           this.y += this.stompVy * dt;
           this.stompVy += 2400 * dt;
-          if (this.y + this.h >= this.baseY) {
-            this.y = this.baseY - this.h;
+          if (this.stompVy >= 0 && this.y + this.h >= this.stompLandingY) {
+            this.y = this.stompLandingY - this.h;
+            this.x = AR.U.clamp(this.x, game.arena.x0 + 10, game.arena.x1 - this.w - 10);
             this.stompLanded = true;
             game.camera.shake(9, 0.4);
             AR.Audio.sfx('boom');
@@ -791,6 +801,27 @@ AR.Boss = class extends AR.Enemy {
         } else if (this.t > 0.8) { this.state = 'move'; this.t = 0; this.stompLanded = false; }
         break;
       }
+      case 'platformLeap':
+        this.facing = AR.U.sign(this.vx || this.facing);
+        if (!pl.dead && !this.leapHitDone && AR.U.rectsOverlap(this.getRect(), pl.getRect())) {
+          this.leapHitDone = true;
+          game.hitPlayer(Math.round(this.dmg * 0.65), this.centerX());
+          pl.knock(this.facing * 300);
+        }
+        if (this.t > 1.6) { this.state = 'move'; this.t = 0; this.platformLeapCd = 1.8; }
+        break;
+      case 'arrowRing':
+        this.vx = 0;
+        this.ringShotT -= dt;
+        if (this.ringBurstsLeft > 0 && this.ringShotT <= 0) {
+          this._spawnArrowRing(game);
+          this.ringBurstsLeft--;
+          this.ringShotT = 0.3;
+        }
+        if (this.ringBurstsLeft <= 0 && this.t > (this.phase === 2 ? 1.15 : 0.85)) {
+          this.state = 'move'; this.t = 0;
+        }
+        break;
       case 'beam': {
         // IA suprême : balayage laser télégraphié puis actif
         const b = this.beam;
@@ -824,8 +855,15 @@ AR.Boss = class extends AR.Enemy {
     // physique au sol pour les boss terrestres
     if (!floats && this.state !== 'stomp') {
       this.vy = (this.vy || 0) + AR.C.GRAV * dt;
-      const res = game.level.moveRect(this, (this.vx || 0) * dt, this.vy * dt, true);
-      if (res.onGround) this.vy = 0;
+      const res = game.level.moveRect(this, (this.vx || 0) * dt, this.vy * dt, !bdef.platformChase);
+      this.onGround = res.onGround;
+      if (res.onGround) {
+        this.vy = 0;
+        if (this.state === 'platformLeap' && this.t > 0.12) {
+          this.state = 'move'; this.t = 0; this.platformLeapCd = 1.8;
+          game.camera.shake(5, 0.2);
+        }
+      }
       if (res.hitWall && this.state === 'charge') {
         this.state = 'move'; this.t = 0;
         game.camera.shake(7, 0.3); AR.Audio.sfx('boom');
@@ -877,8 +915,25 @@ AR.Boss = class extends AR.Enemy {
       case 'stomp':
         this.state = 'stomp';
         this.stompLanded = false;
-        this.stompVx = (pl.x - this.x) / 0.7;
-        this.stompVy = -820;
+        {
+          const support = this._playerSupport(game);
+          const landingY = support ? support.y : this.baseY;
+          const targetX = support
+            ? AR.U.clamp(pl.x + pl.w / 2 - this.w / 2, support.x, support.x + support.w - this.w)
+            : pl.x;
+          const flightT = 0.72;
+          this.stompLandingY = landingY;
+          this.stompVx = (targetX - this.x) / flightT;
+          this.stompVy = (landingY - (this.y + this.h) - 0.5 * 2400 * flightT * flightT) / flightT;
+        }
+        break;
+      case 'arrowRing':
+        this.state = 'arrowRing';
+        this.ringBurstsLeft = this.phase === 2 ? 3 : 2;
+        this.ringShotT = 0;
+        this.ringBurstIndex = 0;
+        this.ringRotation = Math.random() * Math.PI * 2;
+        this.attackPoseT = 1;
         break;
       case 'rocks': case 'javelins': case 'fireballs': case 'volley': case 'flames': {
         this.attackPoseT = Math.max(this.attackPoseT, 0.32);
@@ -946,6 +1001,58 @@ AR.Boss = class extends AR.Enemy {
       default:
         this.state = 'move'; this.t = 0;
     }
+  }
+
+  _playerSupport(game) {
+    const pl = game.player;
+    const footX = pl.x + pl.w / 2, footY = pl.y + pl.h;
+    const arena = game.level.bossArena;
+    if (arena && arena.active) {
+      let best = null, bestD = Infinity;
+      for (const p of arena.platforms) {
+        if (p.w < this.w + 14 || footX < p.x || footX > p.x + p.w) continue;
+        const d = Math.abs(footY - p.y);
+        if (d < 24 && d < bestD) { best = p; bestD = d; }
+      }
+      if (best) return best;
+      return arena.ground;
+    }
+    const y = game.level.groundYpx(footX);
+    return { x: game.arena.x0, y, w: game.arena.x1 - game.arena.x0, ground: true };
+  }
+
+  _startPlatformLeap(game, support) {
+    const pl = game.player;
+    const flightT = 0.78;
+    const targetX = AR.U.clamp(pl.x + pl.w / 2 - this.w / 2,
+      support.x, support.x + support.w - this.w);
+    this.state = 'platformLeap';
+    this.t = 0;
+    this.onGround = false;
+    this.leapHitDone = false;
+    this.vx = (targetX - this.x) / flightT;
+    this.vy = (support.y - (this.y + this.h) - 0.5 * AR.C.GRAV * flightT * flightT) / flightT;
+    this.attackPoseT = 0.5;
+    AR.Audio.sfx('bossRoar');
+  }
+
+  _spawnArrowRing(game) {
+    const n = this.phase === 2 ? 16 : 12;
+    const burst = this.ringBurstIndex++;
+    const speed = (this.phase === 2 ? 350 : 300) + burst * 28;
+    const rotation = this.ringRotation + burst * Math.PI / n;
+    const sx = this.centerX(), sy = this.centerY();
+    for (let i = 0; i < n; i++) {
+      const ang = rotation + (i / n) * Math.PI * 2;
+      AR.Projectiles.spawn({ owner: this,
+        x: sx + Math.cos(ang) * 42, y: sy + Math.sin(ang) * 42,
+        kind: 'earrow', friendly: false, dmg: Math.round(this.dmg * 0.55), r: 6,
+        vx: Math.cos(ang) * speed, vy: Math.sin(ang) * speed, life: 3.2,
+        color: 'hsl(' + Math.round(i / n * 360 + burst * 18) + ' 80% 68%)',
+      });
+    }
+    AR.Particles.shockwave(sx, sy, 90 + burst * 18, AR.C.COLORS.impact);
+    AR.Audio.sfx('enemyShoot');
   }
 
   takeDamage(dmg, opts, game) {

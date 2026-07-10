@@ -221,7 +221,8 @@ AR.UI = {
       for (let n = 0; n < 4; n++) {
         const node = branch.nodes[n];
         const owned = pl.skills.has(node.id);
-        const canBuy = !owned && pl.skillPoints > 0 && (n === 0 || pl.skills.has(branch.nodes[n - 1].id));
+        const prerequisiteMet = n === 0 || pl.skills.has(branch.nodes[n - 1].id);
+        const canBuy = !owned && prerequisiteMet && pl.skillPoints >= node.cost;
         const y = 140 + n * 116;
         const r = { x: x + 6, y, w: colW - 32, h: 100 };
         const hov = this._hover(r);
@@ -235,7 +236,11 @@ AR.UI = {
         ctx.font = 'bold 14px "Segoe UI", sans-serif';
         ctx.textAlign = 'left';
         ctx.fillText((owned ? '✔ ' : canBuy ? '○ ' : '🔒 ') + node.name, r.x + 10, y + 24);
+        ctx.textAlign = 'right';
+        ctx.fillStyle = owned ? branch.color : canBuy ? AR.C.COLORS.xp : AR.C.COLORS.textDim;
+        ctx.fillText(node.cost + ' pt' + (node.cost > 1 ? 's' : ''), r.x + r.w - 10, y + 24);
         ctx.font = '12px "Segoe UI", sans-serif';
+        ctx.textAlign = 'left';
         ctx.fillStyle = AR.C.COLORS.textDim;
         this._wrapText(ctx, node.desc, r.x + 10, y + 46, r.w - 20, 16);
         ctx.restore();

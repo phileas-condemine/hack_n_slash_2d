@@ -110,32 +110,33 @@ AR.ENEMIES = {
 // ------------------------------------------------------------------ LES BOSS
 AR.BOSSES = {
   mammoth_chief: {
-    name: 'CHEF MAMMOUTH', hp: 550, dmg: 24, h: 210, speed: 90, xp: 220, coins: 120,
-    patterns: ['charge', 'stomp', 'summon:stone_spear', 'charge'],
-    phase2: 0.5, p2patterns: ['charge', 'rocks', 'stomp', 'charge', 'summon:beast_hunter'],
+    name: 'CHEF MAMMOUTH', hp: 5500, dmg: 24, h: 210, speed: 90, xp: 220, coins: 120,
+    patterns: ['charge', 'stomp', 'arrowRing'],
+    phase2: 0.5, p2patterns: ['arrowRing', 'stomp', 'charge', 'arrowRing'],
+    platformChase: true,
   },
   chariot_commander: {
-    name: 'COMMANDANT DE CHAR', hp: 700, dmg: 26, h: 190, speed: 130, xp: 280, coins: 150,
+    name: 'COMMANDANT DE CHAR', hp: 7000, dmg: 26, h: 190, speed: 130, xp: 280, coins: 150,
     patterns: ['sweep', 'javelins', 'sweep', 'summon:hoplite'],
     phase2: 0.5, p2patterns: ['sweep', 'javelins', 'javelins', 'sweep', 'summon:archer_auxilia'],
   },
   yokai_lord: {
-    name: 'SEIGNEUR YŌKAI', hp: 850, dmg: 24, h: 200, speed: 80, xp: 340, coins: 180, floats: true,
+    name: 'SEIGNEUR YŌKAI', hp: 8500, dmg: 24, h: 200, speed: 80, xp: 340, coins: 180, floats: true,
     patterns: ['blink', 'fireballs', 'summon:wisp3', 'fireballs'],
     phase2: 0.5, p2patterns: ['blink', 'ring', 'fireballs', 'blink', 'ring', 'summon:wisp3'],
   },
   war_engineer: {
-    name: 'INGÉNIEUR DE GUERRE', hp: 1000, dmg: 26, h: 205, speed: 60, xp: 400, coins: 220,
+    name: 'INGÉNIEUR DE GUERRE', hp: 10000, dmg: 26, h: 205, speed: 60, xp: 400, coins: 220,
     patterns: ['volley', 'mortars', 'volley', 'summon:musketeer'],
     phase2: 0.5, p2patterns: ['volley', 'mortars', 'mortars', 'charge', 'volley'],
   },
   diesel_behemoth: {
-    name: 'BÉHÉMOTH DIESEL', hp: 1200, dmg: 30, h: 195, speed: 70, xp: 480, coins: 260, armored: true,
+    name: 'BÉHÉMOTH DIESEL', hp: 12000, dmg: 30, h: 195, speed: 70, xp: 480, coins: 260, armored: true,
     patterns: ['charge', 'flames', 'mortars', 'stomp'],
     phase2: 0.45, p2patterns: ['charge', 'flames', 'charge', 'mortars', 'stomp'],
   },
   ai_overlord: {
-    name: 'IA SUPRÊME', hp: 1500, dmg: 28, h: 230, speed: 110, xp: 600, coins: 400, floats: true, flyH: 150,
+    name: 'IA SUPRÊME', hp: 15000, dmg: 28, h: 230, speed: 110, xp: 600, coins: 400, floats: true, flyH: 150,
     patterns: ['beam', 'ring', 'summon:drone_swarm', 'beam'],
     phase2: 0.5, p2patterns: ['beam', 'ring', 'ring', 'blink', 'beam', 'summon:shield_drone'],
   },
@@ -162,42 +163,42 @@ AR.WEAPONS = {
 };
 
 // ------------------------------------------------------------- COMPÉTENCES
-// 4 branches, 4 rangs chacune (achat séquentiel), 1 point par rang
+// 4 branches, 4 rangs chacune (achat séquentiel), coût progressif : 1 / 2 / 3 / 4 points
 AR.SKILLS = [
   {
     id: 'blade', name: 'Voie de la Lame', color: '#e8a545',
     nodes: [
-      { id: 'blade1', name: 'Tranchant affûté', desc: 'Dégâts d\'épée +25%' },
-      { id: 'blade2', name: 'Souffle du combo', desc: 'Le 3e coup du combo émet une onde tranchante' },
-      { id: 'blade3', name: 'Iaijutsu', desc: 'Temps de charge de l\'épée -35%' },
-      { id: 'blade4', name: 'Lame fantôme', desc: 'Attaque chargée : +60% portée et dégâts' },
+      { id: 'blade1', name: 'Tranchant affûté', cost: 1, desc: 'Dégâts d\'épée +25%' },
+      { id: 'blade2', name: 'Souffle du combo', cost: 2, desc: 'Le 3e coup du combo émet une onde tranchante' },
+      { id: 'blade3', name: 'Iaijutsu', cost: 3, desc: 'Temps de charge de l\'épée -35%' },
+      { id: 'blade4', name: 'Lame fantôme', cost: 4, desc: 'Attaque chargée : +60% portée et dégâts' },
     ],
   },
   {
     id: 'bow', name: 'Voie de l\'Arc', color: '#5cc9a8',
     nodes: [
-      { id: 'bow1', name: 'Œil de faucon', desc: 'Dégâts d\'arc +25%' },
-      { id: 'bow2', name: 'Bras du tengu', desc: 'Temps de charge de l\'arc -35%' },
-      { id: 'bow3', name: 'Pointe explosive', desc: 'La flèche chargée explose à l\'impact' },
-      { id: 'bow4', name: 'Tir triple', desc: 'Le tir rapide envoie 3 flèches en éventail' },
+      { id: 'bow1', name: 'Œil de faucon', cost: 1, desc: 'Dégâts d\'arc +25%' },
+      { id: 'bow2', name: 'Bras du tengu', cost: 2, desc: 'Temps de charge de l\'arc -35%' },
+      { id: 'bow3', name: 'Pointe explosive', cost: 3, desc: 'La flèche chargée explose à l\'impact' },
+      { id: 'bow4', name: 'Tir triple', cost: 4, desc: 'Le tir rapide envoie 3 flèches en éventail' },
     ],
   },
   {
     id: 'body', name: 'Voie du Corps', color: '#e05c7e',
     nodes: [
-      { id: 'body1', name: 'Endurance', desc: 'PV max +30' },
-      { id: 'body2', name: 'Pas de l\'ombre', desc: 'Recharge du dash -40%' },
-      { id: 'body3', name: 'Foulée du vent', desc: 'Vitesse +15%, potions +1 emplacement' },
-      { id: 'body4', name: 'Peau de fer', desc: 'Dégâts subis -20%' },
+      { id: 'body1', name: 'Endurance', cost: 1, desc: 'PV max +30' },
+      { id: 'body2', name: 'Pas de l\'ombre', cost: 2, desc: 'Recharge du dash -40%' },
+      { id: 'body3', name: 'Foulée du vent', cost: 3, desc: 'Vitesse +15%, potions +1 emplacement' },
+      { id: 'body4', name: 'Peau de fer', cost: 4, desc: 'Dégâts subis -20%' },
     ],
   },
   {
     id: 'spirit', name: 'Voie de l\'Esprit', color: '#c05cff',
     nodes: [
-      { id: 'spirit1', name: 'Éveil', desc: 'Débloque Vague spirituelle (1) et Nuée de kunaïs (2)' },
-      { id: 'spirit2', name: 'Méditation', desc: 'Esprit max +50, régénération doublée' },
-      { id: 'spirit3', name: 'Illumination', desc: 'Débloque Frappe éclair (3) et Voile temporel (4)' },
-      { id: 'spirit4', name: 'Transcendance', desc: 'Sorts : coût -30%, dégâts +50%' },
+      { id: 'spirit1', name: 'Éveil', cost: 1, desc: 'Débloque Vague spirituelle (1) et Nuée de kunaïs (2)' },
+      { id: 'spirit2', name: 'Méditation', cost: 2, desc: 'Esprit max +50, régénération doublée' },
+      { id: 'spirit3', name: 'Illumination', cost: 3, desc: 'Débloque Frappe éclair (3) et Voile temporel (4)' },
+      { id: 'spirit4', name: 'Transcendance', cost: 4, desc: 'Sorts : coût -30%, dégâts +50%' },
     ],
   },
 ];

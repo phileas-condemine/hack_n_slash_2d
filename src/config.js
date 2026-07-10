@@ -23,6 +23,7 @@ AR.C = {
     CRIT: 0.05, CRIT_MULT: 1.6,
     POTION_HEAL: 0.40, POTION_MAX: 3,
     INVULN: 0.9,
+    LEVEL_STAT_GROWTH: 0.01,
   },
 
   XP_BASE: 60, XP_GROWTH: 1.32,

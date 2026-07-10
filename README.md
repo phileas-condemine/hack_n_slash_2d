@@ -49,7 +49,7 @@ La jauge au-dessus du héros montre la **charge** de l'arme ; à pleine charge, 
   - **tir ami** : tout projectile blesse ce qu'il touche, allié comme ennemi — les tireurs se repositionnent pour éviter leurs propres rangs ;
   - un monstre attaqué **traque son agresseur** ; les tireurs esquivent d'un bond et ripostent.
 - **3 difficultés** : Normal, Difficile (esquives, dashs, parades fréquentes, or/XP -20%), Cauchemar (téléportation télégraphiée, double saut, or/XP -35%).
-- **Progression** : XP, arbre de 16 compétences en 4 voies, 4 sorts illustrés, 6 crans d'armes, reliques, potions.
+- **Progression** : XP, bonus cumulatif de 1 % aux attributs principaux par niveau, arbre de 16 compétences en 4 voies (coûts progressifs de 1 à 4 points par rang), 4 sorts illustrés, 6 crans d'armes, reliques, potions.
 - **Tours à coffres** : plateformes exigeantes (double saut, dash, Frappe éclair), souvent à grimper de droite à gauche — butin garanti au sommet.
 - **Mode démo** : l'IA joue seule (déplacements, combats, achats, choix de faille), adapte son arsenal aux boucliers et contourne les combats trop coûteux ; accélérable ×2/×4/×8 — idéal pour tester l'équilibrage.
 - **Capture** : enregistrement WebM du canvas et captures PNG intégrés.
