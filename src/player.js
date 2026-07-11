@@ -13,6 +13,7 @@ AR.Player = class {
     this.jumpsUsed = 0;
     this.dashing = false; this.dashT = 0; this.dashCd = 0; this.dashCharges = 1;
     this.airDashed = false;
+    this.climbing = false; this.climbCooldown = 0;
     this.dropThrough = 0;
     this.dashHeld = 0;
     this.trail = [];
@@ -162,13 +163,21 @@ AR.Player = class {
       if (this.trail[i].t <= 0) this.trail.splice(i, 1);
     }
 
+    // ---------------- escalade : détection préalable (la touche « haut » sert aussi au saut)
+    const climbCx = this.x + this.w / 2, climbCy = this.y + this.h / 2;
+    const onClimb = game.level.climbableAt && game.level.climbableAt(climbCx, climbCy);
+    // Intention d'escalade : sur une liane avec haut/bas maintenu, « haut » grimpe
+    // (et ne déclenche pas de saut). Le petit cooldown couvre le sommet de la liane.
+    if (this.climbing || onClimb) this.climbCooldown = 0.18; else this.climbCooldown -= dt;
+    const climbIntent = (onClimb || this.climbing || this.climbCooldown > 0) && (In.down('up') || In.down('down'));
+
     // ---------------- saut / double saut
     this.jumpBuffer -= dt; this.coyote -= dt;
-    if (In.pressed('jump')) {
+    if (In.pressed('jump') && !climbIntent) {
       if (In.down('down') && this.onGround) { this.dropThrough = 0.25; }
       else this.jumpBuffer = P.BUFFER;
     }
-    if (this.jumpBuffer > 0) {
+    if (this.jumpBuffer > 0 && !this.climbing) {
       if (this.onGround || this.coyote > 0) {
         this.vy = P.JUMP_VY;
         this.jumpBuffer = 0; this.coyote = 0;
@@ -183,10 +192,35 @@ AR.Player = class {
           { color: AR.C.COLORS.spirit, speed: 140, size: 3, life: 0.35, spread: 1.2, angle: Math.PI / 2 });
       }
     }
-    if (In.released('jump') && this.vy < 0) this.vy *= P.JUMP_CUT;
+    if (In.released('jump') && this.vy < 0 && !this.climbing) this.vy *= P.JUMP_CUT;
+
+    // ---------------- escalade (lianes / échelles) — cf. 00_pre_requis §7.1
+    if (!this.climbing && onClimb && !this.dashing && (In.down('up') || In.down('down'))) {
+      this.climbing = true; this.jumpsUsed = 0; this.airDashed = false;
+    }
+    if (this.climbing) {
+      if (!onClimb || this.dashing) {
+        this.climbing = false;
+      } else {
+        this.jumpBuffer = 0; this.coyote = 0;
+        let cvy = 0;
+        if (In.down('up')) cvy -= 150;
+        if (In.down('down')) cvy += 150;
+        this.vy = cvy;
+        if (dir !== 0) {
+          // se décaler / sortir sur le côté (vitesse réduite sur la prise, cf. 00 §7.1)
+          this.vx = dir * 45;
+        } else if (onClimb.x !== undefined) {
+          // sans entrée horizontale : recentrer pour ne pas glisser hors du volume
+          const target = (onClimb.x + onClimb.w / 2) * AR.C.TILE - this.w / 2;
+          this.x = AR.U.damp(this.x, target, 14, dt);
+          this.vx = 0;
+        }
+      }
+    }
 
     // ---------------- gravité + collision
-    if (!this.dashing) this.vy += AR.C.GRAV * dt;
+    if (!this.dashing && !this.climbing) this.vy += AR.C.GRAV * dt;
     this.vy = Math.min(this.vy, 980);
     this.kvx *= Math.pow(0.01, dt);
     const wasGround = this.onGround;
@@ -214,7 +248,8 @@ AR.Player = class {
       this.x = safe.x; this.y = safe.y;
       // Les dégâts environnementaux n'ont pas de provenance : passer undefined
       // évite le recul artificiel vers la droite qui renvoyait dans le trou.
-      game.hitPlayer(Math.round(this.stats.maxHp * 0.12), undefined, true);
+      const fallRatio = (game.level.fallDamageRatio !== undefined ? game.level.fallDamageRatio : 0.12);
+      game.hitPlayer(Math.round(this.stats.maxHp * fallRatio), undefined, true);
       this.vx = 0; this.vy = 0; this.kvx = 0;
       this.dashing = false; this.dashT = 0; this.dropThrough = 0;
       this.jumpsUsed = 0; this.airDashed = false;

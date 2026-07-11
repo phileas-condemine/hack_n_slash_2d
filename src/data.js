@@ -70,6 +70,9 @@ AR.ENEMIES = {
   stone_brute:    { name: 'Brute au gourdin', hp: 62, dmg: 18, speed: 65, xp: 24, coins: 9, h: 92, behavior: 'brute', range: 92, aggro: 400, atkCd: 1.9, tele: 0.6, facing: 'l', knock: 320 },
   war_shaman:     { name: 'Chaman de guerre', hp: 34, dmg: 9, speed: 55, xp: 26, coins: 10, h: 96, behavior: 'caster', range: 560, keep: 340, aggro: 600, atkCd: 2.6, tele: 0.7, proj: 'wisp' },
   mammoth_rider:  { name: 'Monteur de mammouth', hp: 150, dmg: 22, speed: 70, xp: 60, coins: 25, h: 128, behavior: 'charger', range: 480, aggro: 560, atkCd: 2.6, tele: 0.75, chargeSpeed: 420, knock: 380, elite: true },
+  // Nouveaux monstres de l'extension (âge de pierre) — cf. 01_niveau_age_de_pierre.md §6
+  stone_cave_stalker: { name: 'Traqueur des cavernes', hp: 40, dmg: 12, speed: 72, xp: 34, coins: 14, h: 96, behavior: 'assassin', range: 66, aggro: 500, atkCd: 1.9, tele: 0.45, blinkCd: 2.8, facing: 'l' },
+  stone_cave_bats:    { name: 'Nuée de chauves-souris', hp: 22, dmg: 8, speed: 150, xp: 16, coins: 6, h: 72, behavior: 'flyer', range: 60, aggro: 520, atkCd: 1.6, tele: 0.35, dive: true, flyH: 150 },
 
   // --- Antiquité
   hoplite:        { name: 'Hoplite', hp: 40, dmg: 12, speed: 90, xp: 16, coins: 6, h: 82, behavior: 'shield', range: 64, aggro: 430, atkCd: 1.4, tele: 0.45, block: 0.6 },
@@ -107,13 +110,22 @@ AR.ENEMIES = {
   mech_assassin:  { name: 'Assassin mécanisé', hp: 120, dmg: 22, speed: 220, xp: 65, coins: 28, h: 94, behavior: 'assassin', range: 70, aggro: 700, atkCd: 1.3, tele: 0.26, blinkCd: 2.4, elite: true, parry: true },
 };
 
+// Sprite de repli si l'image d'un ennemi est absente (le comportement/les stats
+// restent ceux de l'ennemi réel ; seul le rendu emprunte le sprite indiqué).
+AR.ENEMY_FALLBACK = {
+  stone_cave_stalker: 'beast_hunter',
+  stone_cave_bats: 'war_shaman',
+};
+
 // ------------------------------------------------------------------ LES BOSS
 AR.BOSSES = {
   mammoth_chief: {
     name: 'CHEF MAMMOUTH', hp: 5500, dmg: 24, h: 210, speed: 90, xp: 220, coins: 120,
     patterns: ['charge', 'stomp', 'arrowRing'],
     phase2: 0.5, p2patterns: ['arrowRing', 'stomp', 'charge', 'arrowRing'],
-    platformChase: true,
+    // Les deux promontoires de l'arène (cf. arenas.js) doivent rester une échappatoire
+    // réelle pendant une charge au sol (§8/§13 du spec niveau 1) : platformChase ferait
+    // sauter le boss sur la même plateforme et neutraliserait tout refuge.
   },
   chariot_commander: {
     name: 'COMMANDANT DE CHAR', hp: 7000, dmg: 26, h: 190, speed: 130, xp: 280, coins: 150,

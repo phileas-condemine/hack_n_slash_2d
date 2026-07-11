@@ -171,13 +171,31 @@ AR.HUD = {
       ctx.textAlign = 'left';
     }
 
+    // ---------------- invite d'escalade (liane/échelle) : discoverability
+    if (!game.player.climbing && game.level.climbableAt) {
+      const pl = game.player;
+      const onClimb = game.level.climbableAt(pl.x + pl.w / 2, pl.y + pl.h / 2);
+      if (onClimb) {
+        const x = pl.x + pl.w / 2 - game.camera.cx(), y = pl.y - game.camera.cy() - 14;
+        ctx.font = 'bold 14px "Segoe UI", sans-serif'; ctx.textAlign = 'center';
+        const label = '↑ / ↓ : Grimper';
+        ctx.fillStyle = 'rgba(10,14,18,0.85)';
+        const tw = ctx.measureText(label).width;
+        ctx.fillRect(x - tw / 2 - 8, y - 16, tw + 16, 22);
+        ctx.fillStyle = C.spirit;
+        ctx.fillText(label, x, y);
+        ctx.textAlign = 'left';
+      }
+    }
+
     // ---------------- invite d'interaction
     if (game.interactPrompt) {
       const p = game.interactPrompt;
       const x = p.x - game.camera.cx(), y = p.y - game.camera.cy() - (p.type === 'portal' ? 116 : 58);
       ctx.font = 'bold 14px "Segoe UI", sans-serif'; ctx.textAlign = 'center';
       ctx.fillStyle = 'rgba(10,14,18,0.85)';
-      const label = p.type === 'chest' ? 'Ouvrir' : p.type === 'portal' ? 'Traverser la faille' : 'Marchander';
+      const label = p.type === 'chest' ? 'Ouvrir' : p.type === 'portal' ? 'Traverser la faille' :
+        p.type === 'lever' ? 'Actionner' : 'Marchander';
       const tw = ctx.measureText('[E] ' + label).width;
       ctx.fillRect(x - tw / 2 - 8, y - 16, tw + 16, 22);
       ctx.fillStyle = C.impact;

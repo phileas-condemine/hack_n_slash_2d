@@ -1,5 +1,19 @@
-// Arcane Rift - niveaux procéduraux : terrain, collisions, parallaxe, décor, météo
+// Arcane Rift - niveaux : terrain (procédural OU authored), collisions multi-étage,
+// grille de collision, rooms, traversal, parallaxe, décor, météo
 window.AR = window.AR || {};
+
+// Drapeaux de la grille de collision (cartes authored). Voir 00_pre_requis §5.2.
+AR.TILE_FLAGS = {
+  EMPTY: 0,
+  SOLID: 1 << 0,
+  ONE_WAY: 1 << 1,
+  HAZARD: 1 << 2,
+  CLIMBABLE: 1 << 3,
+  DOOR: 1 << 4,
+  BREAKABLE: 1 << 5,
+  NO_ENEMY: 1 << 6,
+  NO_RESPAWN: 1 << 7,
+};
 
 AR.Level = class {
   constructor(eraIdx, seed) {
@@ -7,10 +21,34 @@ AR.Level = class {
     this.eraIdx = eraIdx;
     this.era = AR.ERAS[eraIdx];
     this.seed = seed;
-    const rng = AR.rng(seed);
-    this.rng = rng;
+    this.rng = AR.rng(seed);
     this.PIT = 9999;
+    this.worldH = C.WORLD_H;
+    // ----- contrats communs, remplis par l'un des deux constructeurs de carte
+    this.platforms = []; this.props = []; this.spawns = []; this.chestSpots = [];
+    this.gateClosed = false; this.grid = null;
+    this.rooms = []; this.roomById = {};
+    this.climbables = []; this.breakables = []; this.interactables = [];
+    this.encounters = []; this.triggers = []; this.hazards = [];
+    this.safeAnchors = []; this.navHints = {}; this.dynGates = [];
+    this.fallDamageRatio = 0.1;
 
+    const spec = (AR.LEVEL_SPECS && AR.LEVEL_SPECS[this.era.id]) || null;
+    if (spec) this._buildFromSpec(spec);
+    else this._buildProcedural(seed);
+
+    // ----- couches de parallaxe + texture de sol + météo (commun aux deux)
+    this._buildLayers();
+    this._buildGroundPattern();
+    this.ambient = [];
+    for (let i = 0; i < 70; i++) this.ambient.push(this._newAmbient(true));
+  }
+
+  // ============================================ GÉNÉRATION PROCÉDURALE (legacy)
+  _buildProcedural(seed) {
+    const C = AR.C, T = C.TILE;
+    const rng = this.rng;
+    const eraIdx = this.eraIdx;
     // ----- squelette du terrain (hauteurs par colonne, en tuiles)
     const len = 400 + eraIdx * 22;
     const arenaLen = 34;
@@ -179,14 +217,279 @@ AR.Level = class {
     // torches d'arène
     this.props.push({ type: 'fire', x: (this.arenaStartTx + 4) * T, y: agy * T, s: 1.2, r: 0.5 });
     this.props.push({ type: 'fire', x: (this.tilesW - 4) * T, y: agy * T, s: 1.2, r: 0.5 });
+  }
 
-    // ----- couches de parallaxe pré-rendues + texture de sol
-    this._buildLayers();
-    this._buildGroundPattern();
+  // ============================================== CARTE AUTHORED (level_specs)
+  // Conventions : toutes les coordonnées de spec sont en TUILES.
+  //   solids/empties/hazards/gates/rect : {x,y,w,h}   (empties = grottes/tunnels creusés)
+  //   oneWay      : {x,y,w,id?,kind?}
+  //   climbables  : {id,x,y,w,h, exitY?}
+  //   breakables  : {id,type:'wall'|'bridge', rect:{x,y,w,h}, hp?, land?}
+  //   interactables:{id,type:'lever'|'door', x,y, rect?, links:[], prompt?, state?}
+  //   rooms       : {id, rect, tags:[], camera:{minX,maxX,minY,maxY}, safeRespawn:[{x,y,priority?}]}
+  //   spawns      : {tx,ty,id, elite?, suspended?, activate?, onPlatform?}   (ty = tuile du pied)
+  //   chests      : {x,y, high?}      merchant : {x,y}      props : {type,tx,ty, ox?, s?, r?}
+  //   encounters  : {id, roomId, trigger:{x,y,w,h}, gates:[{x,y,w,h}], waves:[{budget,pool}]|fixed:[id..], reward?}
+  //   triggers    : {id, rect:{x,y,w,h}, action, ...}      navHints : objet libre (mode démo)
+  _buildFromSpec(spec) {
+    const C = AR.C, T = C.TILE, F = AR.TILE_FLAGS;
+    this.authored = true;
+    this.spec = spec;
+    this.tilesW = spec.tilesW;
+    this.worldH = spec.worldH || C.WORLD_H;
+    this.fallDamageRatio = spec.fallDamageRatio || 0.1;
+    this.startRoom = spec.startRoom || null;
+    this.grid = new Uint8Array(this.tilesW * this.worldH);
 
-    // ----- météo ambiante
-    this.ambient = [];
-    for (let i = 0; i < 70; i++) this.ambient.push(this._newAmbient(true));
+    // --- terrain solide : additif (solids) puis soustractif (empties = grottes/tunnels)
+    for (const r of spec.solids || []) this._fillRect(r, F.SOLID);
+    for (const r of spec.empties || []) this._clearRect(r, F.SOLID | F.BREAKABLE | F.DOOR);
+    for (const r of spec.hazards || []) { this._fillRect(r, F.HAZARD); this.hazards.push(this._rectPx(r)); }
+
+    // --- plateformes traversables (one-way) conservées dans this.platforms (compat)
+    for (const p of spec.oneWay || []) {
+      this.platforms.push({ tx: p.x, ty: p.y, w: p.w, kind: p.kind || 'ledge', id: p.id });
+    }
+
+    // --- lianes / échelles
+    for (const c of spec.climbables || []) {
+      this.climbables.push({ id: c.id, x: c.x, y: c.y, w: c.w, h: c.h, exitY: c.exitY });
+      this._fillRect({ x: c.x, y: c.y, w: c.w, h: c.h }, F.CLIMBABLE);
+    }
+
+    // --- destructibles : murs (SOLID+BREAKABLE) et ponts fragiles (one-way + effondrement)
+    for (const b of spec.breakables || []) {
+      const obj = { id: b.id, type: b.type, rect: b.rect, hp: b.hp || 45, maxHp: b.hp || 45,
+        broken: false, triggered: false, collapseT: 0, land: b.land };
+      this.breakables.push(obj);
+      if (b.type === 'bridge') {
+        this.platforms.push({ tx: b.rect.x, ty: b.rect.y, w: b.rect.w, kind: 'bone_bridge', breakId: b.id });
+      } else {
+        this._fillRect(b.rect, F.SOLID | F.BREAKABLE);
+      }
+    }
+
+    // --- interactables (leviers, portes) ; portes fermées = solides
+    for (const o of spec.interactables || []) {
+      const obj = { id: o.id, type: o.type, x: o.x, y: o.y, rect: o.rect, links: o.links || [],
+        prompt: o.prompt, state: o.state || (o.type === 'door' ? 'closed' : 'off'), oneShot: o.oneShot !== false };
+      this.interactables.push(obj);
+      if (o.type === 'door' && obj.state === 'closed' && o.rect) this._fillRect(o.rect, F.SOLID | F.DOOR);
+    }
+
+    // --- rooms + ancres de respawn
+    for (const r of spec.rooms || []) {
+      const room = { id: r.id, rect: r.rect, tags: r.tags || [], camera: r.camera || null, safeRespawn: r.safeRespawn || [] };
+      this.rooms.push(room); this.roomById[r.id] = room;
+      for (const s of room.safeRespawn) this.safeAnchors.push({ x: s.x, y: s.y, roomId: r.id, priority: s.priority || 5 });
+    }
+
+    // --- encounters + triggers
+    for (const e of spec.encounters || []) {
+      this.encounters.push({ id: e.id, roomId: e.roomId, trigger: e.trigger, gates: e.gates || [],
+        waves: e.waves || null, fixed: e.fixed || null, reward: e.reward || null, state: 'idle', waveIdx: 0 });
+    }
+    for (const t of spec.triggers || []) this.triggers.push({ ...t, fired: false });
+    this.navHints = spec.navHints || {};
+
+    // --- surface primaire dérivée (compat groundYpx / ambiance / respawn legacy)
+    this._deriveHeights();
+
+    // --- props authored + props auto des éléments de traversal
+    for (const p of spec.props || []) {
+      this.props.push({ type: p.type, x: (p.tx + (p.ox || 0)) * T, y: p.ty * T, s: p.s || 1,
+        r: p.r !== undefined ? p.r : this.rng() });
+    }
+    for (const c of this.climbables) this.props.push({ type: 'vine', x: (c.x + c.w / 2) * T, y: c.y * T, vh: c.h, s: 1, r: 0 });
+    for (const o of this.interactables) if (o.type === 'lever') this.props.push({ type: 'lever', ref: o, x: o.x * T, y: o.y * T, s: 1, r: 0 });
+
+    // --- spawns (ennemis libres + suspendus/dormants)
+    this.spawns = [];
+    for (const s of spec.spawns || []) {
+      this.spawns.push({ x: s.tx * T + T / 2, y: s.ty * T, id: s.id, elite: !!s.elite,
+        suspended: !!s.suspended, dormant: !!s.suspended || !!s.dormant, activate: s.activate || null, onPlatform: !!s.onPlatform });
+    }
+
+    // --- coffres, marchand
+    for (const c of spec.chests || []) this.chestSpots.push({ x: (c.x + 0.5) * T, y: c.y * T, high: !!c.high });
+    this.merchantX = spec.merchant ? spec.merchant.x * T : 0;
+
+    // --- arène de boss (réutilise le pipeline image existant)
+    this.spawnX = (spec.spawnX !== undefined ? spec.spawnX : 3) * T;
+    this.arenaStartTx = spec.arenaStartTx;
+    this.gateTx = spec.gateTx !== undefined ? spec.gateTx : this.arenaStartTx + 1;
+    this.arenaGy = spec.arenaGy || 23;
+    this._buildBossArena();
+    if (!this.bossArena) {
+      this.bossX = (this.arenaStartTx + 20) * T;
+      this.portalX = (this.arenaStartTx + 16) * T;
+    }
+  }
+
+  // ---- grille : primitives
+  _fillRect(r, flag) {
+    const W = this.tilesW, H = this.worldH;
+    const x0 = Math.max(0, r.x | 0), x1 = Math.min(W, (r.x + r.w) | 0);
+    const y0 = Math.max(0, r.y | 0), y1 = Math.min(H, (r.y + r.h) | 0);
+    for (let ty = y0; ty < y1; ty++) for (let tx = x0; tx < x1; tx++) this.grid[ty * W + tx] |= flag;
+  }
+  _clearRect(r, flag) {
+    const W = this.tilesW, H = this.worldH;
+    const x0 = Math.max(0, r.x | 0), x1 = Math.min(W, (r.x + r.w) | 0);
+    const y0 = Math.max(0, r.y | 0), y1 = Math.min(H, (r.y + r.h) | 0);
+    for (let ty = y0; ty < y1; ty++) for (let tx = x0; tx < x1; tx++) this.grid[ty * W + tx] &= ~flag;
+  }
+  _rectPx(r) { const T = AR.C.TILE; return { x: r.x * T, y: r.y * T, w: r.w * T, h: r.h * T }; }
+  _flagAt(tx, ty) {
+    if (tx < 0 || tx >= this.tilesW || ty < 0 || ty >= this.worldH) return 0;
+    return this.grid[ty * this.tilesW + tx];
+  }
+  _deriveHeights() {
+    this.heights = new Array(this.tilesW).fill(this.PIT);
+    const F = AR.TILE_FLAGS, W = this.tilesW;
+    for (let tx = 0; tx < W; tx++) {
+      for (let ty = 0; ty < this.worldH; ty++) {
+        if (this.grid[ty * W + tx] & F.SOLID) { this.heights[tx] = ty; break; }
+      }
+    }
+  }
+
+  // Sol le plus proche SOUS (x, fromY) : consulte la grille + les plateformes one-way.
+  // Sert au multi-étage (grottes) là où groundYpx (surface primaire) serait ambigu.
+  surfaceYAt(x, fromY, opts) {
+    opts = opts || {};
+    const T = AR.C.TILE;
+    const tx = Math.floor(x / T);
+    const startTy = Math.max(0, Math.floor((fromY !== undefined ? fromY : 0) / T));
+    const maxDist = opts.maxDistance !== undefined ? opts.maxDistance : this.worldH * T;
+    let solidY = Infinity;
+    for (let ty = startTy; ty <= this.worldH; ty++) {
+      if (ty * T - (fromY || 0) > maxDist) break;
+      if (this.solidAt(tx, ty)) { solidY = ty * T; break; }
+    }
+    let owY = Infinity;
+    if (opts.includeOneWay !== false) {
+      for (const p of this.platforms) {
+        if (p.broken) continue;
+        if (x >= p.tx * T && x <= (p.tx + p.w) * T) {
+          const py = p.ty * T;
+          if (py >= (fromY || 0) - 2 && py < owY) owY = py;
+        }
+      }
+    }
+    const best = Math.min(solidY, owY);
+    return best === Infinity ? this.worldH * T * 2 : best;
+  }
+
+  // Sol adapté à l'entité : grille (multi-étage) si carte authored, sinon groundYpx legacy.
+  // L'arène de boss active garde son sol image (via groundYpx qui le gère en priorité).
+  groundYAtEntity(x, fromY) {
+    const arena = this.bossArena;
+    if ((arena && arena.active) || !this.grid) return this.groundYpx(x);
+    return this.surfaceYAt(x, fromY, { includeOneWay: true });
+  }
+
+  // ---- lianes / échelles : renvoie l'objet climbable (pour recentrage) ou null
+  climbableAt(x, y) {
+    if (!this.grid) return null;
+    const T = AR.C.TILE, tx = Math.floor(x / T), ty = Math.floor(y / T);
+    if (!(this._flagAt(tx, ty) & AR.TILE_FLAGS.CLIMBABLE)) return null;
+    for (const c of this.climbables) {
+      if (tx >= c.x && tx < c.x + c.w && ty >= c.y && ty < c.y + c.h) return c;
+    }
+    return true;
+  }
+
+  // ---- rooms
+  currentRoomAt(x, y) {
+    const T = AR.C.TILE, txp = x / T, typ = y / T;
+    for (const r of this.rooms) {
+      const R = r.rect;
+      if (txp >= R.x && txp <= R.x + R.w && typ >= R.y && typ <= R.y + R.h) return r;
+    }
+    return null;
+  }
+  roomHasTag(x, y, tag) {
+    const r = this.currentRoomAt(x, y);
+    return !!(r && r.tags.indexOf(tag) >= 0);
+  }
+
+  // ---- destructibles
+  breakableAt(tx, ty) {
+    for (const b of this.breakables) {
+      if (b.broken || b.type === 'bridge') continue;
+      const R = b.rect;
+      if (tx >= R.x && tx < R.x + R.w && ty >= R.y && ty < R.y + R.h) return b;
+    }
+    return null;
+  }
+  hitBreakable(b, dmg, game) {
+    if (!b || b.broken) return false;
+    b.hp -= dmg;
+    if (game) {
+      const T = AR.C.TILE;
+      AR.Particles.burst((b.rect.x + b.rect.w / 2) * T, (b.rect.y + b.rect.h / 2) * T, 6,
+        { color: ['#7a6a52', '#a89a80'], speed: 120, size: 3, life: 0.4 });
+      AR.Audio.sfx('hit');
+    }
+    if (b.hp <= 0) this.breakOpen(b, game);
+    return true;
+  }
+  breakOpen(b, game) {
+    b.broken = true;
+    if (b.type !== 'bridge') this._clearRect(b.rect, AR.TILE_FLAGS.SOLID | AR.TILE_FLAGS.BREAKABLE);
+    else { const p = this.platforms.find((pp) => pp.breakId === b.id); if (p) p.broken = true; }
+    this._deriveHeights();
+    if (game) {
+      const T = AR.C.TILE;
+      AR.Particles.burst((b.rect.x + b.rect.w / 2) * T, (b.rect.y + b.rect.h / 2) * T, 18,
+        { color: ['#7a6a52', '#a89a80', '#57503a'], speed: 220, size: 4, life: 0.6 });
+      AR.Audio.sfx('boom'); game.camera.shake(4, 0.3);
+    }
+  }
+
+  // ponts fragiles : déclenchés au passage, s'effondrent après un délai
+  updateDynamics(dt, game) {
+    const T = AR.C.TILE, pl = game.player;
+    for (const b of this.breakables) {
+      if (b.type !== 'bridge' || b.broken) continue;
+      const p = this.platforms.find((pp) => pp.breakId === b.id);
+      if (!p) continue;
+      if (!b.triggered && pl.onGround &&
+          pl.x + pl.w > p.tx * T && pl.x < (p.tx + p.w) * T &&
+          Math.abs((pl.y + pl.h) - p.ty * T) < 6) {
+        b.triggered = true;
+        AR.Particles.burst(pl.x + pl.w / 2, p.ty * T, 8, { color: '#cfc5a8', speed: 90, size: 3, life: 0.5 });
+      }
+      if (b.triggered) {
+        b.collapseT += dt;
+        if (b.collapseT >= (b.collapseTime || 1.6)) this.breakOpen(b, game);
+      }
+    }
+  }
+
+  // ---- interactables (leviers → portes/raccourcis)
+  activateInteractable(o, game) {
+    if (!o || (o.oneShot && o.state === 'on')) return false;
+    o.state = o.state === 'on' ? 'off' : 'on';
+    for (const linkId of o.links) {
+      const door = this.interactables.find((d) => d.id === linkId);
+      if (door && door.type === 'door' && door.rect) {
+        door.state = door.state === 'open' ? 'closed' : 'open';
+        if (door.state === 'open') this._clearRect(door.rect, AR.TILE_FLAGS.SOLID | AR.TILE_FLAGS.DOOR);
+        else this._fillRect(door.rect, AR.TILE_FLAGS.SOLID | AR.TILE_FLAGS.DOOR);
+      }
+    }
+    this._deriveHeights();
+    if (game) { AR.Audio.sfx('gate'); AR.HUD.notify('Levier actionné — un passage s\'ouvre', AR.C.COLORS.spirit); }
+    return true;
+  }
+
+  // ---- barrières d'encounter (solides temporaires posées dans la grille)
+  setGateSolid(rect, closed) {
+    if (closed) this._fillRect(rect, AR.TILE_FLAGS.SOLID);
+    else this._clearRect(rect, AR.TILE_FLAGS.SOLID);
+    this._deriveHeights();
   }
 
   // Remonte une plateforme au-dessus du terrain le plus haut qu'elle recouvre.
@@ -251,6 +554,10 @@ AR.Level = class {
   solidAt(tx, ty) {
     if (tx < 0 || tx >= this.tilesW) return true;
     if (this.gateClosed && tx === this.gateTx && ty >= this.arenaGy - 7) return true;
+    if (this.grid) {
+      if (ty < 0 || ty >= this.worldH) return false; // sous la carte : vide (chute)
+      return (this.grid[ty * this.tilesW + tx] & AR.TILE_FLAGS.SOLID) !== 0;
+    }
     const h = this.heights[tx];
     return h !== this.PIT && ty >= h;
   }
@@ -273,6 +580,18 @@ AR.Level = class {
     if (arena && arena.active) {
       const x = AR.U.clamp(anchorX, arena.ground.x + T, arena.ground.x + arena.ground.w - entityW - T);
       return { x, y: arena.ground.y - entityH - 2 };
+    }
+
+    // Cartes authored : ancres de respawn déclarées (préférer celle déjà franchie, la plus proche).
+    if (this.grid && this.safeAnchors.length) {
+      let best = null, bestScore = Infinity;
+      for (const s of this.safeAnchors) {
+        const sx = (s.x + 0.5) * T;
+        const behind = sx <= anchorX + T * 2;
+        const score = Math.abs(sx - anchorX) + (behind ? 0 : 1e6) - s.priority;
+        if (score < bestScore) { bestScore = score; best = s; }
+      }
+      if (best) return { x: (best.x + 0.5) * T - entityW / 2, y: best.y * T - entityH - 2 };
     }
 
     let cursor = AR.U.clamp(Math.floor((anchorX + entityW / 2) / T), 0, this.tilesW - 1);
@@ -345,6 +664,7 @@ AR.Level = class {
         // plateformes traversables (uniquement en tombant, par le dessus)
         if (!landed && !ignorePlatforms) {
           for (const p of this.platforms) {
+            if (p.broken) continue;
             const py = p.ty * T;
             if (prevBottom <= py + 1 && bottom >= py &&
                 e.x + e.w > p.tx * T && e.x < (p.tx + p.w) * T) {
@@ -504,6 +824,7 @@ AR.Level = class {
   }
 
   drawTerrain(ctx, cam) {
+    if (this.grid) { this._drawTerrainGrid(ctx, cam); return; }
     const T = AR.C.TILE, era = this.era;
     const cx = cam.cx(), cy = cam.cy();
     const tx0 = Math.max(0, Math.floor(cx / T) - 1);
@@ -532,10 +853,87 @@ AR.Level = class {
         ctx.fillRect(x, y, 6, (hl - h) * T);
       }
     }
-    // plateformes
+    this._drawPlatforms(ctx, cam);
+    this._drawArenaGate(ctx, cam);
+  }
+
+  // Rendu tuile-à-tuile pour les cartes authored (gère grottes, plafonds, parois).
+  _drawTerrainGrid(ctx, cam) {
+    const T = AR.C.TILE, era = this.era, F = AR.TILE_FLAGS, W = this.tilesW;
+    const cx = cam.cx(), cy = cam.cy();
+    const tx0 = Math.max(0, Math.floor(cx / T) - 1);
+    const tx1 = Math.min(W - 1, Math.ceil((cx + AR.C.VIEW_W) / T) + 1);
+    const ty0 = Math.max(0, Math.floor(cy / T) - 1);
+    const ty1 = Math.min(this.worldH - 1, Math.ceil((cy + AR.C.VIEW_H) / T) + 1);
+    const pat = ctx.createPattern(this.groundPattern, 'repeat');
+    for (let ty = ty0; ty <= ty1; ty++) {
+      for (let tx = tx0; tx <= tx1; tx++) {
+        const f = this.grid[ty * W + tx];
+        if (!(f & F.SOLID)) continue;
+        const x = tx * T - cx, y = ty * T - cy;
+        ctx.fillStyle = pat;
+        ctx.save(); ctx.translate(-cx % 96, -cy % 96);
+        ctx.fillRect(x + cx % 96, y + cy % 96, T + 1, T + 1);
+        ctx.restore();
+        const above = this._flagAt(tx, ty - 1) & F.SOLID;
+        const below = this._flagAt(tx, ty + 1) & F.SOLID;
+        if (!above) { // surface : bande + liseré
+          ctx.fillStyle = era.groundTop; ctx.fillRect(x, y, T + 1, 9);
+          ctx.fillStyle = era.accent; ctx.globalAlpha = era.id === 'cyber' ? 0.95 : 0.55;
+          ctx.fillRect(x, y, T + 1, 3); ctx.globalAlpha = 1;
+        }
+        if (!(this._flagAt(tx - 1, ty) & F.SOLID)) { ctx.fillStyle = 'rgba(0,0,0,0.22)'; ctx.fillRect(x, y, 5, T + 1); }
+        if (!(this._flagAt(tx + 1, ty) & F.SOLID)) { ctx.fillStyle = 'rgba(0,0,0,0.16)'; ctx.fillRect(x + T - 5, y, 5, T + 1); }
+        if (!below) { ctx.fillStyle = 'rgba(0,0,0,0.30)'; ctx.fillRect(x, y + T - 6, T + 1, 6); } // plafond de grotte
+        if (f & F.BREAKABLE) this._drawBreakableTile(ctx, x, y, T, tx, ty);
+      }
+    }
+    this._drawPlatforms(ctx, cam);
+    this._drawArenaGate(ctx, cam);
+  }
+
+  // Mur friable : doit se lire comme de la roche fissurée qu'on peut détruire au
+  // sabre, pas comme une palissade en bois condamnée. Teinte terreuse + fissures
+  // irrégulières (pas un simple X) + éboulis au sol ; les fissures s'aggravent et
+  // le tout pulse légèrement à mesure que les PV du mur baissent, pour guider l'œil.
+  _drawBreakableTile(ctx, x, y, T, tx, ty) {
+    const b = this.breakableAt(tx, ty);
+    const dmgRatio = b ? 1 - AR.U.clamp(b.hp / b.maxHp, 0, 1) : 0;
+    const seed = (tx * 928371 + ty * 12289) >>> 0;
+    const jit = (n) => ((seed >> n) % 7) - 3;
+    ctx.fillStyle = 'rgba(120,70,40,0.22)';
+    ctx.fillRect(x, y, T + 1, T + 1);
+    ctx.strokeStyle = 'rgba(255,210,140,' + (0.55 + dmgRatio * 0.4) + ')';
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    const cx0 = x + T / 2, cy0 = y + T / 2;
+    for (let i = 0; i < 5; i++) {
+      const a = (i / 5) * Math.PI * 2;
+      ctx.moveTo(cx0, cy0);
+      ctx.lineTo(cx0 + Math.cos(a) * (T * 0.42) + jit(i), cy0 + Math.sin(a) * (T * 0.42) + jit(i + 2));
+    }
+    ctx.stroke();
+    // éboulis / poussière au pied du mur (accumule visuellement avec les dégâts)
+    ctx.fillStyle = 'rgba(90,75,55,0.7)';
+    const debris = 2 + Math.round(dmgRatio * 4);
+    for (let i = 0; i < debris; i++) {
+      ctx.fillRect(x + 4 + ((seed >> (i * 3)) % (T - 8)), y + T - 5 - (i % 2) * 3, 3, 3);
+    }
+  }
+
+  _drawPlatforms(ctx, cam) {
+    const T = AR.C.TILE, era = this.era, cx = cam.cx(), cy = cam.cy();
     for (const p of this.platforms) {
+      if (p.broken) continue;
       const x = p.tx * T - cx, y = p.ty * T - cy;
       if (x > AR.C.VIEW_W + 60 || x + p.w * T < -60) continue;
+      if (p.kind === 'bone_bridge') { // planches d'os claires
+        ctx.fillStyle = '#cfc5a8'; ctx.fillRect(x, y, p.w * T, 10);
+        ctx.fillStyle = 'rgba(80,60,40,0.5)';
+        for (let i = 0; i <= p.w; i++) ctx.fillRect(x + i * T - 1, y, 2, 10);
+        ctx.fillStyle = 'rgba(0,0,0,0.28)'; ctx.fillRect(x + 4, y + 10, p.w * T - 8, 4);
+        continue;
+      }
       ctx.fillStyle = era.groundTop;
       ctx.fillRect(x, y, p.w * T, 12);
       ctx.fillStyle = era.accent;
@@ -543,16 +941,18 @@ AR.Level = class {
       ctx.fillStyle = 'rgba(0,0,0,0.3)';
       ctx.fillRect(x + 4, y + 12, p.w * T - 8, 5);
     }
-    // porte de l'arène
-    if (this.gateClosed) {
-      const gx = this.gateTx * T - cx, gy = (this.arenaGy - 7) * T - cy;
-      ctx.fillStyle = era.rock;
-      ctx.fillRect(gx, gy, T, 7 * T);
-      ctx.fillStyle = era.accent;
-      ctx.globalAlpha = 0.5;
-      for (let i = 0; i < 7; i++) ctx.fillRect(gx + 6, gy + i * T + 8, T - 12, 4);
-      ctx.globalAlpha = 1;
-    }
+  }
+
+  _drawArenaGate(ctx, cam) {
+    if (!this.gateClosed) return;
+    const T = AR.C.TILE, era = this.era, cx = cam.cx(), cy = cam.cy();
+    const gx = this.gateTx * T - cx, gy = (this.arenaGy - 7) * T - cy;
+    ctx.fillStyle = era.rock;
+    ctx.fillRect(gx, gy, T, 7 * T);
+    ctx.fillStyle = era.accent;
+    ctx.globalAlpha = 0.5;
+    for (let i = 0; i < 7; i++) ctx.fillRect(gx + 6, gy + i * T + 8, T - 12, 4);
+    ctx.globalAlpha = 1;
   }
 
   drawProps(ctx, cam, time) {
@@ -715,6 +1115,35 @@ AR.Level = class {
         ctx.fillRect(-8, -10, 16, 2); ctx.fillRect(-8, -6, 16, 2);
         ctx.globalAlpha = 1;
         break;
+      case 'vine': {
+        // liane grimpable qui pend depuis le haut de la corniche
+        const T = AR.C.TILE, hpx = (p.vh || 5) * T;
+        ctx.strokeStyle = '#5c7a3a'; ctx.lineWidth = 5; ctx.lineCap = 'round';
+        ctx.beginPath();
+        for (let yy = 0; yy <= hpx; yy += 12) {
+          const wob = Math.sin(yy * 0.05 + time * 1.2 + p.r * 6) * 5;
+          if (yy === 0) ctx.moveTo(wob, yy); else ctx.lineTo(wob, yy);
+        }
+        ctx.stroke();
+        ctx.fillStyle = '#7fa050';
+        for (let yy = 18; yy < hpx; yy += 34) {
+          const wob = Math.sin(yy * 0.05 + time * 1.2 + p.r * 6) * 5;
+          ctx.beginPath();
+          ctx.ellipse(wob - 7, yy, 6, 3, -0.5, 0, Math.PI * 2);
+          ctx.ellipse(wob + 7, yy + 8, 6, 3, 0.5, 0, Math.PI * 2);
+          ctx.fill();
+        }
+        break;
+      }
+      case 'lever': {
+        const on = p.ref && p.ref.state === 'on';
+        ctx.fillStyle = rock; ctx.fillRect(-6, -8, 12, 8);
+        ctx.strokeStyle = on ? '#5cc9a8' : '#c9a86a'; ctx.lineWidth = 4; ctx.lineCap = 'round';
+        ctx.beginPath(); ctx.moveTo(0, -6); ctx.lineTo(on ? 13 : -13, -24); ctx.stroke();
+        ctx.fillStyle = on ? '#5cc9a8' : '#e8a545';
+        ctx.beginPath(); ctx.arc(on ? 13 : -13, -24, 5, 0, Math.PI * 2); ctx.fill();
+        break;
+      }
       case 'stall': {
         // échoppe du marchand
         ctx.fillStyle = '#6a5238';

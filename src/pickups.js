@@ -30,7 +30,7 @@ AR.Pickups = {
       if (!p.settled && (p.type === 'coin' || p.type === 'heart' || p.type === 'potionDrop')) {
         p.x += p.vx * dt; p.y += p.vy * dt; p.vy += 1200 * dt;
         p.vx *= 0.985;
-        const gy = game.level.groundYpx(p.x);
+        const gy = game.level.groundYAtEntity(p.x, p.y);
         if (p.y >= gy - 4 && p.vy > 0) { p.y = gy - 4; p.vy = -p.vy * 0.35; if (Math.abs(p.vy) < 60) p.settled = true; }
         if (p.y > AR.C.WORLD_H * AR.C.TILE + 200) { this.list.splice(i, 1); continue; }
       }

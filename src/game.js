@@ -100,6 +100,9 @@ AR.Game = class {
     for (const s of lvl.spawns) {
       const e = new AR.Enemy(s.id, s.x, s.y, s.elite, scale);
       e.onPlatform = !!s.onPlatform;
+      // ennemis dormants (chauves-souris suspendues) : réveillés par un trigger de scène
+      e.dormant = !!s.dormant;
+      e.activateGroup = s.activate || null;
       this.enemies.push(e);
     }
     for (const c of lvl.chestSpots) {
@@ -222,7 +225,7 @@ AR.Game = class {
     // activation des ennemis proches de la caméra
     const camX = this.camera.x;
     for (const e of this.enemies) {
-      if (!e.active && Math.abs(e.centerX() - camX - AR.C.VIEW_W / 2) < AR.C.VIEW_W + 320) e.active = true;
+      if (!e.active && !e.dormant && Math.abs(e.centerX() - camX - AR.C.VIEW_W / 2) < AR.C.VIEW_W + 320) e.active = true;
     }
     for (let i = this.enemies.length - 1; i >= 0; i--) {
       const e = this.enemies[i];
@@ -236,18 +239,30 @@ AR.Game = class {
     AR.Pickups.update(dt, this);
     AR.Particles.update(dt);
     lvl.updateAmbient(dt, this.time);
+
+    // ---- systèmes des cartes authored (rooms, ponts, triggers, encounters)
+    if (lvl.authored) {
+      this.currentRoom = lvl.currentRoomAt(pl.x + pl.w / 2, pl.y + pl.h / 2);
+      lvl.updateDynamics(dt, this);
+      this._updateTriggers();
+      this._updateEncounters(dt);
+      this._suppressSafeRoomProjectiles();
+    }
+
     this.camera.follow(pl, lvl, dt);
 
     // ---- déclenchement de l'arène du boss
     if (!this.bossTriggered && pl.x > lvl.arenaStartTx * AR.C.TILE) this._startBossFight();
 
-    // ---- interactions
-    this.interactPrompt = AR.Pickups.nearestInteractive(pl);
+    // ---- interactions (coffre / marchand / portail / levier)
+    const lever = lvl.authored ? this._nearestLever(pl) : null;
+    this.interactPrompt = AR.Pickups.nearestInteractive(pl) || lever;
     if (this.interactPrompt && AR.Input.pressed('interact') && !this.shopOpen) {
       const p = this.interactPrompt;
       if (p.type === 'chest') this.openChest(p);
       else if (p.type === 'merchant') { this.shopOpen = true; AR.Audio.sfx('ui'); }
       else if (p.type === 'portal') this._enterPortal();
+      else if (p.type === 'lever') lvl.activateInteractable(p._int, this);
     }
 
     // ---- mort du joueur
@@ -264,6 +279,124 @@ AR.Game = class {
         this.state = 'gameover';
       }
     }
+  }
+
+  // ============================================ SYSTÈMES DE CARTE AUTHORED
+  // Réveille les ennemis dormants (chauves-souris) quand le joueur franchit un trigger.
+  _updateTriggers() {
+    const lvl = this.level, pl = this.player, T = AR.C.TILE;
+    const pcx = pl.x + pl.w / 2, pcy = pl.y + pl.h / 2;
+    for (const tr of lvl.triggers) {
+      if (tr.fired) continue;
+      const r = tr.rect;
+      if (pcx > r.x * T && pcx < (r.x + r.w) * T && pcy > r.y * T && pcy < (r.y + r.h) * T) {
+        tr.fired = true;
+        if (tr.action === 'wakeSpawns') {
+          let woke = 0;
+          for (const e of this.enemies) {
+            if (e.activateGroup === tr.group && !e.dead) {
+              e.dormant = false; e.active = true;
+              e.armEmergence(e.def.behavior === 'flyer' ? 1.1 : 1.6);
+              woke++;
+            }
+          }
+          if (woke) { AR.HUD.notify('Une présence s\'éveille...', AR.C.COLORS.textDim); AR.Audio.sfx('telegraph'); }
+        }
+      }
+    }
+  }
+
+  // Encounters verrouillés : entrée -> fermeture des barrières -> vagues -> ouverture + récompense.
+  _updateEncounters(dt) {
+    const lvl = this.level, pl = this.player, T = AR.C.TILE;
+    const pcx = pl.x + pl.w / 2, pcy = pl.y + pl.h / 2;
+    for (const enc of lvl.encounters) {
+      if (enc.state === 'cleared') continue;
+      if (enc.state === 'idle') {
+        const tr = enc.trigger;
+        if (tr && pcx > tr.x * T && pcx < (tr.x + tr.w) * T && pcy > tr.y * T && pcy < (tr.y + tr.h) * T) {
+          this._startEncounter(enc);
+        }
+        continue;
+      }
+      // active : purge des morts, vague suivante ou clôture
+      enc._live = enc._live.filter((e) => !e.dead);
+      if (enc._live.length === 0) {
+        if (enc.waves && enc.waveIdx + 1 < enc.waves.length) {
+          enc.waveIdx++;
+          this._spawnWave(enc, enc.waves[enc.waveIdx]);
+        } else {
+          this._clearEncounter(enc);
+        }
+      }
+    }
+  }
+
+  _startEncounter(enc) {
+    enc.state = 'active';
+    enc.waveIdx = 0;
+    enc._live = [];
+    for (const g of enc.gates) this.level.setGateSolid(g, true);
+    AR.HUD.notify('Embuscade ! Les barrières se ferment', AR.C.COLORS.danger);
+    AR.Audio.sfx('gate');
+    if (enc.waves && enc.waves[0]) this._spawnWave(enc, enc.waves[0]);
+  }
+
+  _spawnWave(enc, wave) {
+    const lvl = this.level, T = AR.C.TILE;
+    const scale = AR.ERA_SCALE[this.eraIdx] * (1 + this.ngPlus * 0.55) * this.diff.hpMult;
+    const ids = wave.ids || [];
+    const centerTx = enc.trigger.x + enc.trigger.w / 2;
+    ids.forEach((id, i) => {
+      const isElite = (wave.elite && wave.elite.indexOf(id) >= 0) || !!AR.ENEMIES[id].elite;
+      const tx = centerTx + (i - (ids.length - 1) / 2) * 3;
+      const x = tx * T;
+      // sol depuis la hauteur du joueur (qui a déclenché la vague) : évite de faire
+      // apparaître un ennemi dans le plafond de grotte au-dessus du sol réel.
+      const y = lvl.groundYAtEntity(x, this.player.y);
+      const e = new AR.Enemy(id, x, y, isElite, scale);
+      e.active = true;
+      e.armEmergence(1.8); // sort de terre au lieu d'apparaître d'un coup
+      this.enemies.push(e);
+      enc._live.push(e);
+    });
+    AR.Audio.sfx('bossRoar');
+  }
+
+  _clearEncounter(enc) {
+    enc.state = 'cleared';
+    for (const g of enc.gates) this.level.setGateSolid(g, false);
+    if (enc.reward && enc.reward.coins) {
+      AR.Pickups.coinBurst(this.player.x + this.player.w / 2, this.player.y - 20,
+        Math.round(enc.reward.coins * (this.mods.goldMult || 1)), 2);
+    }
+    AR.HUD.notify('Zone sécurisée — les barrières s\'ouvrent', AR.C.COLORS.spirit);
+    AR.Audio.sfx('gate');
+  }
+
+  // Le camp (room 'safe') supprime les projectiles ennemis qui y pénètrent.
+  _suppressSafeRoomProjectiles() {
+    const room = this.currentRoom;
+    if (!room || room.tags.indexOf('safe') < 0) return;
+    const T = AR.C.TILE, R = room.rect;
+    for (const p of AR.Projectiles.list.slice()) {
+      if (p.friendly) continue;
+      if (p.x > R.x * T && p.x < (R.x + R.w) * T && p.y > R.y * T && p.y < (R.y + R.h) * T) {
+        AR.Projectiles.destroy(p, 'safe');
+      }
+    }
+  }
+
+  _nearestLever(pl) {
+    const T = AR.C.TILE, lvl = this.level;
+    const pcx = pl.x + pl.w / 2, pcy = pl.y + pl.h / 2;
+    for (const o of lvl.interactables) {
+      if (o.type !== 'lever') continue;
+      if (o.oneShot && o.state === 'on') continue;
+      const lx = o.x * T, ly = o.y * T;
+      if (AR.U.dist(lx, ly - 10, pcx, pcy) < 70) return { type: 'lever', x: lx, y: ly, _int: o };
+    }
+    return null;
   }
 
   // ================================================== COMBAT
@@ -306,8 +439,18 @@ AR.Game = class {
 
   meleeHit(rect, dmg, opts) {
     let hits = 0;
+    // murs friables authored touchés par le sabre
+    if (this.level.breakableAt) {
+      const T = AR.C.TILE, seen = new Set();
+      for (let ty = Math.floor(rect.y / T); ty <= Math.floor((rect.y + rect.h) / T); ty++) {
+        for (let tx = Math.floor(rect.x / T); tx <= Math.floor((rect.x + rect.w) / T); tx++) {
+          const b = this.level.breakableAt(tx, ty);
+          if (b && !seen.has(b)) { seen.add(b); this.level.hitBreakable(b, dmg, this); }
+        }
+      }
+    }
     for (const e of this.enemies) {
-      if (e.dead || !e.active) continue;
+      if (e.dead || !e.active || e.emergeT > 0) continue;
       if (AR.U.rectsOverlap(rect, e.getRect())) {
         this.hitEnemy(e, dmg, opts);
         hits++;
@@ -361,7 +504,7 @@ AR.Game = class {
   nearestEnemy(x, y, maxD) {
     let best = null, bd = maxD || 1e9;
     for (const e of this.enemies) {
-      if (e.dead || !e.active) continue;
+      if (e.dead || !e.active || e.emergeT > 0) continue;
       const d = AR.U.dist(x, y, e.centerX(), e.centerY());
       if (d < bd) { bd = d; best = e; }
     }

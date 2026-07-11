@@ -12,8 +12,14 @@ AR.Enemy = class {
     this.dmg = Math.round(def.dmg * (elite ? 1.3 : 1) * Math.sqrt(eraScale || 1));
     this.drawH = def.h * (elite ? 1.18 : 1);
     this.h = this.drawH * 0.82;
-    const neutralKey = 'enemies/states/' + id + '_neutral';
-    const dw = AR.Assets.drawnW(AR.SPRITE_META[neutralKey] ? neutralKey : 'enemies/' + id, this.drawH);
+    // sprite effectif : repli sur AR.ENEMY_FALLBACK si l'image de cet ennemi manque
+    this.spriteId = id;
+    if (!AR.SPRITE_META['enemies/states/' + id + '_neutral'] && !AR.SPRITE_META['enemies/' + id] &&
+        AR.ENEMY_FALLBACK && AR.ENEMY_FALLBACK[id]) {
+      this.spriteId = AR.ENEMY_FALLBACK[id];
+    }
+    const neutralKey = 'enemies/states/' + this.spriteId + '_neutral';
+    const dw = AR.Assets.drawnW(AR.SPRITE_META[neutralKey] ? neutralKey : 'enemies/' + this.spriteId, this.drawH);
     this.w = AR.U.clamp(dw * 0.5, 26, this.drawH * 0.95);
     this.x = x - this.w / 2;
     this.y = footY - this.h;
@@ -29,6 +35,8 @@ AR.Enemy = class {
     this.hurtT = 0;           // affichage barre de vie
     this.dead = false; this.deadT = 0;
     this.active = false;
+    // émergence (creusement) : cf. AR.Enemy#armEmergence — 0 = apparition normale
+    this.emergeT = 0;
     this.onGround = false;
     this.homeX = x;
     this.bobPhase = Math.random() * 7;
@@ -49,8 +57,27 @@ AR.Enemy = class {
   centerX() { return this.x + this.w / 2; }
   centerY() { return this.y + this.h / 2; }
 
+  // Déclenche l'animation de creusement (terre qui tremble puis éboulis) avant
+  // que l'ennemi ne devienne visible/actif/attaquable. Utilisé pour les ennemis
+  // d'embuscade (vagues d'encounter, dormants réveillés) qui, sinon,
+  // apparaissaient ou s'activaient instantanément sans aucun signal.
+  armEmergence(duration) {
+    this.emergeT = duration || 1.7;
+    this.state = 'idle';
+  }
+
   update(dt, game) {
     if (this.dead) { this.deadT += dt; return; }
+    if (this.emergeT > 0) {
+      this.emergeT -= dt;
+      if (this.emergeT <= 0) {
+        this.emergeT = 0;
+        AR.Particles.burst(this.centerX(), this.y + this.h, 16,
+          { color: ['#7a6a52', '#a89a80', '#57503a'], speed: 220, size: 4, life: 0.6, up: 120 });
+        AR.Audio.sfx('boom');
+      }
+      return; // invisible au combat et immobile tant que la sortie de terre n'est pas finie
+    }
     if (game.veilT > 0) dt *= 0.45;  // Voile temporel
     this.t += dt;
     this.flash = Math.max(0, this.flash - dt * 6);
@@ -214,7 +241,7 @@ AR.Enemy = class {
         if (this.t >= 0.55) {
           const lvl = game.level;
           const gx = AR.U.clamp(this.tpTarget.x, AR.C.TILE * 2, (lvl.tilesW - 2) * AR.C.TILE);
-          const gy = lvl.groundYpx(gx);
+          const gy = lvl.groundYAtEntity(gx, this.y);
           AR.Particles.burst(this.centerX(), this.centerY(), 16, { color: '#c05cff', speed: 200, size: 3.5, life: 0.4 });
           if (gy < AR.C.WORLD_H * AR.C.TILE) {
             this.x = gx - this.w / 2;
@@ -309,7 +336,7 @@ AR.Enemy = class {
       this.x += (this.vx + this.kvx) * dt;
       this.y += this.vy * dt;
       if (this.state !== 'dive' && def.behavior === 'flyer') {
-        const gy = game.level.groundYpx(this.centerX());
+        const gy = game.level.groundYAtEntity(this.centerX(), this.y);
         this.y = Math.min(this.y, gy - this.h - 20);
       }
     } else {
@@ -340,7 +367,7 @@ AR.Enemy = class {
   _groundAhead(level, dir) {
     const d = dir || this.facing;
     const px = this.x + (d > 0 ? this.w + 10 : -10);
-    const gy = level.groundYpx(px);
+    const gy = level.groundYAtEntity(px, this.y);
     return gy - (this.y + this.h) < AR.C.TILE * 3.5;
   }
 
@@ -500,7 +527,7 @@ AR.Enemy = class {
       case 'mortar': {
         const t = 1.35;
         const lx = txx + (Math.random() - 0.5) * 90;
-        const gy = game.level.groundYpx(lx);
+        const gy = game.level.groundYAtEntity(lx, tyy);
         AR.Particles.telegraphCircle(lx, gy, 66, t, AR.C.COLORS.danger);
         shoot({
           x: sx, y: sy, kind: 'mortar', friendly: false, dmg: this.dmg, g: 1000, r: 8, explodeR: 66,
@@ -587,9 +614,43 @@ AR.Enemy = class {
     return 'neutral';
   }
 
+  // Terre qui tremble et se craquelle avant qu'un ennemi d'embuscade ne sorte du
+  // sol (armEmergence). Le total dure ~1.7s ; l'intensité (tremblement, poussière)
+  // augmente à mesure qu'on approche de la sortie, pour bien signaler l'imminence.
+  // Les ennemis volants/flottants (suspendus dans les airs) n'ont pas de sol
+  // sous eux : un frémissement lumineux remplace la craquelure au sol.
+  _drawEmergence(ctx, fx, fy, time) {
+    const total = 1.7, prog = 1 - AR.U.clamp(this.emergeT / total, 0, 1);
+    if (this.def.behavior === 'flyer' || this.def.float) {
+      const scy = fy - this.h / 2;
+      ctx.save();
+      ctx.globalAlpha = 0.3 + Math.sin(time * 14) * 0.15 + prog * 0.3;
+      ctx.fillStyle = '#cfd8d4';
+      ctx.beginPath(); ctx.ellipse(fx, scy, this.w * 0.4 * (0.7 + prog * 0.4), this.h * 0.35, 0, 0, Math.PI * 2); ctx.fill();
+      ctx.restore();
+      return;
+    }
+    const shake = (Math.random() - 0.5) * 3 * prog;
+    ctx.save();
+    ctx.globalAlpha = 0.55 + prog * 0.35;
+    ctx.fillStyle = 'rgba(40,28,16,0.5)';
+    ctx.beginPath(); ctx.ellipse(fx + shake, fy - 2, this.w * 0.5, 6, 0, 0, Math.PI * 2); ctx.fill();
+    ctx.strokeStyle = 'rgba(90,70,45,0.8)'; ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.moveTo(fx - this.w * 0.4, fy); ctx.lineTo(fx - this.w * 0.1, fy - 6);
+    ctx.moveTo(fx + this.w * 0.4, fy); ctx.lineTo(fx + this.w * 0.15, fy - 5);
+    ctx.stroke();
+    if (Math.random() < 0.35 + prog * 0.4) {
+      ctx.globalAlpha = 0.4 * prog;
+      ctx.fillStyle = '#8a7a5c';
+      ctx.beginPath(); ctx.arc(fx + (Math.random() - 0.5) * this.w, fy - Math.random() * 14, 3 + Math.random() * 3, 0, Math.PI * 2); ctx.fill();
+    }
+    ctx.restore();
+  }
+
   _spriteKey(visualState) {
-    const stateKey = 'enemies/states/' + this.id + '_' + visualState;
-    return AR.SPRITE_META[stateKey] ? stateKey : 'enemies/' + this.id;
+    const stateKey = 'enemies/states/' + this.spriteId + '_' + visualState;
+    return AR.SPRITE_META[stateKey] ? stateKey : 'enemies/' + this.spriteId;
   }
 
   draw(ctx, cam, time) {
@@ -597,6 +658,7 @@ AR.Enemy = class {
     const fx = this.centerX() - cx;
     const fy = this.y + this.h - cy;
     if (fx < -180 || fx > AR.C.VIEW_W + 180) return;
+    if (this.emergeT > 0) { this._drawEmergence(ctx, fx, fy, time); return; }
     const visualState = this._visualState();
     const key = this._spriteKey(visualState);
     const alpha = this.dead ? Math.max(0, 1 - this.deadT * 2) : 1;
@@ -675,6 +737,13 @@ AR.Enemy = class {
 };
 
 // ============================================================== BOSS
+// Durée du télégraphe par pattern (remplace le 0,7 s uniforme historique) : un
+// combat de boss doit laisser le temps de reconnaître l'attaque en cours et d'y
+// réagir, pas seulement de la subir (retour joueur : charge/saut/anneau trop
+// rapides, aucune fenêtre réelle pour esquiver).
+const BOSS_TELE_DURATIONS = {
+  charge: 1.3, sweep: 1.3, stomp: 1.2, arrowRing: 1.6,
+};
 AR.Boss = class extends AR.Enemy {
   constructor(id, x, footY, game) {
     // les boss utilisent leur propre table
@@ -682,6 +751,7 @@ AR.Boss = class extends AR.Enemy {
     // squelette Enemy avec des stats surchargées
     super(game.level.era.enemies[0], x, footY, false, 1);
     this.id = id;
+    this.spriteId = id;
     this.bdef = bdef;
     this.isBoss = true;
     this.name = bdef.name;
@@ -760,13 +830,15 @@ AR.Boss = class extends AR.Enemy {
           this.pattern = this.patterns[this.patIdx % this.patterns.length];
           this.patIdx++;
           this.state = 'tele';
+          this.teleDuration = BOSS_TELE_DURATIONS[this.pattern] || 0.7;
+          this._armTelegraph(game);
           AR.Audio.sfx('telegraph');
         }
         break;
       }
       case 'tele':
         this.vx = 0;
-        if (this.t >= 0.7) { this.t = 0; this._execPattern(game); }
+        if (this.t >= this.teleDuration) { this.t = 0; this._execPattern(game); }
         break;
       case 'charge': {
         this.vx = this.chargeDir * this.speed * 4.2;
@@ -880,6 +952,28 @@ AR.Boss = class extends AR.Enemy {
     }
   }
 
+  // Appelé une fois au tout début du télégraphe (état 'tele') : verrouille la
+  // cible du saut (stomp) sur la position actuelle du joueur et déclenche les
+  // indices visuels propres à chaque pattern, pour laisser un vrai temps de
+  // lecture avant l'exécution (cf. retour joueur : lisibilité des attaques).
+  _armTelegraph(game) {
+    const pl = game.player;
+    this.stompTarget = null;
+    if (this.pattern === 'stomp') {
+      const support = this._playerSupport(game);
+      const landingY = support ? support.y : this.baseY;
+      const targetX = support
+        ? AR.U.clamp(pl.x + pl.w / 2 - this.w / 2, support.x, support.x + support.w - this.w)
+        : pl.x;
+      this.stompTarget = { x: targetX, y: landingY };
+      AR.Particles.arrowDown(targetX + this.w / 2, landingY, this.teleDuration, AR.C.COLORS.danger);
+      AR.Particles.telegraphCircle(targetX + this.w / 2, landingY, 70, this.teleDuration, AR.C.COLORS.danger);
+    } else if (this.pattern === 'arrowRing') {
+      AR.Particles.convergingRing(this.centerX(), this.centerY(), 210, this.phase === 2 ? 20 : 14,
+        this.teleDuration, AR.C.COLORS.impact);
+    }
+  }
+
   _execPattern(game) {
     const pl = game.player;
     const pat = this.pattern;
@@ -896,7 +990,7 @@ AR.Boss = class extends AR.Enemy {
       } else if (game.enemies.filter((e) => !e.dead && !e.isBoss).length < 4) {
         for (let i = 0; i < 2; i++) {
           const mx = this.centerX() + (i === 0 ? -140 : 140);
-          const m = new AR.Enemy(what, mx, game.level.groundYpx(mx), false, AR.ERA_SCALE[game.eraIdx] * 0.8 * (game.diff ? game.diff.hpMult : 1));
+          const m = new AR.Enemy(what, mx, game.level.groundYAtEntity(mx, this.y), false, AR.ERA_SCALE[game.eraIdx] * 0.8 * (game.diff ? game.diff.hpMult : 1));
           m.active = true;
           game.enemies.push(m);
           AR.Particles.burst(mx, m.y + m.h / 2, 12, { color: AR.C.COLORS.magic, speed: 180, size: 4, life: 0.5 });
@@ -912,21 +1006,19 @@ AR.Boss = class extends AR.Enemy {
         this.facing = this.chargeDir;
         AR.Audio.sfx('bossRoar');
         break;
-      case 'stomp':
+      case 'stomp': {
         this.state = 'stomp';
         this.stompLanded = false;
-        {
-          const support = this._playerSupport(game);
-          const landingY = support ? support.y : this.baseY;
-          const targetX = support
-            ? AR.U.clamp(pl.x + pl.w / 2 - this.w / 2, support.x, support.x + support.w - this.w)
-            : pl.x;
-          const flightT = 0.72;
-          this.stompLandingY = landingY;
-          this.stompVx = (targetX - this.x) / flightT;
-          this.stompVy = (landingY - (this.y + this.h) - 0.5 * 2400 * flightT * flightT) / flightT;
-        }
+        // Cible verrouillée dès le télégraphe (_armTelegraph) : bouger pendant la
+        // grosse flèche doit suffire à esquiver, la frappe ne doit pas re-viser
+        // la position actuelle du joueur au moment du saut.
+        const target = this.stompTarget || { x: pl.x, y: this.baseY };
+        const flightT = 0.72;
+        this.stompLandingY = target.y;
+        this.stompVx = (target.x - this.x) / flightT;
+        this.stompVy = (target.y - (this.y + this.h) - 0.5 * 2400 * flightT * flightT) / flightT;
         break;
+      }
       case 'arrowRing':
         this.state = 'arrowRing';
         this.ringBurstsLeft = this.phase === 2 ? 3 : 2;
@@ -976,7 +1068,7 @@ AR.Boss = class extends AR.Enemy {
         const n = this.phase === 2 ? 5 : 3;
         for (let i = 0; i < n; i++) {
           const lx = pl.x + (Math.random() - 0.5) * 340;
-          const gy = game.level.groundYpx(lx);
+          const gy = game.level.groundYAtEntity(lx, pl.y);
           const t = 1.1 + i * 0.22;
           AR.Particles.telegraphCircle(lx, gy, 70, t, AR.C.COLORS.danger);
           AR.Projectiles.spawn({ owner: this,

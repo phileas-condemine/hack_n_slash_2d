@@ -44,6 +44,25 @@ AR.Particles = {
   telegraphCircle(x, y, r, dur, color) {
     this.spawn({ x, y, type: 'tele', life: dur, size: r, color: color || AR.C.COLORS.danger });
   },
+  // Grosse flèche qui pointe vers une frappe au sol prévue à l'avance (ex. saut de
+  // boss) : la cible est FIXE, dessinée dès le début du télégraphe, pour que
+  // s'écarter de cet endroit précis suffise à esquiver.
+  arrowDown(x, y, dur, color) {
+    this.spawn({ x, y, type: 'arrowDown', life: dur, size: 40, color: color || AR.C.COLORS.danger });
+  },
+  // Points qui convergent progressivement vers le boss avant qu'il ne les relâche
+  // en anneau de projectiles (attaque « en étoile »).
+  convergingRing(cx, cy, radius, n, dur, color) {
+    for (let i = 0; i < n; i++) {
+      const a = (i / n) * Math.PI * 2 + Math.random() * 0.3;
+      const x0 = cx + Math.cos(a) * radius, y0 = cy + Math.sin(a) * radius;
+      const life = dur * (0.85 + Math.random() * 0.15);
+      this.spawn({
+        x: x0, y: y0, vx: (cx - x0) / life, vy: (cy - y0) / life, g: 0,
+        life, size: 4 + Math.random() * 2.5, color: color || AR.C.COLORS.danger, type: 'converge',
+      });
+    }
+  },
 
   update(dt) {
     for (let i = this.list.length - 1; i >= 0; i--) {
@@ -115,6 +134,35 @@ AR.Particles = {
           ctx.globalAlpha = 0.22;
           ctx.fillStyle = p.color;
           ctx.beginPath(); ctx.arc(x, y, p.size * prog, 0, Math.PI * 2); ctx.fill();
+          break;
+        }
+        case 'arrowDown': {
+          // pulse + descend légèrement pour attirer l'œil vers le point d'impact fixe
+          const prog = p.t / p.life;
+          const bob = Math.sin(p.t * 10) * 6;
+          const s = p.size * (0.85 + Math.sin(p.t * 10) * 0.15);
+          ctx.globalAlpha = 0.55 + prog * 0.4;
+          ctx.fillStyle = p.color;
+          ctx.beginPath();
+          ctx.moveTo(x, y - s * 1.6 + bob);
+          ctx.lineTo(x - s * 0.55, y - s * 0.5 + bob);
+          ctx.lineTo(x - s * 0.22, y - s * 0.5 + bob);
+          ctx.lineTo(x - s * 0.22, y + bob);
+          ctx.lineTo(x + s * 0.22, y + bob);
+          ctx.lineTo(x + s * 0.22, y - s * 0.5 + bob);
+          ctx.lineTo(x + s * 0.55, y - s * 0.5 + bob);
+          ctx.closePath(); ctx.fill();
+          ctx.globalAlpha = 0.35 + prog * 0.35;
+          ctx.strokeStyle = p.color; ctx.lineWidth = 2;
+          ctx.beginPath(); ctx.ellipse(x, y + 3, s * (0.5 + prog * 0.3), s * 0.16, 0, 0, Math.PI * 2); ctx.stroke();
+          break;
+        }
+        case 'converge': {
+          ctx.globalAlpha = 0.55 + (p.t / p.life) * 0.4;
+          ctx.fillStyle = p.color;
+          ctx.beginPath(); ctx.arc(x, y, p.size, 0, Math.PI * 2); ctx.fill();
+          ctx.globalAlpha *= 0.5;
+          ctx.beginPath(); ctx.arc(x, y, p.size * 1.8, 0, Math.PI * 2); ctx.fill();
           break;
         }
         case 'glow': {

@@ -60,9 +60,22 @@ AR.Camera = class {
       const ty = t.y + t.h / 2 - this.vh * 0.58;
       this.x = AR.U.damp(this.x, tx, 8, dt);
       this.y = AR.U.damp(this.y, ty, 5, dt);
-      const maxX = level.tilesW * AR.C.TILE - this.vw;
-      this.x = AR.U.clamp(this.x, 0, Math.max(0, maxX));
-      this.y = AR.U.clamp(this.y, -AR.C.TILE * 6, AR.C.WORLD_H * AR.C.TILE - this.vh);
+      const T = AR.C.TILE, worldH = level.worldH || AR.C.WORLD_H;
+      let minX = 0, maxX = level.tilesW * T - this.vw;
+      let minY = -T * 6, maxY = worldH * T - this.vh;
+      // bornes par room (routes hautes/basses cadrées différemment) — cf. 00 §11
+      const room = level.currentRoomAt ? level.currentRoomAt(t.x + t.w / 2, t.y + t.h / 2) : null;
+      if (room && room.camera) {
+        const c = room.camera;
+        minX = Math.max(minX, c.minX * T);
+        maxX = Math.min(maxX, c.maxX * T - this.vw);
+        minY = Math.max(minY, c.minY * T);
+        maxY = Math.min(maxY, c.maxY * T - this.vh);
+      }
+      if (maxX < minX) maxX = minX;
+      if (maxY < minY) maxY = minY;
+      this.x = AR.U.clamp(this.x, minX, Math.max(0, maxX));
+      this.y = AR.U.clamp(this.y, minY, maxY);
     }
     if (this.shakeT > 0) {
       this.shakeT -= dt;

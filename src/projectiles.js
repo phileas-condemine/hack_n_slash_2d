@@ -85,7 +85,10 @@ AR.Projectiles = {
 
       // terrain
       const tx = Math.floor(p.x / AR.C.TILE), ty = Math.floor(p.y / AR.C.TILE);
-      if (lvl.solidAt(tx, ty)) { this._expire(p, game, true); this.list.splice(i, 1); continue; }
+      if (lvl.solidAt(tx, ty)) {
+        if (p.friendly && lvl.breakableAt) { const b = lvl.breakableAt(tx, ty); if (b) lvl.hitBreakable(b, p.dmg || 10, game); }
+        this._expire(p, game, true); this.list.splice(i, 1); continue;
+      }
 
       // cibles
       let dead = false;
@@ -97,7 +100,7 @@ AR.Projectiles = {
           }
         }
         for (const e of game.enemies) {
-          if (e.dead || !e.active || (p.hitSet && p.hitSet.has(e))) continue;
+          if (e.dead || !e.active || e.emergeT > 0 || (p.hitSet && p.hitSet.has(e))) continue;
           if (this._hits(p, e)) {
             // blocage au bouclier : la flèche est cassée et n'atteint pas les alliés derrière
             if (this._blockable(p) && e.blocksArrow && e.blocksArrow(p)) {
@@ -128,7 +131,7 @@ AR.Projectiles = {
         } else if (p.t > 0.08) {
           // tir ami : les projectiles ennemis blessent aussi les autres monstres
           for (const e of game.enemies) {
-            if (e.dead || !e.active || e === p.owner) continue;
+            if (e.dead || !e.active || e.emergeT > 0 || e === p.owner) continue;
             if (this._hits(p, e)) {
               if (this._blockableAlly(p) && e.blocksArrow && e.blocksArrow(p, true)) {
                 AR.Particles.text(e.centerX(), e.y - 14, 'BLOQUÉ', AR.C.COLORS.impact);
@@ -174,7 +177,7 @@ AR.Projectiles = {
     game.camera.shake(5, 0.25);
     if (p.friendly) {
       for (const e of game.enemies) {
-        if (e.dead) continue;
+        if (e.dead || !e.active || e.emergeT > 0) continue;
         const d = AR.U.dist(p.x, p.y, e.x + e.w / 2, e.y + e.h / 2);
         if (d < r + Math.max(e.w, e.h) / 2) game.hitEnemy(e, p.dmg * 0.7, { knockX: AR.U.sign(e.x - p.x) * 220 });
       }
@@ -184,7 +187,7 @@ AR.Projectiles = {
       if (!pl.dead && d < r + 30) game.hitPlayer(p.dmg * 0.8, p.x);
       // les explosions ennemies n'épargnent pas leurs alliés
       for (const e of game.enemies) {
-        if (e.dead || !e.active || e === p.owner) continue;
+        if (e.dead || !e.active || e.emergeT > 0 || e === p.owner) continue;
         const ed = AR.U.dist(p.x, p.y, e.centerX(), e.centerY());
         if (ed < r + Math.max(e.w, e.h) / 2) {
           const dealt = e.takeDamage(Math.max(1, Math.round(p.dmg * 0.6)), { fromX: p.x }, game);

@@ -9,8 +9,19 @@ AR.BOSS_ARENAS = {
     platforms: [
       { id: 'ground_main', x: 0.062201, y: 0.701382, w: 0.875598, h: 0.073326, ground: true },
       { id: 'left_front_low', x: 0, y: 0.609989, w: 0.183612, h: 0.024442 },
+      // Relais invisibles (l'arène n'est qu'une image de fond, aucun rendu propre à
+      // ces plateformes) : atteindre left_mid/right_mid depuis le sol demande 183px
+      // de montée, hors de portée d'un simple saut (~71px mesuré) et au-delà même
+      // d'un double saut bien exécuté (~174px max, non fiable). Deux relais à ~60-65px
+      // d'écart ramènent la montée à trois sauts simples successifs, exécutables sans
+      // technique de saut précise, pour que le promontoire reste une échappatoire
+      // réelle pendant la charge du mammouth (cf. 00_pre_requis §10.4 / 01_niveau §8).
+      { id: 'left_step1', x: 0.14, y: 0.6111, w: 0.12, h: 0.02 },
+      { id: 'left_step2', x: 0.15, y: 0.5208, w: 0.12, h: 0.02 },
       { id: 'left_mid', x: 0.123804, y: 0.447396, w: 0.168062, h: 0.029756 },
       { id: 'center_back_small', x: 0.416268, y: 0.656748, w: 0.069976, h: 0.017003 },
+      { id: 'right_step1', x: 0.74, y: 0.6111, w: 0.12, h: 0.02 },
+      { id: 'right_step2', x: 0.73, y: 0.5208, w: 0.12, h: 0.02 },
       { id: 'right_mid', x: 0.709928, y: 0.446334, w: 0.167464, h: 0.029756 },
       { id: 'right_front_low', x: 0.805024, y: 0.615303, w: 0.194976, h: 0.024442 },
     ],

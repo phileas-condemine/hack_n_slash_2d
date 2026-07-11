@@ -17,6 +17,7 @@ AR.DemoAI = {
   avoidedEnemies: new WeakSet(),
   buildFocus: 'balanced',
   traversal: null,
+  bossEvade: null,     // { side: 'left'|'right', stage: 0-3 } : refuge sur les promontoires de l'arène
   uiT: 0,
 
   reset(newRun) {
@@ -27,6 +28,7 @@ AR.DemoAI = {
     this.blockerMemory = new WeakMap();
     this.avoidedEnemies = new WeakSet();
     this.traversal = null;
+    this.bossEvade = null;
     if (newRun || !this.buildFocus) {
       const focuses = ['melee', 'ranged', 'spirit'];
       this.buildFocus = focuses[Math.floor(Math.random() * focuses.length)];
@@ -57,12 +59,24 @@ AR.DemoAI = {
 
   // Le sol est prioritaire ; une plateforme ne sert de chemin que lorsqu'elle
   // couvre réellement une fosse. Cela évite de viser les plateformes décoratives.
-  _supportYAt(level, x) {
+  // fromY : hauteur de référence (pied du joueur) pour les cartes multi-étage —
+  // sans elle, une carte authored renverrait toujours la surface la plus haute
+  // de la colonne (ex. un plateau au-dessus d'une grotte), même en marchant
+  // sur le sol du dessous, ce qui fait croire à l'IA qu'il faut escalader.
+  // On démarre le sondage un peu AU-DESSUS du pied (fenêtre ~6 tuiles, au-delà
+  // des enveloppes de saut du §4.3) : assez haut pour repérer une marche proche
+  // (les blocs d'escalier restent solides jusqu'au socle, donc sonder pile au
+  // niveau du pied masquerait la marche suivante), mais assez bas pour ignorer
+  // un étage totalement distinct de la carte (plateau/grotte à 10+ tuiles).
+  _supportYAt(level, x, fromY) {
     const pitLimit = AR.C.WORLD_H * AR.C.TILE;
-    const groundY = level.groundYpx(x);
+    const scanFrom = fromY !== undefined ? fromY - AR.C.TILE * 6 : 0;
+    const groundY = (level.grid && level.groundYAtEntity) ?
+      level.groundYAtEntity(x, scanFrom) : level.groundYpx(x);
     if (groundY <= pitLimit) return groundY;
     let supportY = groundY;
     for (const p of level.platforms) {
+      if (p.broken) continue;
       if (x >= p.tx * AR.C.TILE && x <= (p.tx + p.w) * AR.C.TILE) {
         supportY = Math.min(supportY, p.ty * AR.C.TILE);
       }
@@ -78,15 +92,19 @@ AR.DemoAI = {
     const horizon = AR.U.clamp(90 + Math.abs(pl.vx) * 0.28, 90, 220);
     let gapDist = Infinity, riseDist = Infinity, maxRise = 0;
     for (let dist = 12; dist <= horizon; dist += 12) {
-      const supportY = this._supportYAt(level, leadX + dir * dist);
+      const supportY = this._supportYAt(level, leadX + dir * dist, footY);
       if (supportY > pitLimit) {
         if (gapDist === Infinity) gapDist = dist;
         continue;
       }
       const rise = footY - supportY;
-      if (rise > T * 0.35 && rise > maxRise) {
-        maxRise = rise;
-        riseDist = dist;
+      if (rise > T * 0.35) {
+        // riseDist doit rester la marche la PLUS PROCHE (celle qui déclenche le
+        // saut) : deux marches rapprochées (ex. l'escalier d'entrée) ne doivent
+        // pas laisser la plus haute écraser la distance de la plus proche, sinon
+        // l'IA reste plaquée contre la première marche sans jamais sauter.
+        if (riseDist === Infinity) riseDist = dist;
+        if (rise > maxRise) maxRise = rise;
       }
     }
     return { gapDist, riseDist, maxRise, horizon };
@@ -96,10 +114,11 @@ AR.DemoAI = {
     if (!dir) return null;
     const T = AR.C.TILE;
     const pitLimit = AR.C.WORLD_H * T;
+    const footY = pl.y + pl.h;
     const leadX = pl.x + pl.w / 2 + dir * (pl.w / 2 + 6);
     let startDist = Infinity;
     for (let dist = 0; dist <= T * 9; dist += T / 4) {
-      const overPit = this._supportYAt(level, leadX + dir * dist) > pitLimit;
+      const overPit = this._supportYAt(level, leadX + dir * dist, footY) > pitLimit;
       if (overPit && startDist === Infinity) startDist = dist;
       else if (!overPit && startDist !== Infinity) {
         return {
@@ -120,7 +139,7 @@ AR.DemoAI = {
     const crossed = this.traversal.dir > 0 ?
       pcx >= this.traversal.landingX - T * 0.7 :
       pcx <= this.traversal.landingX + T * 0.7;
-    const safeGround = this._supportYAt(game.level, pcx) <= AR.C.WORLD_H * T;
+    const safeGround = this._supportYAt(game.level, pcx, pl.y + pl.h) <= AR.C.WORLD_H * T;
     if ((pl.onGround && crossed && safeGround && this.traversal.t > 0.15) || this.traversal.t > 3.2) {
       this.traversal = null;
     }
@@ -198,7 +217,7 @@ AR.DemoAI = {
 
   _currentSurfaceY(level, pl) {
     if (pl.onGround) return pl.y + pl.h;
-    return this._supportYAt(level, pl.x + pl.w / 2);
+    return this._supportYAt(level, pl.x + pl.w / 2, pl.y + pl.h);
   },
 
   _abandonChestCluster(game, pl, chest) {
@@ -301,6 +320,79 @@ AR.DemoAI = {
     this.chestBestD = Infinity;
   },
 
+  // Deux ripostes distinctes selon ce que la charge/saut/anneau punit réellement
+  // (mesuré empiriquement) :
+  //  - 'charge' est bloquée au plan du sol : monter sur un promontoire l'esquive
+  //    entièrement (le rectangle du boss ne dépasse jamais son altitude propre).
+  //  - le choc au sol du 'stomp' ne teste QUE la distance horizontale à la cible
+  //    verrouillée (<240px), pas l'altitude : grimper ne protège pas si on reste
+  //    trop proche horizontalement — mieux vaut courir loin, plus vite qu'une
+  //    escalade à 3 relais.
+  //  - 'arrowRing' part à 360° autour du boss : l'altitude ne retire de rien,
+  //    seule la distance au centre compte — même traitement que le stomp.
+  // Renvoie true si le mouvement/les actions de cette frame ont été entièrement
+  // pris en charge (l'appelant doit alors s'arrêter là).
+  _bossEvadeUpdate(game, pl, dt) {
+    const boss = game.boss;
+    const arena = game.level.bossArena;
+    if (!boss || boss.dead || !arena || !arena.active) { this.bossEvade = null; return false; }
+    const dangerPattern = boss.state === 'tele' ? boss.pattern
+      : ['charge', 'sweep', 'stomp', 'arrowRing'].includes(boss.state) ? boss.state : null;
+    if (!dangerPattern) { this.bossEvade = null; return false; }
+    const climbPattern = dangerPattern === 'charge' || dangerPattern === 'sweep';
+    const pcx = pl.x + pl.w / 2;
+
+    if (!this.bossEvade || this.bossEvade.mode !== (climbPattern ? 'climb' : 'retreat')) {
+      if (climbPattern) {
+        const leftBase = arena.platforms.find((p) => p.id === 'left_step1');
+        const rightBase = arena.platforms.find((p) => p.id === 'right_step1');
+        if (!leftBase || !rightBase) { this.bossEvade = null; return false; }
+        const distL = Math.abs(pcx - (leftBase.x + leftBase.w / 2));
+        const distR = Math.abs(pcx - (rightBase.x + rightBase.w / 2));
+        this.bossEvade = { mode: 'climb', side: distL <= distR ? 'left' : 'right', stage: 0 };
+      } else {
+        // Fuir à l'opposé de la cible verrouillée (stomp) ou du centre du boss
+        // (arrowRing), vers le bord d'arène offrant le plus de recul.
+        const anchorX = boss.stompTarget ? boss.stompTarget.x + boss.w / 2 : boss.centerX();
+        const roomLeft = anchorX - arena.bounds.x0, roomRight = arena.bounds.x1 - anchorX;
+        this.bossEvade = { mode: 'retreat', dir: roomLeft > roomRight ? -1 : 1 };
+      }
+      this.traversal = null; this.bowPlan = 0; this.swordPlan = 0;
+    }
+
+    const a = {};
+    let aimX = boss.centerX(), aimY = boss.centerY();
+    if (this.bossEvade.mode === 'climb') {
+      const ids = this.bossEvade.side === 'left'
+        ? ['left_step1', 'left_step2', 'left_mid']
+        : ['right_step1', 'right_step2', 'right_mid'];
+      const plats = ids.map((id) => arena.platforms.find((p) => p.id === id));
+      const stage = Math.min(this.bossEvade.stage, 2);
+      const plat = plats[stage];
+      if (plat) {
+        const feetY = pl.y + pl.h;
+        if (pl.onGround && this.bossEvade.stage < 3 && Math.abs(feetY - plat.y) < 5) this.bossEvade.stage++;
+        const goalCx = plat.x + plat.w / 2;
+        if (Math.abs(pcx - goalCx) > 14) { a.right = pcx < goalCx; a.left = pcx > goalCx; }
+        if (pl.onGround && Math.abs(pcx - goalCx) < plat.w * 0.5) this._queueJump(0.16);
+      }
+      // depuis le promontoire final, continuer à tirer sur le boss si le tir est dégagé
+      if (this.bossEvade.stage >= 3 && this.decideT <= 0) {
+        const clear = this._hasClearShot(game.level, pcx, pl.y + pl.h * 0.38, boss.centerX(), boss.centerY());
+        if (clear && this._canCast(pl, 0, 0) && Math.random() < 0.4) a.spell1 = true;
+        else { a.bow = true; this.decideT = 0.45; }
+      }
+    } else {
+      // course franche loin de la cible, dash dès que possible pour maximiser la distance
+      a.right = this.bossEvade.dir > 0; a.left = this.bossEvade.dir < 0;
+      if (pl.onGround && !pl.dashing) a.dash = true;
+      aimX = pl.x + this.bossEvade.dir * 300;
+    }
+    this._applyJump(a, dt);
+    AR.Input.setVirtual(a, aimX, aimY);
+    return true;
+  },
+
   // Appelé à chaque pas de simulation quand le mode démo est actif.
   update(game, dt) {
     const a = {};   // actions virtuelles
@@ -349,6 +441,11 @@ AR.DemoAI = {
       AR.Input.setVirtual(a, aimX, aimY); return;
     }
 
+    // ---------- refuge sur les promontoires pendant une attaque de boss au sol
+    // (charge / saut / anneau) : prend la main sur tout le reste tant que le
+    // danger dure. Cf. retour joueur : sans ça, l'IA subit ces attaques au sol.
+    if (this._bossEvadeUpdate(game, pl, dt)) return;
+
     // ---------- dépense automatique des points de compétence
     if (pl.skillPoints > 0) game.buySkillAuto();
 
@@ -360,7 +457,7 @@ AR.DemoAI = {
     let target = null, td = 1e9;
     let avoidedThreat = null, avoidedTd = 1e9;
     for (const e of game.enemies) {
-      if (e.dead || !e.active) continue;
+      if (e.dead || !e.active || e.emergeT > 0) continue;
       const d = AR.U.dist(pcx, pcy, e.centerX(), e.centerY());
       if (this.avoidedEnemies.has(e)) {
         if (d < avoidedTd) { avoidedTd = d; avoidedThreat = e; }
@@ -397,11 +494,24 @@ AR.DemoAI = {
     const blockedShot = !!target && !shotClear && realTd > 110;
 
     // projectile ennemi dangereux ?
+    // À portée de sabre (même fenêtre que game.meleeHit), un projectile qui
+    // fonce droit dessus vaut mieux être détruit d'un coup d'épée que fui :
+    // ça évite le dégât ET ne coûte pas de terrain/temps de charge.
     let threat = null;
+    let parryProjectile = null, parryD = Infinity;
+    const canParry = pl.swordCd <= 0 && !pl.dashing;
+    const parryReach = 70, parryVBand = pl.h / 2 + 7;
     for (const p of AR.Projectiles.list) {
       if (p.friendly) continue;
       const d = AR.U.dist(pcx, pcy, p.x, p.y);
-      if (d < 150 && (p.vx * (pcx - p.x) + p.vy * (pcy - p.y)) > 0) { threat = p; break; }
+      if (!threat && d < 150 && (p.vx * (pcx - p.x) + p.vy * (pcy - p.y)) > 0) threat = p;
+      if (canParry) {
+        const dx = p.x - pcx, dy = p.y - pcy;
+        const incoming = (dx > 0 && p.vx < 0) || (dx < 0 && p.vx > 0);
+        if (incoming && Math.abs(dx) < parryReach && Math.abs(dy) < parryVBand && d < parryD) {
+          parryD = d; parryProjectile = p;
+        }
+      }
     }
 
     // ---------- objectif de déplacement
@@ -596,7 +706,7 @@ AR.DemoAI = {
 
       // Second appui près de l'apex : rattrape les fosses larges et permet
       // d'atteindre les marches ou coffres placés deux tuiles plus haut.
-      const overGap = this._supportYAt(lvl, pcx) > AR.C.WORLD_H * AR.C.TILE;
+      const overGap = this._supportYAt(lvl, pcx, pl.y + pl.h) > AR.C.WORLD_H * AR.C.TILE;
       const airObstacle = path.gapDist < 58 ||
         (path.riseDist < 70 && path.maxRise > AR.C.TILE * 0.55) || chestAbove;
       if (!pl.onGround && !pl.dashing && pl.jumpsUsed === 1 && pl.vy > -80 &&
@@ -631,6 +741,12 @@ AR.DemoAI = {
       a.dash = traversalDash;
       this.bowPlan = 0;
       this.swordPlan = 0;
+    } else if (parryProjectile) {
+      // A le dernier mot sur la garde/direction : parer prime sur un plan de
+      // combat en cours (charge d'arc/sabre), sans annuler une traversée.
+      a.left = parryProjectile.x < pcx;
+      a.right = !a.left;
+      a.sword = true;
     }
 
     this._applyJump(a, dt);
