@@ -88,7 +88,7 @@ AR.Camera = class {
   cy() { return Math.round(this.y + this.sy); }
 };
 
-// Sauvegarde locale (records + réglages, style roguelite)
+// Sauvegarde locale (records + réglages + parties sauvegardées, style roguelite)
 AR.Save = {
   KEY: 'arcaneRift.v1',
   data: null,
@@ -97,9 +97,32 @@ AR.Save = {
     catch (e) { this.data = {}; }
     this.data.records = this.data.records || { bestEra: 0, bestLevel: 0, totalKills: 0, runs: 0, wins: 0, bestTime: 0 };
     this.data.settings = this.data.settings || { muted: false };
+    this.data.saves = this.data.saves || [];
     return this.data;
   },
   save() {
     try { localStorage.setItem(this.KEY, JSON.stringify(this.data)); } catch (e) { /* stockage indisponible */ }
+  },
+
+  // ---- sauvegardes de partie : point de contrôle en début d'ère, nommées et éditables
+  listSaves() {
+    return this.data.saves.slice().sort((a, b) => b.ts - a.ts);
+  },
+  defaultSaveName(eraIdx, ts) {
+    const d = new Date(ts), pad = (n) => String(n).padStart(2, '0');
+    return 'Ère ' + (eraIdx + 1) + ' — ' + pad(d.getDate()) + '/' + pad(d.getMonth() + 1) + ' ' + pad(d.getHours()) + ':' + pad(d.getMinutes());
+  },
+  upsertSave(entry) {
+    const i = this.data.saves.findIndex((s) => s.id === entry.id);
+    if (i >= 0) this.data.saves[i] = entry; else this.data.saves.push(entry);
+    this.save();
+  },
+  renameSave(id, name) {
+    const s = this.data.saves.find((s) => s.id === id);
+    if (s && name.trim()) { s.name = name.trim().slice(0, 40); this.save(); }
+  },
+  deleteSave(id) {
+    this.data.saves = this.data.saves.filter((s) => s.id !== id);
+    this.save();
   },
 };

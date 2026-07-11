@@ -92,8 +92,13 @@ AR.UI = {
     if (this.button(ctx, bx, 332, bw, 46, '🤖  MODE DÉMO (IA)  [G]') || AR.Input.pressed('demo')) {
       game.newRun(true);
     }
-    if (this.button(ctx, bx, 390, bw, 46, '❓  AIDE & CONTRÔLES  [H]') || AR.Input.keys['KeyH']) {
-      game.state = 'help';
+    const halfBw = (bw - 10) / 2;
+    if (this.button(ctx, bx, 390, halfBw, 46, '❓ AIDE  [H]') || AR.Input.keys['KeyH']) {
+      game.stateBefore = 'title'; game.state = 'help';
+    }
+    const hasSaves = AR.Save.data.saves.length > 0;
+    if (this.button(ctx, bx + halfBw + 10, 390, halfBw, 46, '💾 CHARGER', { disabled: !hasSaves })) {
+      game.stateBefore = 'title'; game.saveMenuMode = 'load'; game.savePage = 0; game.state = 'saves';
     }
 
     // ---- sélecteur de difficulté
@@ -185,15 +190,115 @@ AR.UI = {
 
   // ============================================================= PAUSE
   drawPause(ctx, game) {
-    this.panel(ctx, AR.C.VIEW_W / 2 - 190, 180, 380, 330, '— PAUSE —');
+    this.panel(ctx, AR.C.VIEW_W / 2 - 190, 120, 380, 450, '— PAUSE —');
     const bx = AR.C.VIEW_W / 2 - 140;
-    if (this.button(ctx, bx, 260, 280, 46, 'Reprendre  [Échap]')) game.paused = false;
-    if (this.button(ctx, bx, 318, 280, 46, 'Aide & contrôles')) { game.stateBefore = 'play'; game.state = 'help'; game.paused = false; }
-    if (this.button(ctx, bx, 376, 280, 46, (AR.Audio.muted ? 'Réactiver' : 'Couper') + ' le son  [M]')) {
+    let y = 200;
+    if (this.button(ctx, bx, y, 280, 46, 'Reprendre  [Échap]')) game.paused = false;
+    y += 58;
+    if (this.button(ctx, bx, y, 280, 46, '💾 Sauvegarder la partie')) {
+      game.stateBefore = 'play'; game.saveMenuMode = 'save'; game.savePage = 0; game.state = 'saves'; game.paused = false;
+    }
+    y += 58;
+    const hasSaves = AR.Save.data.saves.length > 0;
+    if (this.button(ctx, bx, y, 280, 46, '📂 Charger une partie', { disabled: !hasSaves })) {
+      game.stateBefore = 'play'; game.saveMenuMode = 'load'; game.savePage = 0; game.state = 'saves'; game.paused = false;
+    }
+    y += 58;
+    if (this.button(ctx, bx, y, 280, 46, 'Aide & contrôles')) { game.stateBefore = 'play'; game.state = 'help'; game.paused = false; }
+    y += 58;
+    if (this.button(ctx, bx, y, 280, 46, (AR.Audio.muted ? 'Réactiver' : 'Couper') + ' le son  [M]')) {
       AR.Audio.setMuted(!AR.Audio.muted);
       AR.Save.data.settings.muted = AR.Audio.muted; AR.Save.save();
     }
-    if (this.button(ctx, bx, 434, 280, 46, 'Abandonner la run')) { game.endRun(false); game.state = 'title'; game.paused = false; }
+    y += 58;
+    if (this.button(ctx, bx, y, 280, 46, 'Abandonner la run')) { game.endRun(false); game.state = 'title'; game.paused = false; }
+  },
+
+  // ======================================================= SAUVEGARDES
+  drawSaves(ctx, game) {
+    const W = AR.C.VIEW_W, H = AR.C.VIEW_H, mode = game.saveMenuMode;
+    this.panel(ctx, W / 2 - 340, 50, 680, H - 100, mode === 'save' ? '— SAUVEGARDER LA PARTIE —' : '— CHARGER UNE PARTIE —');
+
+    const saves = AR.Save.listSaves();
+    const pageSize = 4;
+    const maxPage = Math.max(0, Math.ceil(saves.length / pageSize) - 1);
+    game.savePage = AR.U.clamp(game.savePage, 0, maxPage);
+    let y = 104;
+
+    if (mode === 'save') {
+      if (this.button(ctx, W / 2 - 160, y, 320, 42, '+ Nouvelle sauvegarde')) {
+        game.saveGame(null);
+        AR.HUD.notify('Partie sauvegardée', AR.C.COLORS.spirit);
+        game.savePage = 0;
+      }
+      y += 58;
+    }
+
+    const pageItems = saves.slice(game.savePage * pageSize, game.savePage * pageSize + pageSize);
+    if (pageItems.length === 0) {
+      ctx.save();
+      ctx.textAlign = 'center'; ctx.fillStyle = AR.C.COLORS.textDim;
+      ctx.font = 'italic 15px Georgia, serif';
+      ctx.fillText(mode === 'save' ? 'Aucune sauvegarde pour l\'instant.' : 'Aucune sauvegarde disponible.', W / 2, y + 34);
+      ctx.restore();
+    }
+
+    const pad = (n) => String(n).padStart(2, '0');
+    for (const s of pageItems) {
+      const rowY = y, rowH = 74, rowX = W / 2 - 300, rowW = 600;
+      ctx.save();
+      ctx.fillStyle = 'rgba(10,14,18,0.75)';
+      ctx.fillRect(rowX, rowY, rowW, rowH);
+      ctx.strokeStyle = AR.C.COLORS.uiEdge;
+      ctx.strokeRect(rowX, rowY, rowW, rowH);
+      ctx.fillStyle = AR.C.COLORS.text;
+      ctx.font = 'bold 16px "Segoe UI", sans-serif';
+      ctx.textAlign = 'left';
+      ctx.fillText(s.name, rowX + 14, rowY + 28);
+      ctx.fillStyle = AR.C.COLORS.textDim;
+      ctx.font = '12px "Segoe UI", sans-serif';
+      const d = new Date(s.ts);
+      const diffName = (AR.DIFFICULTIES[s.diffIdx] || AR.DIFFICULTIES[0]).name;
+      const sub = 'Ère ' + (s.eraIdx + 1) + '/6' + (s.ngPlus ? ' (NG+' + s.ngPlus + ')' : '') +
+        '  •  Niv ' + (s.player ? s.player.level : 1) + '  •  ' + diffName +
+        '  •  ' + pad(d.getDate()) + '/' + pad(d.getMonth() + 1) + '/' + d.getFullYear() + ' ' + pad(d.getHours()) + ':' + pad(d.getMinutes());
+      ctx.fillText(sub, rowX + 14, rowY + 50);
+      ctx.restore();
+
+      if (this.button(ctx, rowX + rowW - 268, rowY + 16, 40, 40, '✎', { font: 'bold 15px' })) {
+        AR.TextEdit.open({ x: rowX + 10, y: rowY + 6, w: 300, h: 26 }, s.name, (newName) => {
+          AR.Save.renameSave(s.id, newName);
+        });
+      }
+      if (this.button(ctx, rowX + rowW - 220, rowY + 16, 40, 40, '🗑', { font: 'bold 15px' })) {
+        AR.Save.deleteSave(s.id);
+      }
+      const label = mode === 'save' ? 'Écraser' : 'Charger';
+      if (this.button(ctx, rowX + rowW - 168, rowY + 12, 156, 48, label)) {
+        if (mode === 'save') {
+          game.saveGame(s.id);
+          AR.HUD.notify('Sauvegarde mise à jour', AR.C.COLORS.spirit);
+        } else {
+          game.loadGame(s.id);
+          return;
+        }
+      }
+      y += rowH + 10;
+    }
+
+    if (maxPage > 0) {
+      ctx.save();
+      ctx.textAlign = 'center'; ctx.fillStyle = AR.C.COLORS.textDim;
+      ctx.font = '13px "Segoe UI", sans-serif';
+      ctx.fillText('Page ' + (game.savePage + 1) + ' / ' + (maxPage + 1), W / 2, H - 108);
+      ctx.restore();
+      if (game.savePage > 0 && this.button(ctx, W / 2 - 260, H - 130, 100, 34, '◂ Préc.')) game.savePage--;
+      if (game.savePage < maxPage && this.button(ctx, W / 2 + 160, H - 130, 100, 34, 'Suiv. ▸')) game.savePage++;
+    }
+
+    if (this.button(ctx, W / 2 - 110, H - 74, 220, 42, 'Retour  [Échap]') || AR.Input.pressed('pause')) {
+      game.state = game.stateBefore || 'title';
+    }
   },
 
   // ==================================================== ARBRE DE COMPÉTENCES

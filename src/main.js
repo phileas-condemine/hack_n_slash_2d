@@ -20,6 +20,7 @@ AR.VERSION = '1.0.0';
   AR.Save.load();
   AR.Audio.muted = !!AR.Save.data.settings.muted;
   AR.Input.init(canvas);
+  AR.TextEdit.init(canvas);
 
   let progress = 0;
   let game = null;

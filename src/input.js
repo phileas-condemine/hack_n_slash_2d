@@ -18,7 +18,7 @@ AR.Input = {
     window.addEventListener('keydown', (e) => {
       if (e.repeat) return;
       this.keys[e.code] = true;
-      if (['Space', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(e.code)) e.preventDefault();
+      if (['Space', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'Tab'].includes(e.code)) e.preventDefault();
       AR.Audio.unlock();
     });
     window.addEventListener('keyup', (e) => { this.keys[e.code] = false; });
@@ -57,7 +57,7 @@ AR.Input = {
     a.bow = a.bow || this.mouse.right;
     if (this.virtual) {
       // l'IA écrase les actions de gameplay, mais pas les touches "méta"
-      const meta = ['pause', 'demo', 'speedUp', 'speedDown', 'record', 'shot', 'mute', 'confirm', 'skills'];
+      const meta = ['pause', 'demo', 'speedUp', 'speedDown', 'record', 'shot', 'mute', 'confirm', 'skills', 'toggleStats'];
       for (const action in a) { if (!meta.includes(action)) a[action] = !!this.v[action]; }
     }
     this.actions = a;

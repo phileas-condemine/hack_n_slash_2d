@@ -32,6 +32,12 @@ AR.BOSS_ARENAS = {
     platforms: [
       { id: 'ground_main', x: 0.066986, y: 0.717322, w: 0.866029, h: 0.061637, ground: true },
       { id: 'left_pedestal', x: 0.110048, y: 0.649309, w: 0.186005, h: 0.028693 },
+      // Relais invisible : center_dais est 144px au-dessus du sol, hors de portée
+      // d'un simple saut et ne laissant qu'un double saut précis pour y échapper
+      // pendant le sweep du char (même problème identifié sur mammoth_chief, cf.
+      // ses relais left_step/right_step). Un seul palier suffit ici (144px contre
+      // ~213px côté mammouth) pour ramener la montée à deux sauts simples fiables.
+      { id: 'center_step1', x: 0.44, y: 0.640808, w: 0.12, h: 0.02 },
       { id: 'center_dais', x: 0.412679, y: 0.564293, w: 0.175239, h: 0.030818 },
       { id: 'right_pedestal', x: 0.703947, y: 0.649309, w: 0.186005, h: 0.028693 },
     ],

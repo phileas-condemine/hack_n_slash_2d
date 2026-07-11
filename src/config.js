@@ -7,7 +7,8 @@ AR.C = {
   WORLD_H: 32,           // hauteur du monde en tuiles
   GRAV: 1650,
   DT: 1 / 60,            // pas de simulation fixe
-  MAX_STEPS: 20,         // garde-fou (mode accéléré compris)
+  MAX_STEPS: 45,         // garde-fou (mode accéléré compris, jusqu'à ×40)
+  SPEED_STEPS: [1, 2, 4, 8, 10, 15, 20, 30, 40],
 
   PLAYER: {
     W: 34, H: 62, DRAW_H: 92,
@@ -42,6 +43,7 @@ AR.C = {
     potion: ['KeyF'],
     spell1: ['Digit1'], spell2: ['Digit2'], spell3: ['Digit3'], spell4: ['Digit4'],
     skills: ['KeyT'],
+    toggleStats: ['Tab'],
     pause:  ['Escape', 'KeyP'],
     demo:   ['KeyG'],
     speedUp: ['Equal', 'NumpadAdd'],

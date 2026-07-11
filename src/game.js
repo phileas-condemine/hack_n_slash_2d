@@ -11,7 +11,7 @@ AR.Game = class {
     this.skillOpen = false;
     this.shopOpen = false;
     this.demo = false;
-    this.speed = 1;             // ×1 ×2 ×4 ×8 (mode démo)
+    this.speed = 1;             // ×1 ×2 ×4 ×8 ×10 ×15 ×20 ×30 ×40 (mode démo)
     this.time = 0;
     this.acc = 0;
     this.hitStopT = 0;
@@ -31,6 +31,8 @@ AR.Game = class {
     this.deathT = 0;
     this.merchantPickup = null;
     this.runSeed = (Math.random() * 1e9) | 0;
+    this.saveMenuMode = 'load';   // 'save' | 'load' — écran de sauvegardes (voir state === 'saves')
+    this.savePage = 0;
     // difficulté (persistée entre les sessions)
     this.diffIdx = AR.U.clamp(AR.Save.data.settings.difficulty | 0, 0, AR.DIFFICULTIES.length - 1);
     this.diff = AR.DIFFICULTIES[this.diffIdx];
@@ -138,6 +140,67 @@ AR.Game = class {
     AR.Save.save();
   }
 
+  // ================================================== SAUVEGARDES DE PARTIE
+  // Point de contrôle en début d'ère : au chargement, la carte et ses monstres
+  // sont régénérés à neuf (cf. loadLevel) — farmable par design, comme quitter
+  // et rejoindre un niveau dans la plupart des hack-and-slash.
+  saveGame(slotId) {
+    const pl = this.player;
+    const existing = slotId ? AR.Save.data.saves.find((s) => s.id === slotId) : null;
+    const ts = Date.now();
+    const entry = {
+      id: existing ? existing.id : ('s' + ts + Math.floor(Math.random() * 1e6)),
+      name: existing ? existing.name : AR.Save.defaultSaveName(this.eraIdx, ts),
+      ts,
+      eraIdx: this.eraIdx, ngPlus: this.ngPlus, diffIdx: this.diffIdx, runSeed: this.runSeed,
+      coins: this.coins, mods: Object.assign({}, this.mods), stats: Object.assign({}, this.stats),
+      player: {
+        level: pl.level, xp: pl.xp, skillPoints: pl.skillPoints,
+        skills: Array.from(pl.skills), buffs: Object.assign({}, pl.buffs),
+        swordTier: pl.swordTier, bowTier: pl.bowTier, potions: pl.potions,
+        hp: pl.hp, spirit: pl.spirit,
+      },
+    };
+    AR.Save.upsertSave(entry);
+    return entry.id;
+  }
+
+  loadGame(id) {
+    const s = AR.Save.data.saves.find((sv) => sv.id === id);
+    if (!s) return false;
+    this.demo = false;
+    AR.Input.virtual = false;
+    this.speed = 1;
+    this.diffIdx = AR.U.clamp(s.diffIdx | 0, 0, AR.DIFFICULTIES.length - 1);
+    this.diff = AR.DIFFICULTIES[this.diffIdx];
+    this.ngPlus = s.ngPlus || 0;
+    this.eraIdx = s.eraIdx || 0;
+    this.runSeed = s.runSeed;
+    this.coins = s.coins || 0;
+    this.mods = Object.assign({ dmgMult: 1, hpMult: 1, chargeMult: 1, goldMult: 1, enemyDmg: 1, shopDiscount: 1, spiritBonus: 0 }, s.mods);
+    this.stats = Object.assign({ kills: 0, time: 0, coinsEarned: 0, bosses: 0 }, s.stats);
+
+    this.player = new AR.Player(0, 0);
+    const pl = this.player, sp = s.player || {};
+    pl.level = sp.level || 1;
+    pl.xp = sp.xp || 0;
+    pl.skillPoints = sp.skillPoints || 0;
+    pl.skills = new Set(sp.skills || []);
+    pl.buffs = Object.assign({ crit: 0, speed: 0, hpUp: 0, spiritUp: 0 }, sp.buffs);
+    pl.swordTier = sp.swordTier || 0;
+    pl.bowTier = sp.bowTier || 0;
+    pl.potions = sp.potions !== undefined ? sp.potions : 1;
+    pl.recalcStats(this);
+    pl.hp = AR.U.clamp(sp.hp !== undefined ? sp.hp : pl.stats.maxHp, 1, pl.stats.maxHp);
+    pl.spirit = AR.U.clamp(sp.spirit !== undefined ? sp.spirit : pl.stats.maxSpirit, 0, pl.stats.maxSpirit);
+
+    this.loadLevel();
+    this.state = 'play';
+    this.paused = false; this.skillOpen = false; this.shopOpen = false;
+    AR.HUD.notify('Partie chargée : ' + s.name, AR.C.COLORS.spirit);
+    return true;
+  }
+
   // ================================================== BOUCLE PRINCIPALE
   frame(dtReal) {
     this.time += dtReal;
@@ -194,8 +257,17 @@ AR.Game = class {
       AR.HUD.notify(this.demo ? 'Mode démo : l\'IA prend les commandes' : 'Reprise en main', AR.C.COLORS.spirit);
     }
     if (this.demo) {
-      if (In.pressed('speedUp')) { this.speed = Math.min(8, this.speed * 2); AR.HUD.notify('Vitesse ×' + this.speed); }
-      if (In.pressed('speedDown')) { this.speed = Math.max(1, this.speed / 2); AR.HUD.notify('Vitesse ×' + this.speed); }
+      const speedSteps = AR.C.SPEED_STEPS;
+      if (In.pressed('speedUp')) {
+        const i = speedSteps.indexOf(this.speed);
+        this.speed = speedSteps[Math.min(speedSteps.length - 1, i + 1)];
+        AR.HUD.notify('Vitesse ×' + this.speed);
+      }
+      if (In.pressed('speedDown')) {
+        const i = speedSteps.indexOf(this.speed);
+        this.speed = speedSteps[Math.max(0, i - 1)];
+        AR.HUD.notify('Vitesse ×' + this.speed);
+      }
     }
     if (this.state === 'play') {
       if (In.pressed('pause')) {
@@ -207,6 +279,7 @@ AR.Game = class {
         this.skillOpen = !this.skillOpen;
       }
       if (In.pressed('interact') && this.shopOpen) this.shopOpen = false;
+      if (In.pressed('toggleStats')) AR.HUD.statsCollapsed = !AR.HUD.statsCollapsed;
     }
   }
 
@@ -783,6 +856,7 @@ AR.Game = class {
     if (this.state === 'title') { AR.UI.beginFrame(); AR.UI.drawTitle(ctx, this); return; }
     if (this.state === 'help') { AR.UI.beginFrame(); AR.UI.drawHelp(ctx, this); return; }
     if (this.state === 'rift') { AR.UI.beginFrame(); AR.UI.drawRift(ctx, this); return; }
+    if (this.state === 'saves') { AR.UI.beginFrame(); AR.UI.drawSaves(ctx, this); return; }
 
     // monde
     const cam = this.camera, lvl = this.level;

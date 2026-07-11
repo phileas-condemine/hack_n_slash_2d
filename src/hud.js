@@ -4,6 +4,7 @@ window.AR = window.AR || {};
 AR.HUD = {
   bannerT: 0, bannerText: '', bannerSub: '',
   notices: [],   // messages temporaires
+  statsCollapsed: false,  // repli du panneau "CARACTÉRISTIQUES" [Tab]
 
   banner(text, sub) { this.bannerText = text; this.bannerSub = sub || ''; this.bannerT = 3.4; },
   notify(text, color) {
@@ -141,10 +142,10 @@ AR.HUD = {
     }
     // Caractéristiques calculées : niveaux, compétences, armes, objets et failles.
     const statsY = game.demo ? 108 : 88;
-    this._drawStats(ctx, game, statsY);
+    const statsH = this._drawStats(ctx, game, statsY);
 
     // enregistrement
-    const recorderY = statsY + 204;
+    const recorderY = statsY + statsH + 20;
     if (AR.Recorder.recording) {
       ctx.fillStyle = C.danger;
       ctx.globalAlpha = 0.6 + Math.sin(game.time * 6) * 0.4;
@@ -256,24 +257,39 @@ AR.HUD = {
   _drawStats(ctx, game, y) {
     const C = AR.C.COLORS, pl = game.player, st = pl.stats, P = AR.C.PLAYER;
     const w = 300, x = AR.C.VIEW_W - 22 - w;
-    const bowCount = pl.skills.has('bow4') ? 3 : 1;
-    const bowNormal = st.bowDmg * (bowCount > 1 ? 0.7 : 1);
-    const levelBonus = (st.levelMult - 1) * 100;
-    const fmt = (value) => value.toFixed(1);
+    const h = this.statsCollapsed ? 22 : 184;
 
     ctx.save();
     ctx.textAlign = 'left';
     ctx.fillStyle = 'rgba(10,14,18,0.72)';
-    ctx.fillRect(x, y, w, 184);
+    ctx.fillRect(x, y, w, h);
     ctx.strokeStyle = 'rgba(126,200,255,0.35)';
     ctx.lineWidth = 1;
-    ctx.strokeRect(x, y, w, 184);
+    ctx.strokeRect(x, y, w, h);
 
     ctx.fillStyle = C.xp;
     ctx.font = 'bold 11px "Segoe UI", sans-serif';
     ctx.fillText('CARACTÉRISTIQUES', x + 10, y + 17);
     ctx.textAlign = 'right';
+    const toggleHint = '[Tab] ' + (this.statsCollapsed ? '▸ déplier' : '▾ replier');
+    if (this.statsCollapsed) {
+      ctx.fillStyle = C.textDim;
+      ctx.font = '10px "Segoe UI", sans-serif';
+      ctx.fillText(toggleHint, x + w - 10, y + 17);
+      ctx.restore();
+      return h;
+    }
+    const bowCount = pl.skills.has('bow4') ? 3 : 1;
+    const bowNormal = st.bowDmg * (bowCount > 1 ? 0.7 : 1);
+    const levelBonus = (st.levelMult - 1) * 100;
+    const fmt = (value) => value.toFixed(1);
+
+    ctx.fillStyle = C.xp;
+    ctx.font = 'bold 11px "Segoe UI", sans-serif';
     ctx.fillText('niveau +' + fmt(levelBonus) + '%', x + w - 10, y + 17);
+    ctx.fillStyle = C.textDim;
+    ctx.font = '10px "Segoe UI", sans-serif';
+    ctx.fillText(toggleHint, x + w - 10, y + 30);
 
     ctx.font = '11px "Segoe UI", sans-serif';
     ctx.fillStyle = C.text;
@@ -292,6 +308,7 @@ AR.HUD = {
     ctx.fillText('Dash     recharge ' + st.dashCd.toFixed(2) + 's   charges ' + st.dashMax, x + 10, y + 150);
     ctx.fillText('Critique ' + Math.round(st.crit * 100) + '%   réduction dégâts ' + Math.round((1 - st.armor) * 100) + '%', x + 10, y + 169);
     ctx.restore();
+    return h;
   },
 
   _bar(ctx, x, y, w, h, ratio, color, darkColor) {

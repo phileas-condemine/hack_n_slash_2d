@@ -946,10 +946,11 @@ AR.Boss = class extends AR.Enemy {
       this.x = AR.U.clamp(this.x + (this.vx || 0) * dt, game.arena.x0 + 10, game.arena.x1 - this.w - 10);
     }
 
-    // contact
-    if (!pl.dead && this.state !== 'charge' && AR.U.rectsOverlap(this.getRect(), pl.getRect())) {
-      game.hitPlayer(Math.round(this.dmg * 0.35), this.centerX());
-    }
+    // Pas de dégâts de simple contact : un boss ne doit blesser que via une
+    // attaque identifiée (charge/sweep, atterrissage du stomp, platformLeap,
+    // projectiles, beam). Se tenir près de lui pendant 'move'/'tele' (le temps
+    // de lecture du télégraphe) ou pendant 'arrowRing'/'blink' est sans danger ;
+    // chaque état ci-dessus gère déjà ses propres dégâts de contact le cas échéant.
   }
 
   // Appelé une fois au tout début du télégraphe (état 'tele') : verrouille la
