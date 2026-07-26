@@ -153,9 +153,15 @@ AR.Game = class {
       this.enemies.push(e);
     }
     for (const c of lvl.chestSpots) {
-      AR.Pickups.spawn({ type: 'chest', x: c.x, y: c.y, opened: false, high: !!c.high });
+      AR.Pickups.spawn({ type: 'chest', x: c.x, y: c.y, opened: false, high: !!c.high, guaranteed: c.guaranteed || null });
     }
     this.merchantPickup = AR.Pickups.spawn({ type: 'merchant', x: lvl.merchantX, y: lvl.groundYpx(lvl.merchantX), used: false });
+    // mini-portails locaux (poches secrètes) : même visuel que le portail de fin de boss (repris
+    // sans changement dans AR.Pickups/HUD), mais `returnTo` le distingue au moment d'interagir —
+    // téléportation immédiate au lieu d'un changement d'ère.
+    for (const p of lvl.localPortals) {
+      AR.Pickups.spawn({ type: 'portal', x: p.x, y: p.y, returnTo: p.returnTo });
+    }
 
     // position du héros
     const pl = this.player;
@@ -399,6 +405,7 @@ AR.Game = class {
       const p = this.interactPrompt;
       if (p.type === 'chest') this.openChest(p);
       else if (p.type === 'merchant') { this.shopOpen = true; AR.Audio.sfx('ui'); }
+      else if (p.type === 'portal' && p.returnTo) this._useLocalPortal(p);
       else if (p.type === 'portal') this._enterPortal();
       else if (p.type === 'lever') lvl.activateInteractable(p._int, this);
     }
@@ -688,6 +695,20 @@ AR.Game = class {
     AR.Pickups.coinBurst(chest.x, chest.y - 14, Math.round((10 + Math.random() * 10) * gm * (chest.high ? 1.8 : 1)), 2);
     AR.Particles.burst(chest.x, chest.y - 16, 16, { color: [AR.C.COLORS.gold, '#fff'], speed: 200, size: 3, life: 0.6, up: 160 });
     const pl = this.player;
+    // récompense garantie (ex. coffre de la grotte secrète SEC_STONE_04) : pas de tirage aléatoire
+    if (chest.guaranteed === 'swordUp' || chest.guaranteed === 'bowUp') {
+      const tierKey = chest.guaranteed === 'swordUp' ? 'swordTier' : 'bowTier';
+      const weapons = chest.guaranteed === 'swordUp' ? AR.WEAPONS.sword : AR.WEAPONS.bow;
+      const icon = chest.guaranteed === 'swordUp' ? '⚔' : '🏹';
+      if (pl[tierKey] < 5) {
+        pl[tierKey]++;
+        AR.HUD.notify(icon + ' Nouvelle arme : ' + weapons[pl[tierKey]].name + ' !', AR.C.COLORS.impact);
+        pl.recalcStats(this);
+      } else {
+        AR.Pickups.coinBurst(chest.x, chest.y - 14, 40, 3); // déjà au max : compensation en or
+      }
+      return;
+    }
     // coffres perchés : le butin récompense toujours l'escalade
     if (chest.high) {
       const r2 = Math.random();
@@ -891,6 +912,19 @@ AR.Game = class {
     const rec = AR.Save.data.records;
     rec.bestEra = Math.max(rec.bestEra, this.eraIdx);
     AR.Save.save();
+  }
+
+  // Remontée depuis une poche secrète (ex. la grotte de S08) : téléportation immédiate à la
+  // surface, sans changement d'état/d'ère — contrairement à `_enterPortal`, qui ne s'utilise
+  // qu'une fois (le joueur change de niveau), celui-ci reste utilisable à volonté.
+  _useLocalPortal(p) {
+    const pl = this.player;
+    pl.x = p.returnTo.x - pl.w / 2;
+    pl.y = p.returnTo.y - pl.h;
+    pl.vx = 0; pl.vy = 0;
+    AR.Audio.sfx('portal');
+    AR.Particles.burst(pl.x + pl.w / 2, pl.y + pl.h / 2, 20,
+      { color: [AR.C.COLORS.spirit, '#fff'], speed: 220, size: 4, life: 0.5 });
   }
 
   _enterPortal() {

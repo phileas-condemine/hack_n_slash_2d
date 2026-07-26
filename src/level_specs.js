@@ -51,7 +51,12 @@ const STONE = {
     // S07 camp des premiers feux (safe)
     { x: 184, y: 22, w: 28, h: 10 },
     // S08 passe des totems : chasse / enclos élite / antichambre
-    { x: 212, y: 22, w: 36, h: 10 },
+    // Trou de la grotte secrète (§ci-dessous, tx227-233) : bloc 212-248 scindé en deux avec un
+    // vrai vide entre les deux (pas d'`empties` à soustraire — même technique que le puits S02→S04,
+    // un simple manque de sol) ; la grotte a son propre plancher plus bas, ce n'est pas un gouffre.
+    { x: 212, y: 22, w: 15, h: 10 },      // 212-227
+    { x: 233, y: 22, w: 15, h: 10 },      // 233-248
+    { x: 227, y: 28, w: 6, h: 4 },        // plancher de la grotte secrète (SEC_STONE_04), sous le trou
     { x: 248, y: 22, w: 38, h: 10 },      // enclos (38 tuiles : charge du mammouth OK)
     { x: 286, y: 22, w: 10, h: 10 },
     { x: 296, y: 21, w: 10, h: 11 },
@@ -160,6 +165,10 @@ const STONE = {
     { tx: 236, ty: 22, id: 'beast_hunter' },
     { tx: 230, ty: 17, id: 'stone_slinger', onPlatform: true },
     { tx: 300, ty: 20, id: 'stone_spear' },
+    // SEC_STONE_04 : grotte secrète sous le trou de S08 (tx227-233) — mêmes créatures que la
+    // grotte S04/S05 (rien d'autre de prévu pour l'ère 1 dans le pack), actives dès l'arrivée.
+    { tx: 228, ty: 28, id: 'stone_cave_stalker' },
+    { tx: 230, ty: 28, id: 'stone_cave_bats' },
   ],
 
   // ---- coffres ----
@@ -170,9 +179,15 @@ const STONE = {
     { x: 206, y: 22 },                    // coffre du camp
     { x: 178, y: 23 },                    // SEC_STONE_03 : cache d'or (alcôve du levier, plain-pied)
     { x: 312, y: 20 },                    // coffre de préparation (antichambre)
+    { x: 229, y: 28, guaranteed: 'swordUp' }, // SEC_STONE_04 : récompense garantie de la grotte secrète
   ],
 
   merchant: { x: 198, y: 22 },
+
+  // ---- mini-portails locaux (remontée depuis une poche secrète, pas une transition d'ère) ----
+  localPortals: [
+    { x: 232, y: 28, returnTo: { x: 236, y: 22 } }, // SEC_STONE_04 : ramène à la surface, après le trou
+  ],
 
   // ---- décor ----
   props: [

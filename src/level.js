@@ -26,6 +26,7 @@ AR.Level = class {
     this.worldH = C.WORLD_H;
     // ----- contrats communs, remplis par l'un des deux constructeurs de carte
     this.platforms = []; this.props = []; this.spawns = []; this.chestSpots = [];
+    this.localPortals = []; // remontées locales (poches secrètes), distinctes du portail de fin de boss
     this.gateClosed = false; this.grid = null;
     this.rooms = []; this.roomById = {};
     this.climbables = []; this.breakables = []; this.interactables = [];
@@ -311,8 +312,16 @@ AR.Level = class {
     }
 
     // --- coffres, marchand
-    for (const c of spec.chests || []) this.chestSpots.push({ x: (c.x + 0.5) * T, y: c.y * T, high: !!c.high });
+    for (const c of spec.chests || []) {
+      this.chestSpots.push({ x: (c.x + 0.5) * T, y: c.y * T, high: !!c.high, guaranteed: c.guaranteed || null });
+    }
     this.merchantX = spec.merchant ? spec.merchant.x * T : 0;
+
+    // --- mini-portails locaux (poches secrètes)
+    for (const p of spec.localPortals || []) {
+      this.localPortals.push({ x: (p.x + 0.5) * T, y: p.y * T,
+        returnTo: { x: p.returnTo.x * T, y: p.returnTo.y * T } });
+    }
 
     // --- arène de boss (réutilise le pipeline image existant)
     this.spawnX = (spec.spawnX !== undefined ? spec.spawnX : 3) * T;
