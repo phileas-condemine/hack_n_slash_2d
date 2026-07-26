@@ -222,6 +222,33 @@ AR.Minimap = {
       }
     }
 
+    // points d'intérêt (coffres / marchand / portail) : mêmes règles de repérage que le boss
+    // ci-dessous (déjà croisé le brouillard, ou zoomé sur l'arène) — sinon la carte spoilerait
+    // leur position avant même de les avoir vus en jeu.
+    const poiCell = this.fogCellTiles;
+    for (const p of AR.Pickups.list) {
+      if (p.type !== 'chest' && p.type !== 'merchant' && p.type !== 'portal') continue;
+      if (p.type === 'chest' && p.opened) continue;
+      const ptx0 = p.x / T, pty0 = p.y / T;
+      const pcx0 = Math.floor(ptx0 / poiCell), pcy0 = Math.floor(pty0 / poiCell);
+      const seen = !!arena || (pcx0 >= 0 && pcy0 >= 0 && pcx0 < this._cols && pcy0 < this._rows &&
+        this._visited[pcy0 * this._cols + pcx0]);
+      if (!seen) continue;
+      const mx = worldToX(ptx0), my = worldToY(pty0);
+      if (p.type === 'chest') {
+        ctx.fillStyle = C.gold;
+        ctx.fillRect(mx - 3, my - 3, 6, 6);
+      } else if (p.type === 'merchant') {
+        ctx.fillStyle = C.gold;
+        ctx.beginPath();
+        ctx.moveTo(mx, my - 4.5); ctx.lineTo(mx + 4.5, my); ctx.lineTo(mx, my + 4.5); ctx.lineTo(mx - 4.5, my);
+        ctx.closePath(); ctx.fill();
+      } else if (p.type === 'portal') {
+        ctx.strokeStyle = C.spirit; ctx.lineWidth = 1.5;
+        ctx.beginPath(); ctx.arc(mx, my, 4.5, 0, Math.PI * 2); ctx.stroke();
+      }
+    }
+
     // joueur
     const ptx = (pl.x + pl.w / 2) / T, pty = (pl.y + pl.h / 2) / T;
     const px = worldToX(ptx), py = worldToY(pty);
