@@ -744,6 +744,7 @@ AR.Enemy = class {
 // rapides, aucune fenêtre réelle pour esquiver).
 const BOSS_TELE_DURATIONS = {
   charge: 1.3, sweep: 1.3, stomp: 1.2, arrowRing: 1.6,
+  shadowStrike: 0.9, turretSweep: 0.85,
 };
 AR.Boss = class extends AR.Enemy {
   constructor(id, x, footY, game) {
@@ -806,7 +807,11 @@ AR.Boss = class extends AR.Enemy {
     }
 
     const floats = bdef.floats;
-    if (floats) {
+    // pendant la frappe de `shadowStrike`, le Yōkai plonge à hauteur du héros
+    // au lieu de rester à son altitude de vol habituelle (sinon la "frappe au
+    // corps à corps" resterait hors de portée verticale, cf. hauteur de vol)
+    const diving = this.state === 'shadowStrike' && this.shadowStage === 'strike';
+    if (floats && !diving) {
       const targetY = this.baseY - (bdef.flyH || 110) - this.h + Math.sin(this.t * 1.8) * 16;
       this.y = AR.U.damp(this.y, targetY, 2.5, dt);
     }
@@ -922,6 +927,55 @@ AR.Boss = class extends AR.Enemy {
           AR.Audio.sfx('spell');
           this.state = 'move'; this.t = 0;
         }
+        break;
+      }
+      case 'shadowStrike': {
+        if (this.shadowStage === 'teleport') {
+          if (this.t > 0.15) {
+            const side = Math.random() < 0.5 ? -1 : 1;
+            this.x = AR.U.clamp(pl.x + side * 70, game.arena.x0 + 40, game.arena.x1 - 40 - this.w);
+            this.y = pl.y + pl.h / 2 - this.h / 2; // plonge à hauteur du héros pour la frappe
+            this.facing = AR.U.sign(pl.x - this.x || 1);
+            AR.Particles.burst(this.centerX(), this.centerY(), 18, { color: '#c05cff', speed: 200, size: 4, life: 0.4 });
+            AR.Audio.sfx('spell');
+            this.shadowStage = 'strike';
+            this.t = 0;
+          }
+        } else if (this.shadowStage === 'strike') {
+          if (this.t > 0.28 && !this.shadowHit) {
+            this.shadowHit = true;
+            AR.Audio.sfx('slashHeavy');
+            game.camera.shake(6, 0.25);
+            AR.Particles.slashArc(this.centerX(), this.centerY(), this.facing, true, '#c05cff');
+            if (!pl.dead && AR.U.dist(this.centerX(), this.centerY(), pl.x + pl.w / 2, pl.y + pl.h / 2) < 110) {
+              game.hitPlayer(Math.round(this.dmg * 0.9), this.centerX());
+              pl.knock(AR.U.sign(pl.x + pl.w / 2 - this.centerX()) * 320);
+            }
+          }
+          if (this.t > 0.55) { this.state = 'move'; this.t = 0; this.shadowStage = null; }
+        }
+        break;
+      }
+      case 'turretSweep': {
+        this.vx = 0;
+        const DURATION = 1.4;
+        this.sweepT += dt;
+        this.sweepShotT -= dt;
+        if (this.sweepShotT <= 0 && this.sweepT < DURATION) {
+          this.sweepShotT = 0.09;
+          const T = this.sweepT / DURATION;
+          const targetX = AR.U.lerp(game.arena.x0 + 40, game.arena.x1 - 40, this.sweepDir > 0 ? T : 1 - T);
+          const groundY = game.level.groundYAtEntity(targetX, this.y);
+          const sx = this.centerX(), sy = this.y + this.h * 0.3;
+          const ang = AR.U.angle(sx, sy, targetX, groundY - 10);
+          AR.Projectiles.spawn({ owner: this,
+            x: sx, y: sy, kind: 'bullet', friendly: false,
+            dmg: Math.round(this.dmg * 0.4), r: 6,
+            vx: Math.cos(ang) * 760, vy: Math.sin(ang) * 760, life: 1.0,
+          });
+          AR.Audio.sfx('enemyShoot');
+        }
+        if (this.sweepT >= DURATION + 0.15) { this.state = 'move'; this.t = 0; }
         break;
       }
     }
@@ -1107,6 +1161,29 @@ AR.Boss = class extends AR.Enemy {
       case 'blink':
         this.state = 'blink';
         AR.Particles.burst(this.centerX(), this.centerY(), 18, { color: '#c05cff', speed: 200, size: 4, life: 0.4 });
+        break;
+      case 'shadowStrike':
+        // Signature du Yōkai : contrairement à `blink` (repositionnement seul,
+        // sans dégât), ici le téléport est immédiatement suivi d'une frappe au
+        // corps à corps — punit qui ignore le télégraphe au lieu de laisser le
+        // temps de riposter à distance (retour joueur : ce boss doit avoir sa
+        // propre identité, pas juste téléport + boules d'énergie).
+        this.state = 'shadowStrike';
+        this.shadowStage = 'teleport';
+        this.shadowHit = false;
+        this.t = 0;
+        break;
+      case 'turretSweep':
+        // Signature de l'ingénieur de guerre : balayage de tirs au sol sur
+        // toute la largeur de l'arène — se réfugier sur un piédestal surélevé
+        // (cf. `left_upper`/`right_upper`/paliers bas) l'esquive complètement,
+        // récompensant l'usage de la verticalité de l'arène plutôt que de
+        // camper au sol.
+        this.state = 'turretSweep';
+        this.sweepT = 0;
+        this.sweepShotT = 0;
+        this.sweepDir = this.centerX() < (game.arena.x0 + game.arena.x1) / 2 ? 1 : -1;
+        AR.Audio.sfx('bossRoar');
         break;
       default:
         this.state = 'move'; this.t = 0;

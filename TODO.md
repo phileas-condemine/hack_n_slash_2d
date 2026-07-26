@@ -30,11 +30,14 @@ facile trop vite car l'arbre de compétences et l'amélioration d'armes sont "fi
 - [x] **Boss R2** : bug de la pluie de javelots corrigé le 2026-07-26 (`src/enemy.js`, pattern `javelins`) — les projectiles avec gravité (rock/javelin) utilisaient un simple angle+vitesse fixe puis subissaient la gravité, donc retombaient largement avant la cible (undershoot, ressenti comme "mal maîtrisé"). Remplacé par un vrai calcul balistique (temps de vol fixe, vitesse résolue pour atteindre le point de chute visé) : chaque javelot atterrit maintenant réellement sur/autour du héros. Vérifié en jeu (positions de tir simulées et comparées au calcul attendu).
   - [ ] Minions corps-à-corps trop faibles en PV → leur donner plus de vie (le comportement saut + attaque sur la plateforme centrale est bon, à garder tel quel)
   - [ ] Boss globalement le moins prioritaire à retoucher (déjà satisfaisant grâce aux minions)
-- [ ] **Boss R3 (Yokai)** : bon gameplay (téléportation, missiles), à garder comme référence de qualité
-  - [ ] Augmenter sensiblement ses PV (actuellement trop faible, meurt trop vite)
-  - [ ] Ajouter des minions pour rendre l'arène plus intéressante
-- [ ] **Boss R4, R5, R6** : concevoir et ajouter des minions spécifiques à chacun (actuellement absents)
-- [ ] **Boss R4, R5, R6** : concevoir une attaque spéciale distinctive pour chacun (sur le modèle boss R1 qui fonctionne bien, et boss R3/Yokai)
+- [x] **Boss R3 (Yokai)** : bon gameplay (téléportation, missiles), à garder comme référence de qualité
+  - [x] Augmenter sensiblement ses PV (actuellement trop faible, meurt trop vite) — **fait le 2026-07-26** : 8500 → 13000 PV (`src/data.js`). Constat en jeu : l'IA ne perdait jamais contre les boss R3/R4, contrairement à R2/R5 — signe qu'ils étaient sous-dimensionnés par rapport au reste.
+  - [x] Ajouter des minions pour rendre l'arène plus intéressante — **fait le 2026-07-26** : `summon:wisp3` ne posait que des projectiles homing (pas de vrais adversaires) ; remplacé par `summon:spirit_caster` (vrais sbires, cap à 4 ennemis actifs comme les autres boss). Vérifié en jeu : spawn correct, plafond respecté.
+  - [x] **Nouvelle attaque signature "Frappe de l'ombre"** (`shadowStrike`, `src/enemy.js`) : contrairement à `blink` (repositionnement seul, sans dégât), le Yōkai plonge maintenant à hauteur du héros juste après le téléport et enchaîne une frappe courte portée — punit qui ignore le télégraphe au lieu de laisser tout loisir de riposter à distance. Vérifié en jeu (dégâts confirmés à portée, aucun dégât hors de portée).
+- [x] **Boss R4 (Ingénieur de guerre)** : PV relevés 10000 → 14000 (`src/data.js`), sbire ajouté en phase 2 (`summon:pikeman` — la phase 2 n'en avait aucun avant, contrairement à la phase 1)
+  - [x] **Nouvelle attaque signature "Balayage de tourelle"** (`turretSweep`, `src/enemy.js`) : rafale de tirs au sol balayant toute la largeur de l'arène ; se réfugier sur un palier surélevé (`left_lower`/`right_lower`/`left_upper`/`right_upper`, cf. section Lisibilité des arènes) l'esquive complètement — récompense l'usage de la verticalité de l'arène plutôt que de camper au sol. Vérifié en jeu (balayage progressif confirmé, 14 tirs sur la durée prévue).
+- [ ] **Boss R6 (IA suprême)** : pas encore passé en revue (contrairement à R2/R5, l'IA n'a signalé aucune difficulté particulière avec R3/R4 avant ce correctif — R6 n'a pas encore de retour de jeu, à observer avant de décider s'il faut le retoucher)
+- [x] **Boss R2, R5** : selon le retour joueur, l'IA a déjà de vraies difficultés contre le Commandant de char et le Béhémoth diesel — pas de changement nécessaire, à garder comme référence de bon calibrage
 
 ## 🧟 Variété des ennemis (pas seulement les boss)
 

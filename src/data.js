@@ -138,14 +138,24 @@ AR.BOSSES = {
     phase2: 0.5, p2patterns: ['sweep', 'javelins', 'javelins', 'sweep', 'summon:archer_auxilia'],
   },
   yokai_lord: {
-    name: 'SEIGNEUR YŌKAI', hp: 8500, dmg: 24, h: 200, speed: 80, xp: 340, coins: 180, floats: true,
-    patterns: ['blink', 'fireballs', 'summon:wisp3', 'fireballs'],
-    phase2: 0.5, p2patterns: ['blink', 'ring', 'fireballs', 'blink', 'ring', 'summon:wisp3'],
+    // PV relevés (8500->13000) et deux ajouts d'identité (retour joueur : l'IA
+    // ne perdait jamais contre ce boss, contrairement à R2/R5) : `summon:wisp3`
+    // ne posait que des projectiles homing, pas de vrais sbires — remplacé par
+    // `summon:spirit_caster` (vrais adversaires) ; `shadowStrike` donne au
+    // téléport un vrai coup de sanction au lieu d'un simple repositionnement.
+    name: 'SEIGNEUR YŌKAI', hp: 13000, dmg: 24, h: 200, speed: 80, xp: 340, coins: 180, floats: true,
+    patterns: ['blink', 'fireballs', 'summon:spirit_caster', 'shadowStrike'],
+    phase2: 0.5, p2patterns: ['shadowStrike', 'ring', 'fireballs', 'blink', 'summon:spirit_caster', 'shadowStrike'],
   },
   war_engineer: {
-    name: 'INGÉNIEUR DE GUERRE', hp: 10000, dmg: 26, h: 205, speed: 60, xp: 400, coins: 220,
-    patterns: ['volley', 'mortars', 'volley', 'summon:musketeer'],
-    phase2: 0.5, p2patterns: ['volley', 'mortars', 'mortars', 'charge', 'volley'],
+    // PV relevés (10000->14000) : la phase 2 n'invoquait plus aucun sbire
+    // (seule la phase 1 avait `summon:musketeer`) — sbire ajouté en phase 2
+    // aussi, et `turretSweep` (balayage au sol sur toute l'arène) donne à ce
+    // boss une attaque distinctive qui récompense l'usage des plateformes
+    // (cf. `left_lower`/`right_lower` ajoutées à cette arène).
+    name: 'INGÉNIEUR DE GUERRE', hp: 14000, dmg: 26, h: 205, speed: 60, xp: 400, coins: 220,
+    patterns: ['volley', 'mortars', 'turretSweep', 'summon:musketeer'],
+    phase2: 0.5, p2patterns: ['turretSweep', 'mortars', 'volley', 'summon:pikeman', 'turretSweep'],
   },
   diesel_behemoth: {
     name: 'BÉHÉMOTH DIESEL', hp: 12000, dmg: 30, h: 195, speed: 70, xp: 480, coins: 260, armored: true,
