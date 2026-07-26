@@ -46,6 +46,7 @@ AR.Touch = {
       <button class="tbtn tbtn-potion" data-action="potion">Potion</button>
       <button class="tbtn tbtn-interact" data-action="interact">E</button>
       <button class="tbtn tbtn-pause" data-action="pause">⏸</button>
+      <button class="tbtn tbtn-map" data-action="toggleMap">🗺</button>
       <button class="tbtn tbtn-demo" data-action="demo"><span class="tring"></span><span class="tlabel">IA</span></button>
       <div class="tspeed">
         <button class="tbtn tbtn-speeddown" data-action="speedDown">−</button>

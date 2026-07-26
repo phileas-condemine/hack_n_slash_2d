@@ -49,6 +49,7 @@ AR.C = {
     spell1: ['Digit1'], spell2: ['Digit2'], spell3: ['Digit3'], spell4: ['Digit4'],
     skills: ['KeyT'],
     toggleStats: ['Tab'],
+    toggleMap: ['KeyN'],
     pause:  ['Escape', 'KeyP'],
     demo:   ['KeyG'],
     speedUp: ['Equal', 'NumpadAdd'],

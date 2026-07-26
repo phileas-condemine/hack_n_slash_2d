@@ -68,7 +68,7 @@ AR.Input = {
     for (const action in this.touch) { if (this.touch[action]) a[action] = true; }
     if (this.virtual) {
       // l'IA écrase les actions de gameplay, mais pas les touches "méta"
-      const meta = ['pause', 'demo', 'speedUp', 'speedDown', 'record', 'shot', 'mute', 'log', 'confirm', 'skills', 'toggleStats'];
+      const meta = ['pause', 'demo', 'speedUp', 'speedDown', 'record', 'shot', 'mute', 'log', 'confirm', 'skills', 'toggleStats', 'toggleMap'];
       for (const action in a) { if (!meta.includes(action)) a[action] = !!this.v[action]; }
     }
     this.actions = a;

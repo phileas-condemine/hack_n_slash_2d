@@ -331,6 +331,7 @@ AR.Game = class {
       }
       if (In.pressed('interact') && this.shopOpen) this.shopOpen = false;
       if (In.pressed('toggleStats')) AR.HUD.statsCollapsed = !AR.HUD.statsCollapsed;
+      if (In.pressed('toggleMap')) AR.Minimap.collapsed = !AR.Minimap.collapsed;
     }
   }
 
@@ -384,6 +385,7 @@ AR.Game = class {
       this._updateEncounters(dt);
       this._suppressSafeRoomProjectiles();
     }
+    AR.Minimap.update(this);
 
     this.camera.follow(pl, lvl, dt);
 
@@ -980,6 +982,7 @@ AR.Game = class {
     }
 
     AR.HUD.draw(ctx, this);
+    AR.Minimap.draw(ctx, this);
 
     // overlays
     AR.UI.beginFrame();
