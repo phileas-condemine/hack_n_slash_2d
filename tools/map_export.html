@@ -150,6 +150,13 @@
     });
 
     render();
+
+    // Rafraîchissement en un geste : ouvrir/recharger la page avec
+    // ?autodownload=1 régénère et relance directement les 6 téléchargements,
+    // sans avoir à cliquer sur quoi que ce soit (cf. tools/README.md).
+    if (new URLSearchParams(location.search).get('autodownload')) {
+      setTimeout(() => document.getElementById('dlAllBtn').click(), 150);
+    }
   </script>
 </body>
 </html>
