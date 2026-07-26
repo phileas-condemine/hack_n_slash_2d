@@ -849,6 +849,13 @@ AR.DemoAI = {
         goalX = ex + approachDir * AR.C.TILE * 1.5;
       } else if (realTd < (projectileBlocker ? 175 : 135)) {
         // corps à corps : enchaîner les coups, parfois une chargée
+        // `pl.facing` n'est mis à jour par le jeu qu'en se déplaçant (ou en
+        // visant à l'arc) : immobile à portée de corps à corps (ex. juste
+        // après avoir grimpé sur une corniche), il restait figé sur l'ancienne
+        // direction de marche et les coups d'épée manquaient indéfiniment
+        // (retour joueur : IA bloquée, tape dans le vide). On le réoriente
+        // explicitement vers la cible avant chaque coup.
+        pl.facing = AR.U.sign(dx) || pl.facing;
         if (this.swordPlan > 0) {
           this.swordPlan -= dt;
           a.sword = this.swordPlan > 0.02;
