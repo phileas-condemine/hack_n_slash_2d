@@ -416,11 +416,21 @@ AR.Player = class {
     AR.Audio.sfx('chargedBow');
     game.camera.shake(3, 0.15);
     AR.Particles.shockwave(sx + Math.cos(ang) * 30, sy + Math.sin(ang) * 30, 34, AR.C.COLORS.spirit);
+    // Le temps de maintien au-delà du seuil "chargé" tend l'arc : un tir tout
+    // juste chargé garde une vraie parabole (retombe vite), un tir maintenu au
+    // maximum est plus tendu/plat mais retombe quand même avant la fin de sa
+    // portée — jamais une ligne droite à l'infini (cf. retour joueur : la
+    // flèche chargée partait tout droit, trop forte, sans que l'ennemi la
+    // voie venir).
+    const overT = Math.max(0, this.bowHold - st.bowChargeTime);
+    const chargeLevel = AR.U.clamp(overT / (st.bowChargeTime * 0.6), 0, 1);
+    const g = AR.U.lerp(260, 90, chargeLevel);
+    const life = AR.U.lerp(0.7, 0.95, chargeLevel);
     AR.Projectiles.spawn({
       x: sx, y: sy, kind: 'parrow', friendly: true,
       dmg: st.bowDmg * AR.C.PLAYER.CHARGED_BOW_MULT, r: 9, pierce: true,
       vx: Math.cos(ang) * AR.C.PLAYER.CHARGED_ARROW_SPEED, vy: Math.sin(ang) * AR.C.PLAYER.CHARGED_ARROW_SPEED,
-      life: 0.85, knock: 260,
+      g, life, knock: 260,
       explodeR: this.skills.has('bow3') ? 62 : 0,
     });
   }

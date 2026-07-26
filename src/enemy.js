@@ -1035,14 +1035,29 @@ AR.Boss = class extends AR.Enemy {
         const kind = { rocks: 'rock', javelins: 'javelin', fireballs: 'fireball', volley: 'bullet', flames: 'flame' }[pat];
         const n = pat === 'flames' ? 10 : (this.phase === 2 ? 6 : 4);
         const sx = this.centerX(), sy = this.y + this.h * 0.3;
+        const g = (kind === 'rock' || kind === 'javelin') ? 500 : kind === 'flame' ? -40 : 0;
+        // rock/javelin subissent une vraie gravité (parabole) : viser un simple
+        // angle+vitesse fixe comme les autres tirs les fait retomber court, avant
+        // le héros (bug remonté : "les flèches tombent"). On résout la balistique
+        // pour un temps de vol donné afin que chaque projectile retombe bien sur
+        // sa cible (l'éventail décale le point de chute, pas l'angle de tir).
+        const ballistic = g > 0;
+        const flightT = 0.85;
         for (let i = 0; i < n; i++) {
-          const ang = AR.U.angle(sx, sy, pl.x + pl.w / 2, pl.y + pl.h / 2) + (i - (n - 1) / 2) * 0.16;
-          const sp = kind === 'bullet' ? 700 : kind === 'flame' ? 300 + i * 20 : 460;
+          let vx, vy;
+          if (ballistic) {
+            const tx = pl.x + pl.w / 2 + (i - (n - 1) / 2) * 70, ty = pl.y + pl.h * 0.5;
+            vx = (tx - sx) / flightT;
+            vy = (ty - sy - 0.5 * g * flightT * flightT) / flightT;
+          } else {
+            const ang = AR.U.angle(sx, sy, pl.x + pl.w / 2, pl.y + pl.h / 2) + (i - (n - 1) / 2) * 0.16;
+            const sp = kind === 'bullet' ? 700 : kind === 'flame' ? 300 + i * 20 : 460;
+            vx = Math.cos(ang) * sp; vy = Math.sin(ang) * sp;
+          }
           AR.Projectiles.spawn({ owner: this,
             x: sx, y: sy, kind, friendly: false, dmg: Math.round(this.dmg * 0.6),
             r: kind === 'flame' ? 12 : 7,
-            vx: Math.cos(ang) * sp, vy: Math.sin(ang) * sp,
-            g: (kind === 'rock' || kind === 'javelin') ? 500 : kind === 'flame' ? -40 : 0,
+            vx, vy, g,
             life: kind === 'flame' ? 0.7 : 2.5,
           });
         }

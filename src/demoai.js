@@ -25,6 +25,7 @@ AR.DemoAI = {
   traversal: null,
   bossEvade: null,     // { side: 'left'|'right', stage: 0-3 } : refuge sur les promontoires de l'arène
   uiT: 0,
+  portalDropDir: 0,        // -1/1 une fois choisi : direction figée pour descendre vers le portail
 
   reset(newRun) {
     this.decideT = 0; this.bowPlan = 0; this.swordPlan = 0;
@@ -39,6 +40,7 @@ AR.DemoAI = {
     this.climbPhase = null;
     this.traversal = null;
     this.bossEvade = null;
+    this.portalDropDir = 0;
     if (newRun || !this.buildFocus) {
       const focuses = ['melee', 'ranged', 'spirit'];
       this.buildFocus = focuses[Math.floor(Math.random() * focuses.length)];
@@ -761,7 +763,32 @@ AR.DemoAI = {
       Math.abs(game.merchantPickup.x - pcx) < 520 &&
       (pl.hp < pl.maxHp * 0.75 || game.coins > 130);
 
-    if (portal) goalX = portal.x;
+    if (portal) {
+      goalX = portal.x;
+      // Le portail apparaît toujours au niveau du sol de l'arène ; si le héros
+      // est resté sur une plateforme surélevée juste au-dessus, l'écart
+      // horizontal est quasi nul (aucune direction n'est alors donnée plus
+      // bas) alors qu'il reste un vrai écart vertical à descendre : il restait
+      // bloqué là indéfiniment.
+      const arena = game.level.bossArena;
+      const portalBelow = arena && arena.active && (portal.y - (pl.y + pl.h)) > AR.C.TILE * 1.2;
+      if (portalBelow) {
+        // Direction figée dès qu'elle est choisie (recalculée seulement une
+        // fois au sol/portail atteint) puis reprojetée à chaque frame à
+        // distance fixe devant le héros dans cette direction : viser un point
+        // fixe (ex. bord de plateforme) pouvait largement dépasser la
+        // position réelle du portail, et une fois retombé sous le seuil
+        // "encore en l'air" le rabattait sur `portal.x` — situé alors de
+        // l'autre côté — provoquant un aller-retour sans fin. En reprojetant
+        // sur la position courante, l'écart au but ne redescend jamais sous
+        // le seuil "arrivé" tant qu'il reste à descendre, donc plus de
+        // rebond ; l'approche fine reprend sur `portal.x` dès l'atterrissage.
+        if (!this.portalDropDir) this.portalDropDir = portal.x >= pcx ? 1 : -1;
+        goalX = pcx + this.portalDropDir * AR.C.TILE * 4;
+      } else {
+        this.portalDropDir = 0;
+      }
+    }
     else if (projectileBlocker) goalX = target.centerX() + AR.C.TILE * 2.2;
     else if (target && (target.isBoss || realTd < 520)) goalX = null; // on combat sur place
     else if (chest) goalX = chest.x;

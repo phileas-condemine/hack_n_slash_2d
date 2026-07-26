@@ -55,6 +55,14 @@ AR.BOSS_ARENAS = {
     sourceSize: { width: 1672, height: 941 },
     platforms: [
       { id: 'ground_main', x: 0.094498, y: 0.750266, w: 0.811603, h: 0.053135, ground: true },
+      // Le fond illustré prévoit deux rampes en bois de part et d'autre, menant du
+      // sol jusqu'au sommet de left_upper/right_upper (~136px de montée depuis ce
+      // palier, contre ~226px directement depuis le sol — hors de portée d'un
+      // double saut). Sans collision dessus, ces rampes étaient purement décoratives
+      // et les plateformes hautes restaient inatteignables. Paliers ajoutés en
+      // symétrie sur le palier bas mesuré (~90px de montée depuis le sol).
+      { id: 'left_lower', x: 0.10, y: 0.625, w: 0.12, h: 0.025 },
+      { id: 'right_lower', x: 0.78, y: 0.625, w: 0.12, h: 0.025 },
       { id: 'left_upper', x: 0.15012, y: 0.435707, w: 0.226077, h: 0.028693 },
       { id: 'center_bridge', x: 0.395933, y: 0.380446, w: 0.20634, h: 0.025505 },
       { id: 'right_upper', x: 0.623804, y: 0.435707, w: 0.226675, h: 0.028693 },

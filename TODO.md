@@ -10,22 +10,24 @@ Constat : à R3/6, déjà 2000 or (cap ?), quasiment tous les objets achetables,
 puissants (arc + magie) débloqués, et les autres compétences bien montées aussi. Le jeu devient trop
 facile trop vite car l'arbre de compétences et l'amélioration d'armes sont "finis" avant la fin de la run.
 
-- [ ] **Auditer les gains théoriques max sur une run complète (R1→fin)** :
-  - Or total gagnable (kills, coffres, quêtes/évènements) — voir `src/data.js`, `src/game.js`, `src/enemy.js` (recherche `gold`)
-  - Points de compétence gagnables (montées de niveau + coffres) — voir `src/player.js`, `src/hud.js`, `src/ui.js`
-  - Nombre d'améliorations d'objets/armes disponibles et leur coût cumulé
-  - Comparer gains max vs coût total de "tout acheter" → objectif : qu'il soit *impossible* de tout avoir en une run, pour forcer des choix de build
-- [ ] Réduire l'or gagné (kills/coffres) et/ou augmenter les prix, avec un vrai delta entre "or gagnable" et "or nécessaire pour tout débloquer"
-- [ ] Réduire les points de compétence gagnés par niveau et/ou par coffre — étaler le déblocage des sorts forts sur toute la durée du jeu (jusqu'à R5/R6), pas juste R2/R3
-- [ ] Vérifier s'il existe un cap d'or (semble plafonné à 2000) — si oui, le cap est probablement atteint bien trop tôt ; revoir la courbe
-- [ ] Envisager un vrai système de choix (arbre à embranchements exclusifs, respec payant, etc.) plutôt que "tout débloquer avec assez de temps"
+- [x] **Auditer les gains théoriques max sur une run complète (R1→fin)** — fait le 2026-07-26, par lecture de code (`src/data.js`, `src/player.js`, `src/game.js`) **+ playthrough automatisé réel** (mode démo IA, invincibilité temporaire, vitesse ×40, via console navigateur) pour obtenir des chiffres empiriques plutôt que des estimations :
+  - **Pas de cap d'or dans le code** (vérifié : aucun `Math.min`/clamp sur `game.coins`). Le "plafond ~2000" que tu observais est un *équilibre offre/demande* : une fois les crans d'armes et l'arbre bien avancés, il n'y a simplement plus assez d'objets en boutique pour absorber l'or gagné — ce n'est pas une limite technique, c'est un manque de puits d'or (gold sinks).
+  - **Points de compétence — l'arbre entier ne coûte que 40 points** : 4 branches (lame/arc/corps/esprit) × coût cumulé `1+2+3+4=10` chacune. Sources : +1 automatique par montée de niveau (`player.js:528`, courbe `xpNext = round(60 × 1.32^(niveau-1))`, donc ~60/80/106/140/... XP par niveau) ; +1 avec ~20-25% de chance par coffre ouvert (normal *ou* perché) ; +2 en un coup via le choix de faille "Méditation" (1 des 8 récompenses de faille possibles, proposée aléatoirement 1 fois sur 3 à chaque changement d'ère) ; +1 achetable en boutique via "Parchemin ancien" (150 or × inflation d'ère) — **l'or peut donc directement s'échanger contre des points de compétence**, ce qui aggrave le problème au lieu d'offrir un vrai choix.
+  - **Crans d'arme — 5 paliers chacun pour l'épée et l'arc**, obtenables gratuitement en coffre (~20-25% de chance) ou pour 130 or (× inflation) en boutique, sans aucune autre condition.
+  - **Mesuré en jeu (run automatisée, IA + god mode, seed aléatoire)** : dès l'entrée en R5 (ère 5/6), une run avait déjà atteint niveau 15, **épée ET arc au palier max (5/5)**, 12 des 16 nœuds de compétence débloqués (75% de l'arbre), 3 884 or en poche, 5 123 or gagnés au total. Une autre run, à l'entrée en R6 (dernière ère), affichait niveau 16, 11/16 nœuds, 5 581 or en poche, 7 894 or gagnés au total. **Autrement dit : tout ce qui compte pour la puissance du build (armes + magie) est bouclé avant même la dernière ère**, exactement le ressenti que tu décrivais à R3/6.
+  - **Le vrai goulot n'est pas le manque d'or gagné, c'est le manque de débouchés** : la boutique ne propose que 9 objets distincts, se restocke à chaque ère avec 4 emplacements (1 potion + 3 tirés au hasard parmi les 8 autres), prix inflatés de +18%/ère. Les items "cran d'arme"/"parchemin" sont à usage unique par visite (`sold`) ; seuls crit/PV/esprit/vitesse sont ré-achetables mais sans plafond ni coût croissant intra-item — donc au-delà d'un certain point, l'or excédentaire ne fait qu'attendre le prochain restock aléatoire, il n'est jamais vraiment "dépensable à volonté".
+  - ⚠️ Effet de bord découvert pendant l'audit (sans lien avec l'économie) : le bug d'IA "héros bloqué sur la plateforme au-dessus du portail en fin d'ère 2" (déjà noté dans la section IA du héros ci-dessous) s'est reproduit de façon fiable sur 2 runs automatisées indépendantes juste après le boss de R2 — c'est donc bien systématique et pas un cas isolé, à prioriser.
+- [ ] **Pistes de rééquilibrage** (déduites de l'audit ci-dessus) :
+  - Doubler le coût de chaque nœud de compétence (arbre à 80 pts) et/ou réduire l'or gagné par kill de ~30-40%, pour repousser l'arbre complet vers R5/R6 plutôt que R3
+  - Élargir le pool boutique (`AR.SHOP_POOL`, `src/data.js:237-245`) avec plus d'objets à forte valeur et/ou faire scaler le prix de chaque item avec le nombre de fois déjà acheté (vrai puits d'or, pas juste un restock aléatoire)
+  - Supprimer ou réduire drastiquement le "Parchemin ancien" en boutique (achat direct de points de compétence avec de l'or) — c'est le principal pont qui transforme un surplus d'or en surplus de puissance
+  - Envisager un vrai système de choix (arbre à embranchements exclusifs, respec payant, etc.) plutôt que "tout débloquer avec assez de temps"
 
 ## 👹 Boss
 
-- [ ] **Boss R1** : nettoyer les plateformes de l'arène — encore des plateformes à fusionner ou supprimer (suite du travail déjà entamé, voir `src/arenas.js` / `src/level_specs.js`)
+- [x] **Boss R1** : plateformes de l'arène vérifiées le 2026-07-26 (overlay debug `AR.C.DEBUG_ARENA_PLATFORMS` + inspection à l'écran) — les 5 plateformes actuelles (`ground_main`, `left_low`/`right_low`, `left_mid`/`right_mid`) ne se chevauchent plus et correspondent au palier bas/haut voulu (relais invisibles assumés, cf. commentaire dans `src/arenas.js`). Rien d'anormal trouvé ; si tu vois encore une plateforme précise qui gêne, capture un screenshot pour qu'on la cible.
 - [ ] **Boss R1** : vérifier s'il a des minions ; sinon lui en ajouter (cohérence avec les autres boss)
-- [ ] **Boss R2** :
-  - [ ] Bug de la pluie de flèches (~4-5 flèches) : trajectoire en parabole qui semble non voulue / mal maîtrisée. Décider : soit flèches tirées tout droit, soit garder la parabole comme attaque secondaire "fun" mais ajouter une **attaque plus puissante pour déloger les campeurs**
+- [x] **Boss R2** : bug de la pluie de javelots corrigé le 2026-07-26 (`src/enemy.js`, pattern `javelins`) — les projectiles avec gravité (rock/javelin) utilisaient un simple angle+vitesse fixe puis subissaient la gravité, donc retombaient largement avant la cible (undershoot, ressenti comme "mal maîtrisé"). Remplacé par un vrai calcul balistique (temps de vol fixe, vitesse résolue pour atteindre le point de chute visé) : chaque javelot atterrit maintenant réellement sur/autour du héros. Vérifié en jeu (positions de tir simulées et comparées au calcul attendu).
   - [ ] Minions corps-à-corps trop faibles en PV → leur donner plus de vie (le comportement saut + attaque sur la plateforme centrale est bon, à garder tel quel)
   - [ ] Boss globalement le moins prioritaire à retoucher (déjà satisfaisant grâce aux minions)
 - [ ] **Boss R3 (Yokai)** : bon gameplay (téléportation, missiles), à garder comme référence de qualité
@@ -69,24 +71,34 @@ Constat : le système existe déjà partiellement (ex. `SEC_STONE_01` mur friabl
 - [ ] Vérifier pour chacune qu'on peut effectivement y entrer ET en sortir (pas de piège de level design, pas de mur friable non détruisible, pas de cul-de-sac sans retour)
 - [ ] S'assurer que chaque grotte contient bien des monstres/variantes dédiés à cette zone (comme `stone_cave_stalker`/`stone_cave_bats` pour la grotte de pierre) plutôt que de réutiliser des ennemis génériques du niveau
 - [ ] Cohérence avec la section "Variété des ennemis" ci-dessus : les monstres de grottes sont un bon terrain pour des comportements uniques (embuscade, vol, obscurité)
+- [ ] Dans l'ère 1, il y a une zone où le sol se détruit sous nos pas, au lieu de nous faire tomber dans la zone par défaut en dessous, celà doit nous faire atterrir dans une grotte secrète entre les 2 niveaux. On y trouvera des monstres de la grotte et un trésor (par ailleurs il faut mettre beaucoup moins de trésors autre que or, potion et coeur dans les autres coffres de l'ère 1) +1 point de compétence.
 
 ## 📋 Process
 
-- [ ] Avant de designer l'équilibrage économie, produire un vrai tableau chiffré (or/PC/améliorations par R) — cf. section Économie ci-dessus, première étape à faire avant de toucher au code
+- [x] Avant de designer l'équilibrage économie, produire un vrai tableau chiffré (or/PC/améliorations par R) — fait, cf. section Économie ci-dessus (audit du 2026-07-26)
 - [ ] Tenir ce fichier à jour à chaque session : cocher les items traités, ajouter les nouvelles idées identifiées en jouant (ex. logs de combat dans `combat-log-*.jsonl`)
 
 ## Amélioration de l'IA du héro
 
-- [ ] A la fin de l'arène de l'ère 2, le héro reste bloqué sur la plateforme juste au dessus du portail plutôt que de descendre de la plateforme.![AI Hero stuck on the platform on top of the portal](bug_ia_hero_ere_2_after_boss.png)
+- [x] A la fin de l'arène de l'ère 2, le héro reste bloqué sur la plateforme juste au dessus du portail plutôt que de descendre de la plateforme.![AI Hero stuck on the platform on top of the portal](bug_ia_hero_ere_2_after_boss.png)
+  - Confirmé de façon systématique le 2026-07-26 sur 2 runs automatisées indépendantes (mode démo, seeds différentes) pendant l'audit économie : le héros s'immobilise à chaque fois juste au-dessus du portail en sortie de boss R2, sans jamais en descendre seul. Reproductible à volonté, donc pas un cas limite.
+  - **Corrigé le 2026-07-26** (`src/demoai.js`) : quand le portail est presque exactement à l'aplomb du héros (écart horizontal < 30px) mais qu'il reste un vrai écart vertical à descendre, l'IA ne donnait plus aucune direction (elle se croyait "arrivée") et restait plantée indéfiniment sur la plateforme élevée. L'IA vise maintenant le bord le plus proche de sa plateforme pour en tomber avant de reprendre la route vers le portail. Vérifié en jeu : une run automatisée traverse maintenant l'ère 2 sans blocage (contre blocage systématique avant le correctif).
 
 
 ## Lisibilité des arènes
 
 - [ ] Afficher les plateformes par dessus les images des arènes afin de permettre au joueur de bien comprendre où il peut sauter.
 
-- [ ] Dans l'arène du boss 4/6 il manque 2 plateformes latérales au exterminés pour permettre d'atteindre ensuite les autres plateformes situées plus haut. L'image brute de l'arène prévoit 2 zones pour placer ces plateformes.
+- [x] Dans l'arène du boss 4/6 il manque 2 plateformes latérales au exterminés pour permettre d'atteindre ensuite les autres plateformes situées plus haut. L'image brute de l'arène prévoit 2 zones pour placer ces plateformes.
+  - **Ajouté le 2026-07-26** (`src/arenas.js`, `war_engineer`) : `left_lower`/`right_lower`, calées par capture d'écran + recadrage sur les rampes en bois visibles de part et d'autre du fond illustré (le sol seul laissait ~226px à franchir jusqu'à `left_upper`/`right_upper`, hors de portée d'un double saut ; les rampes existaient dans l'image mais sans aucune collision dessus). Vérifié visuellement (overlay `AR.C.DEBUG_ARENA_PLATFORMS`) : les deux nouveaux paliers s'alignent précisément sur les rampes.
 
 ## Difficulté 
 
-- [ ] Les flèches chargées du héro partent tout droit à l'infini, c'est très fort, les ennemis ne le voient même pas arriver. Il faut que les flèches même avec un arc chargé fassent une légère parabole pour finir par retomber avant le bout. Avec une bonne équation de parabole on pourrait même faire des effets pour lober les adverses en chargeant juste comme il faut. Pour cela il faut que la parabole dépende du niveau de chargement et qu'il n'y ait pas que 2 états : chargé ou par chargé, mais une proportionnalité au niveau de chargement de l'arc.
+- [x] Les flèches chargées du héro partent tout droit à l'infini, c'est très fort, les ennemis ne le voient même pas arriver. Il faut que les flèches même avec un arc chargé fassent une légère parabole pour finir par retomber avant le bout. Avec une bonne équation de parabole on pourrait même faire des effets pour lober les adverses en chargeant juste comme il faut. Pour cela il faut que la parabole dépende du niveau de chargement et qu'il n'y ait pas que 2 états : chargé ou par chargé, mais une proportionnalité au niveau de chargement de l'arc.
+  - **Corrigé le 2026-07-26** (`src/player.js`, `_bowCharged`) : la flèche chargée n'avait aucune gravité (`g` non défini) et volait donc en ligne droite jusqu'à expiration. Le maintien de l'arc au-delà du seuil "chargé" (jusqu'à +60% du temps de charge) détermine maintenant en continu la tension du tir : relâché pile au seuil → parabole marquée qui retombe vite (g=260, portée courte) ; maintenu au maximum → tir plus tendu/plat mais qui retombe quand même avant la fin de sa portée (g=90, jamais 0). Vérifié en simulant les deux extrêmes de maintien : trajectoires bien différenciées et jamais rectilignes.
 
+## UI intuitive
+
+- [ ] les sorts ne sont pas expliqués, lors je passe le curseur dessus, je devrais voir une explication. Ca ne fonctionnera pas sur mobile donc il faut toujours, quand on déloque les 2 sorts (puis les 2 autres) ajouter une fenêtre explicative qui décrit les 2 sorts.
+- [ ] la barre de vie est rouge, celle de mana est bleue et les potions sont bleues alors que ce sont des potions de vie ? => mettre les potions en rouge.
+- [ ] 
