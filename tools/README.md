@@ -49,7 +49,8 @@ seule façon de voir à quoi ressemble une carte est de jouer une run complète 
 
 Chaque carte exportée montre : la silhouette de terrain complète (pas de brouillard de guerre,
 toute la carte d'un coup), les coffres (carré or), le marchand (losange or), les salles taguées
-(ère 1 uniquement) et la zone de l'arène de boss (cadre rouge).
+(ère 1 uniquement), la zone de l'arène de boss (cadre rouge) et la position d'apparition de
+chaque monstre (point rouge, plus gros pour une élite).
 
 ## dev_server.py
 

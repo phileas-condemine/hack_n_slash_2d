@@ -28,7 +28,8 @@
     <code>tools/dev_server.py</code> fonctionne aussi). Génère les 6 cartes avec le vrai code de
     génération de niveau du jeu (<code>AR.Level</code>), sans brouillard de guerre : silhouette de
     terrain pixel-exacte + coffres / marchand / salles (ère 1 uniquement, les autres sont procédurales)
-    / zone de l'arène de boss. À chaque évolution des maps (<code>level_specs.js</code>, génération
+    / zone de l'arène de boss / position d'apparition de chaque monstre. À chaque évolution des maps
+    (<code>level_specs.js</code>, génération
     procédurale dans <code>level.js</code>...), il suffit de recharger cette page (ou de cliquer sur
     « Régénérer ») pour obtenir des exports à jour — la seed fixe garantit un résultat reproductible
     tant que le code de génération ne change pas.
@@ -42,6 +43,7 @@
     <span><span class="swatch" style="background:#ffc94d"></span> coffre</span>
     <span><span class="swatch" style="background:#ffc94d;transform:rotate(45deg)"></span> marchand</span>
     <span><span class="swatch" style="background:#ff3d6e"></span> zone d'arène du boss</span>
+    <span><span class="swatch" style="background:#ff3d6e;border-radius:50%"></span> apparition d'un monstre (plus gros si élite)</span>
     <span><span class="swatch" style="border:1px solid #35e0c0;background:none"></span> salle "start" (ère 1)</span>
     <span><span class="swatch" style="border:1px solid #ffc94d;background:none"></span> salle "marchand" (ère 1)</span>
     <span><span class="swatch" style="border:1px solid #7ec8ff;background:none"></span> salle "sûre/hub" (ère 1)</span>
@@ -109,6 +111,15 @@
         ctx.fill();
       }
 
+      // position d'apparition de chaque monstre (donnée statique du niveau)
+      ctx.fillStyle = C.danger;
+      for (const s of lvl.spawns) {
+        const sx = (s.x / T) * SCALE, sy = (s.y / T) * SCALE;
+        ctx.beginPath();
+        ctx.arc(sx, sy, s.elite ? 3.5 : 2.2, 0, Math.PI * 2);
+        ctx.fill();
+      }
+
       return { cnv, lvl };
     }
 
@@ -123,7 +134,7 @@
         box.innerHTML = `<h2>R${i + 1} — ${era.name}</h2>
           <div class="meta">${lvl.authored ? 'authored (level_specs)' : 'procédurale'} ·
             ${lvl.tilesW}×${lvl.worldH} tuiles · seed ${seed + i} ·
-            ${lvl.chestSpots.length} coffre(s)</div>`;
+            ${lvl.chestSpots.length} coffre(s) · ${lvl.spawns.length} monstre(s)</div>`;
         const wrap = document.createElement('div');
         wrap.className = 'canvasWrap';
         cnv.dataset.filename = `minimap_R${i + 1}_${era.id}_seed${seed + i}.png`;

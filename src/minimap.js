@@ -249,6 +249,22 @@ AR.Minimap = {
       }
     }
 
+    // sbires : position d'apparition de chaque monstre (donnée statique du niveau, indépendante
+    // de son état de vie/mort courant — utile pour repérer la densité/répartition des spawns),
+    // mêmes règles de repérage que les points d'intérêt ci-dessus.
+    for (const s of lvl.spawns) {
+      const stx = s.x / T, sty = s.y / T;
+      const scx = Math.floor(stx / poiCell), scy = Math.floor(sty / poiCell);
+      const seen = !!arena || (scx >= 0 && scy >= 0 && scx < this._cols && scy < this._rows &&
+        this._visited[scy * this._cols + scx]);
+      if (!seen) continue;
+      const sx = worldToX(stx), sy = worldToY(sty);
+      ctx.fillStyle = C.danger;
+      ctx.globalAlpha = 0.85;
+      ctx.beginPath(); ctx.arc(sx, sy, s.elite ? 3 : 2, 0, Math.PI * 2); ctx.fill();
+      ctx.globalAlpha = 1;
+    }
+
     // joueur
     const ptx = (pl.x + pl.w / 2) / T, pty = (pl.y + pl.h / 2) / T;
     const px = worldToX(ptx), py = worldToY(pty);
