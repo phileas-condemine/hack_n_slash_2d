@@ -148,6 +148,7 @@ AR.Player = class {
       if (!this.onGround) this.airDashed = true;
       this.invulnT = Math.max(this.invulnT, P.DASH_TIME + 0.06);
       AR.Audio.sfx('dash');
+      AR.EventLog.push('player', { event: 'dash', x: Math.round(this.x), y: Math.round(this.y), dir: this.dashDir });
       AR.Particles.burst(this.x + this.w / 2, this.y + this.h, 8,
         { color: '#cfd8d4', speed: 120, size: 3, life: 0.3, up: 30 });
     }
@@ -183,11 +184,13 @@ AR.Player = class {
         this.jumpBuffer = 0; this.coyote = 0;
         this.jumpsUsed = 1;
         AR.Audio.sfx('jump');
+        AR.EventLog.push('player', { event: 'jump', x: Math.round(this.x), y: Math.round(this.y) });
       } else if (this.jumpsUsed === 1) {
         this.vy = P.DOUBLE_JUMP_VY;
         this.jumpBuffer = 0;
         this.jumpsUsed = 2;
         AR.Audio.sfx('djump');
+        AR.EventLog.push('player', { event: 'double_jump', x: Math.round(this.x), y: Math.round(this.y) });
         AR.Particles.burst(this.x + this.w / 2, this.y + this.h, 10,
           { color: AR.C.COLORS.spirit, speed: 140, size: 3, life: 0.35, spread: 1.2, angle: Math.PI / 2 });
       }
@@ -314,6 +317,7 @@ AR.Player = class {
     if (In.pressed('potion') && this.potions > 0 && this.hp < st.maxHp) {
       this.potions--;
       this.heal(Math.round(st.maxHp * AR.C.PLAYER.POTION_HEAL));
+      AR.EventLog.push('player', { event: 'potion', hpAfter: this.hp, potionsLeft: this.potions });
       AR.Audio.sfx('potion');
       AR.Particles.burst(this.x + this.w / 2, this.y + this.h / 2, 14,
         { color: ['#4a90c2', '#8ecfff'], speed: 90, size: 3, life: 0.6, g: -150 });
@@ -328,6 +332,7 @@ AR.Player = class {
   // --------------------------------------------------------- attaques
   _swordLight(game) {
     const st = this.stats;
+    AR.EventLog.push('player', { event: 'sword_light', x: Math.round(this.x), y: Math.round(this.y) });
     this.swordCd = st.swordCooldown;
     this.comboIdx = this.comboT > 0 ? (this.comboIdx + 1) % 3 : 0;
     this.comboT = AR.C.PLAYER.COMBO_WINDOW;
@@ -363,6 +368,7 @@ AR.Player = class {
 
   _swordCharged(game) {
     const st = this.stats;
+    AR.EventLog.push('player', { event: 'sword_charged', x: Math.round(this.x), y: Math.round(this.y) });
     this.attackAnim = 'charged_sword'; this.attackAnimT = 0.3;
     const dmg = st.swordDmg * st.chargedSwordMult;
     AR.Audio.sfx('chargedSlash');
@@ -381,6 +387,7 @@ AR.Player = class {
 
   _bowQuick(game, aim) {
     const st = this.stats;
+    AR.EventLog.push('player', { event: 'bow_quick', x: Math.round(this.x), y: Math.round(this.y) });
     this.bowCd = st.bowCooldown;
     this.attackAnim = 'bow'; this.attackAnimT = 0.22;
     const sx = this.x + this.w / 2, sy = this.y + this.h * 0.38;
@@ -401,6 +408,7 @@ AR.Player = class {
 
   _bowCharged(game, aim) {
     const st = this.stats;
+    AR.EventLog.push('player', { event: 'bow_charged', x: Math.round(this.x), y: Math.round(this.y) });
     this.attackAnim = 'charged_bow'; this.attackAnimT = 0.3;
     const sx = this.x + this.w / 2, sy = this.y + this.h * 0.38;
     const ang = AR.U.angle(sx, sy, aim.x, aim.y);
@@ -424,6 +432,7 @@ AR.Player = class {
     if (this.spirit < cost) { AR.Audio.sfx('error'); return; }
     this.spirit -= cost;
     this.spellCds[i] = 1.2;
+    AR.EventLog.push('player', { event: 'spell', id: spell.id, x: Math.round(this.x), y: Math.round(this.y) });
     // pose d'incantation dédiée (assets/hero/spells)
     this.attackAnim = spell.cast;
     this.attackAnimT = spell.id === 'veil' ? 0.5 : 0.35;
@@ -497,7 +506,10 @@ AR.Player = class {
     this.flash = 1;
     if (fromX !== undefined) this.knock(AR.U.sign(this.x + this.w / 2 - fromX) * 240);
     AR.Audio.sfx('hurt');
-    if (this.hp <= 0) { this.hp = 0; this.dead = true; }
+    if (this.hp <= 0) {
+      this.hp = 0; this.dead = true;
+      AR.EventLog.push('player', { event: 'death', x: Math.round(this.x), y: Math.round(this.y) });
+    }
     return dmg;
   }
 

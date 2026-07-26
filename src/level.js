@@ -803,16 +803,37 @@ AR.Level = class {
   drawBossArena(ctx, cam) {
     const arena = this.bossArena;
     const img = arena && AR.Assets.images[arena.image];
+    ctx.fillStyle = this.era.sky[0];
+    ctx.fillRect(0, 0, AR.C.VIEW_W, AR.C.VIEW_H);
     if (img && img.complete && img.naturalWidth) {
-      ctx.fillStyle = this.era.sky[0];
-      ctx.fillRect(0, 0, AR.C.VIEW_W, AR.C.VIEW_H);
       // Le fond appartient au monde : il suit exactement le tremblement de
       // caméra, comme les surfaces de collision et les combattants.
       ctx.drawImage(img, arena.x - cam.cx(), arena.y - cam.cy(), arena.width, arena.height);
-      return;
     }
-    ctx.fillStyle = this.era.sky[0];
-    ctx.fillRect(0, 0, AR.C.VIEW_W, AR.C.VIEW_H);
+    if (arena && AR.C.DEBUG_ARENA_PLATFORMS) this._drawArenaDebug(ctx, cam, arena);
+  }
+
+  // Surligne les plateformes de collision (invisibles en jeu normal) par-dessus
+  // le fond illustré, pour caler leur position sur l'image de l'arène.
+  _drawArenaDebug(ctx, cam, arena) {
+    const cx = cam.cx(), cy = cam.cy();
+    ctx.save();
+    for (const p of arena.platforms) {
+      const x = p.x - cx, y = p.y - cy;
+      ctx.fillStyle = p.ground ? 'rgba(60,255,140,0.4)' : 'rgba(255,60,220,0.5)';
+      ctx.fillRect(x, y, p.w, p.h);
+      ctx.strokeStyle = p.ground ? '#3cff8c' : '#ff3cdc';
+      ctx.lineWidth = 3;
+      ctx.strokeRect(x, y, p.w, p.h);
+      ctx.fillStyle = '#fff';
+      ctx.strokeStyle = '#000';
+      ctx.lineWidth = 3;
+      ctx.font = 'bold 14px "Segoe UI", sans-serif';
+      ctx.textAlign = 'left'; ctx.textBaseline = 'bottom';
+      ctx.strokeText(p.id, x + 4, y - 4);
+      ctx.fillText(p.id, x + 4, y - 4);
+    }
+    ctx.restore();
   }
 
   _tileLayer(ctx, layer, cam, factor, yTop) {

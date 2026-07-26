@@ -590,6 +590,7 @@ AR.Enemy = class {
   die(game, silent) {
     if (this.dead) return;
     this.dead = true; this.deadT = 0;
+    AR.EventLog.push('enemy', { event: 'death', id: this.spriteId || this.id, x: Math.round(this.x), y: Math.round(this.y) });
     if (silent) return;
     const cx = this.centerX(), cy = this.centerY();
     AR.Audio.sfx('die');
@@ -833,6 +834,7 @@ AR.Boss = class extends AR.Enemy {
           this.teleDuration = BOSS_TELE_DURATIONS[this.pattern] || 0.7;
           this._armTelegraph(game);
           AR.Audio.sfx('telegraph');
+          AR.EventLog.push('boss', { event: 'pattern', id: this.id, pattern: this.pattern, phase: this.phase });
         }
         break;
       }
@@ -1168,6 +1170,7 @@ AR.Boss = class extends AR.Enemy {
   die(game) {
     if (this.dead) return;
     this.dead = true; this.deadT = 0;
+    AR.EventLog.push('boss', { event: 'death', id: this.id });
     AR.Audio.sfx('bossDie');
     game.camera.shake(12, 0.8);
     const cx = this.centerX(), cy = this.centerY();

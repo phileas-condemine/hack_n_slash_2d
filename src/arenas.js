@@ -8,38 +8,34 @@ AR.BOSS_ARENAS = {
     sourceSize: { width: 1672, height: 941 },
     platforms: [
       { id: 'ground_main', x: 0.062201, y: 0.701382, w: 0.875598, h: 0.073326, ground: true },
-      { id: 'left_front_low', x: 0, y: 0.609989, w: 0.183612, h: 0.024442 },
-      // Relais invisibles (l'arène n'est qu'une image de fond, aucun rendu propre à
-      // ces plateformes) : atteindre left_mid/right_mid depuis le sol demande 183px
-      // de montée, hors de portée d'un simple saut (~71px mesuré) et au-delà même
-      // d'un double saut bien exécuté (~174px max, non fiable). Deux relais à ~60-65px
-      // d'écart ramènent la montée à trois sauts simples successifs, exécutables sans
-      // technique de saut précise, pour que le promontoire reste une échappatoire
-      // réelle pendant la charge du mammouth (cf. 00_pre_requis §10.4 / 01_niveau §8).
-      { id: 'left_step1', x: 0.14, y: 0.6111, w: 0.12, h: 0.02 },
-      { id: 'left_step2', x: 0.15, y: 0.5208, w: 0.12, h: 0.02 },
+      // left_front_low/left_step1 (et leurs symétriques right_*) étaient quasi à la
+      // même hauteur et se chevauchaient en x : fusionnés en un seul palier bas par
+      // côté. Relais invisibles (l'arène n'est qu'une image de fond) : depuis le sol,
+      // un simple saut (~71px mesuré) atteint ce palier bas (~65px de montée) ; de là,
+      // rejoindre left_mid/right_mid (~117px de montée) demande un double saut.
+      { id: 'left_low', x: 0, y: 0.610545, w: 0.26, h: 0.022221 },
       { id: 'left_mid', x: 0.123804, y: 0.447396, w: 0.168062, h: 0.029756 },
-      { id: 'center_back_small', x: 0.416268, y: 0.656748, w: 0.069976, h: 0.017003 },
-      { id: 'right_step1', x: 0.74, y: 0.6111, w: 0.12, h: 0.02 },
-      { id: 'right_step2', x: 0.73, y: 0.5208, w: 0.12, h: 0.02 },
       { id: 'right_mid', x: 0.709928, y: 0.446334, w: 0.167464, h: 0.029756 },
-      { id: 'right_front_low', x: 0.805024, y: 0.615303, w: 0.194976, h: 0.024442 },
+      { id: 'right_low', x: 0.74, y: 0.613202, w: 0.26, h: 0.022221 },
     ],
   },
   chariot_commander: {
     id: 'antiquity_war_chariot_commander', image: 'arenas/boss/arena_02_acropole_ruins',
     sourceSize: { width: 1672, height: 941 },
+    // Le char reste au sol et tire à distance pour punir les campeurs : le
+    // joueur doit sans cesse changer de plateforme plutôt que de s'y figer.
+    // Le sol était trop proche des pedestaux/paliers (~49-55px, à peine plus
+    // que la hauteur du héros) : monter dessus ne dégageait pas vraiment de la
+    // hitbox de charge/sweep du char, qui restait donc quasi impossible à
+    // esquiver par l'escalade. Sol abaissé et paliers remontés pour restaurer
+    // une vraie garde-hauteur (~95-100px, un saut simple fiable par palier).
     platforms: [
-      { id: 'ground_main', x: 0.066986, y: 0.717322, w: 0.866029, h: 0.061637, ground: true },
-      { id: 'left_pedestal', x: 0.110048, y: 0.649309, w: 0.186005, h: 0.028693 },
-      // Relais invisible : center_dais est 144px au-dessus du sol, hors de portée
-      // d'un simple saut et ne laissant qu'un double saut précis pour y échapper
-      // pendant le sweep du char (même problème identifié sur mammoth_chief, cf.
-      // ses relais left_step/right_step). Un seul palier suffit ici (144px contre
-      // ~213px côté mammouth) pour ramener la montée à deux sauts simples fiables.
-      { id: 'center_step1', x: 0.44, y: 0.640808, w: 0.12, h: 0.02 },
-      { id: 'center_dais', x: 0.412679, y: 0.564293, w: 0.175239, h: 0.030818 },
-      { id: 'right_pedestal', x: 0.703947, y: 0.649309, w: 0.186005, h: 0.028693 },
+      { id: 'ground_main', x: 0.066986, y: 0.78, w: 0.866029, h: 0.061637, ground: true },
+      { id: 'left_pedestal', x: 0.110048, y: 0.645, w: 0.186005, h: 0.028693 },
+      // Aligné sur le plateau de l'autel central (pas de palier intermédiaire :
+      // s'y réfugier pendant le sweep du char demande donc un double saut précis).
+      { id: 'center_dais', x: 0.412679, y: 0.60, w: 0.175239, h: 0.030818 },
+      { id: 'right_pedestal', x: 0.703947, y: 0.645, w: 0.186005, h: 0.028693 },
     ],
   },
   yokai_lord: {

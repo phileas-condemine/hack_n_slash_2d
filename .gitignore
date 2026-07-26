@@ -20,3 +20,6 @@ dist/
 
 # Captures & recordings (generated at runtime)
 captures/
+
+# Journal de combat (généré en local par tools/dev_server.py)
+logs/

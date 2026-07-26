@@ -18,8 +18,10 @@ AR.VERSION = '1.0.0';
   resize();
 
   AR.Save.load();
+  AR.EventLog.recoverPending();
   AR.Audio.muted = !!AR.Save.data.settings.muted;
   AR.Input.init(canvas);
+  AR.Touch.init(canvas);
   AR.TextEdit.init(canvas);
 
   let progress = 0;

@@ -237,7 +237,7 @@ AR.HUD = {
     }
 
     // ---------------- curseur / réticule (hors démo)
-    if (!game.demo && game.state === 'play' && !game.paused && !game.shopOpen && !game.skillOpen) {
+    if (!game.demo && !AR.Touch.enabled && game.state === 'play' && !game.paused && !game.shopOpen && !game.skillOpen) {
       const m = AR.Input.mouse;
       ctx.strokeStyle = C.spirit; ctx.lineWidth = 1.6;
       ctx.globalAlpha = 0.85;

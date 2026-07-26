@@ -128,7 +128,12 @@ AR.BOSSES = {
     // sauter le boss sur la même plateforme et neutraliserait tout refuge.
   },
   chariot_commander: {
-    name: 'COMMANDANT DE CHAR', hp: 7000, dmg: 26, h: 190, speed: 130, xp: 280, coins: 150,
+    // h réduit (190 -> 150) : à 190 (hitbox = h*0.8 = 152px), sa hitbox de
+    // charge/sweep dépassait même la plateforme centrale remontée à 130px de
+    // dégagement (mesuré : recouvrement de 22px, un joueur immobile dessus se
+    // faisait quand même toucher). À 150, hitbox = 120px < 130px : le centre
+    // est désormais réellement hors d'atteinte, avec 10px de marge.
+    name: 'COMMANDANT DE CHAR', hp: 7000, dmg: 26, h: 150, speed: 130, xp: 280, coins: 150,
     patterns: ['sweep', 'javelins', 'sweep', 'summon:hoplite'],
     phase2: 0.5, p2patterns: ['sweep', 'javelins', 'javelins', 'sweep', 'summon:archer_auxilia'],
   },
@@ -254,6 +259,19 @@ AR.RIFTS = [
 
 // Multiplicateurs de difficulté par ère (HP / dégâts des ennemis)
 AR.ERA_SCALE = [1.0, 1.25, 1.55, 1.9, 2.3, 2.8];
+
+// Profil de progression "moyenne" d'un joueur qui atteindrait naturellement
+// cette ère (niveau, or, crans d'armes, compétences déjà prises, potions).
+// Utilisé quand on choisit de démarrer directement sur une ère depuis le menu
+// titre, au lieu de toujours repartir de zéro (voir Game#newRun).
+AR.ERA_START_PROFILE = [
+  { level: 1, coins: 60, swordTier: 0, bowTier: 0, skills: [], skillPoints: 0, potions: 1 },
+  { level: 5, coins: 180, swordTier: 1, bowTier: 0, skills: ['blade1'], skillPoints: 2, potions: 2 },
+  { level: 9, coins: 380, swordTier: 2, bowTier: 1, skills: ['blade1', 'blade2', 'bow1'], skillPoints: 3, potions: 2 },
+  { level: 13, coins: 650, swordTier: 3, bowTier: 2, skills: ['blade1', 'blade2', 'bow1', 'bow2', 'body1'], skillPoints: 4, potions: 3 },
+  { level: 17, coins: 980, swordTier: 4, bowTier: 3, skills: ['blade1', 'blade2', 'blade3', 'bow1', 'bow2', 'body1', 'body2'], skillPoints: 3, potions: 3 },
+  { level: 21, coins: 1400, swordTier: 5, bowTier: 4, skills: ['blade1', 'blade2', 'blade3', 'bow1', 'bow2', 'body1', 'body2', 'body3', 'spirit1'], skillPoints: 3, potions: 4 },
+];
 
 // ---------------------------------------------------- NIVEAUX DE DIFFICULTÉ
 // Le mode Normal correspond à l'équilibrage historique. Les modes supérieurs

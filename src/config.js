@@ -10,6 +10,11 @@ AR.C = {
   MAX_STEPS: 45,         // garde-fou (mode accéléré compris, jusqu'à ×40)
   SPEED_STEPS: [1, 2, 4, 8, 10, 15, 20, 30, 40],
 
+  // Surligne les plateformes de collision des arènes de boss par-dessus le
+  // fond illustré (mise au point de leur position) — outil de debug, à
+  // activer ponctuellement en local, jamais en production.
+  DEBUG_ARENA_PLATFORMS: false,
+
   PLAYER: {
     W: 34, H: 62, DRAW_H: 92,
     WALK: 160, SPRINT: 265, ACCEL: 2400, AIR_CTRL: 0.75,
@@ -51,6 +56,7 @@ AR.C = {
     record: ['KeyR'],
     shot:   ['KeyC'],
     mute:   ['KeyM'],
+    log:    ['KeyL'],
     confirm: ['Enter', 'NumpadEnter'],
   },
 

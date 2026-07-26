@@ -15,6 +15,12 @@ AR.DemoAI = {
   chestRetries: new WeakMap(),
   blockerMemory: new WeakMap(),
   avoidedEnemies: new WeakSet(),
+  lootTarget: null,
+  lootAttemptT: 0,
+  lootBestD: Infinity,
+  lootIgnore: new WeakSet(),
+  lootRetries: new WeakMap(),
+  climbPhase: null,
   buildFocus: 'balanced',
   traversal: null,
   bossEvade: null,     // { side: 'left'|'right', stage: 0-3 } : refuge sur les promontoires de l'arène
@@ -27,6 +33,10 @@ AR.DemoAI = {
     this.chestRetries = new WeakMap();
     this.blockerMemory = new WeakMap();
     this.avoidedEnemies = new WeakSet();
+    this.lootTarget = null; this.lootAttemptT = 0; this.lootBestD = Infinity;
+    this.lootIgnore = new WeakSet();
+    this.lootRetries = new WeakMap();
+    this.climbPhase = null;
     this.traversal = null;
     this.bossEvade = null;
     if (newRun || !this.buildFocus) {
@@ -320,6 +330,227 @@ AR.DemoAI = {
     this.chestBestD = Infinity;
   },
 
+  // butin non ramassé (pièce, potion, cœur) le plus proche actuellement visible à l'écran
+  _pickVisibleLoot(game, pcx, pcy) {
+    const cam = game.camera, margin = 40;
+    let best = null, bestD = Infinity;
+    for (const p of AR.Pickups.list) {
+      if (!['coin', 'heart', 'potionDrop'].includes(p.type) || this.lootIgnore.has(p)) continue;
+      if (p.x < cam.x - margin || p.x > cam.x + cam.vw + margin) continue;
+      if (p.y < cam.y - margin || p.y > cam.y + cam.vh + margin) continue;
+      const d = AR.U.dist(pcx, pcy, p.x, p.y);
+      if (d < bestD) { bestD = d; best = p; }
+    }
+    return best;
+  },
+
+  // abandonne le butin visé si aucun progrès n'est fait depuis un moment
+  // (ex : pièce coincée hors d'atteinte malgré le correctif de sortie de mur)
+  _trackLootAttempt(game, pl, loot, pcx, pcy, dt) {
+    if (this.lootTarget !== loot) {
+      this.lootTarget = loot; this.lootAttemptT = 0; this.lootBestD = Infinity;
+    }
+    const d = AR.U.dist(pcx, pcy, loot.x, loot.y);
+    if (d < this.lootBestD - 6) { this.lootBestD = d; this.lootAttemptT = 0; }
+    else this.lootAttemptT += dt;
+    if (this.lootAttemptT < 2.5) return false;
+    this.lootIgnore.add(loot);
+    this._clearLootAttempt();
+    return true;
+  },
+
+  _clearLootAttempt() {
+    this.lootTarget = null;
+    this.lootAttemptT = 0;
+    this.lootBestD = Infinity;
+  },
+
+  // Compte les sauts/traversées tentés pour atteindre un butin précis. Persiste
+  // au-delà de _clearLootAttempt (qui est appelé dès qu'une traversée démarre) :
+  // sans ça, une pièce nécessitant un saut+dash imprécis (à côté d'une fosse,
+  // sous une plateforme) fait recommencer le compteur de blocage à chaque essai
+  // et l'IA boucle indéfiniment sans jamais l'abandonner.
+  _recordLootJump(loot) {
+    const attempts = (this.lootRetries.get(loot) || 0) + 1;
+    this.lootRetries.set(loot, attempts);
+    if (attempts >= 2) this.lootIgnore.add(loot);
+  },
+
+  // Chemin de plateformes vers le côté gauche/droit de l'arène, de la plus basse
+  // à la plus haute. Générique à toutes les arènes de boss (peu importe le nombre
+  // de paliers ou leurs id) : une zone morte autour du centre du sol exclut les
+  // plateformes centrales (souvent décoratives ou destinées à un autre usage).
+  _evadeRoute(arena, side) {
+    const ground = arena.ground;
+    const midX = ground.x + ground.w / 2;
+    const dead = ground.w * 0.15;
+    return arena.platforms
+      .filter((p) => !p.ground)
+      .filter((p) => {
+        const cx = p.x + p.w / 2;
+        return side === 'left' ? cx < midX - dead : cx > midX + dead;
+      })
+      .sort((a, b) => b.y - a.y);
+  },
+
+  // ============================================================= STRATÉGIES DE BOSS
+  // Chaque boss impose une lecture différente de son arène ; un module dédié par
+  // id de boss vaut mieux qu'une seule heuristique générique. Renvoie true si la
+  // frame a été entièrement prise en charge (l'appelant s'arrête alors là), sinon
+  // false pour retomber sur l'esquive générique (_bossEvadeUpdate) puis le combat
+  // habituel — ce qui permet à un module de ne reprendre la main que ponctuellement
+  // (ex: rester passif tant qu'aucun sbire n'est au sol) sans dupliquer le reste de l'IA.
+  _bossStrategyUpdate(game, pl, dt) {
+    const boss = game.boss;
+    const arena = game.level.bossArena;
+    if (!boss || boss.dead || !arena || !arena.active) return false;
+    if (game.level.era.boss === 'chariot_commander') return this._chariotCommanderStrategy(game, pl, dt);
+    return false;
+  },
+
+  // ---- Commandant de char (ère 2) -----------------------------------------
+  // Le char reste au sol et frappe large (charge/sweep) : sa hitbox dépasse
+  // les piédestaux latéraux, seule la plateforme centrale est une vraie zone
+  // sûre (retour joueur, confirmé par mesure). Stratégie la plus simple pour
+  // l'instant : camper dessus, ne JAMAIS en repartir de soi-même. Parer les
+  // flèches/javelots qui approchent, punir d'un coup d'épée chargé un sbire
+  // venu se frotter à nous, sinon canarder le char en continu à l'arc.
+  //
+  // _hasClearShot n'est PAS utilisable ici : elle teste `level.solidAt`, la
+  // grille de tuiles du niveau *normal* — sans rapport avec la géométrie de
+  // l'arène (image de fond + arena.platforms). Elle finissait presque toujours
+  // par renvoyer "bloqué" sur du terrain sans lien avec l'arène visible, et
+  // l'IA ne tirait alors jamais tant qu'elle campait au centre. L'arène est
+  // une pièce ouverte sans obstacle entre le centre et le sol : on tire donc
+  // sans condition de visée dégagée.
+  _chariotCommanderStrategy(game, pl, dt) {
+    // Ce module renvoie `true` tant que le combat continue, donc le
+    // décompte partagé de decideT (fait normalement plus loin dans update(),
+    // jamais atteint ici) doit être fait nous-mêmes — sinon, une fois fixé à
+    // une valeur > 0 par le tir/coup d'épée, il n'est plus jamais redescendu
+    // à 0 et bloque toute action suivante pour le reste du combat.
+    this.decideT -= dt;
+    const arena = game.level.bossArena;
+    const boss = game.boss;
+    const centerDais = arena.platforms.find((p) => p.id === 'center_dais');
+    const leftPed = arena.platforms.find((p) => p.id === 'left_pedestal');
+    const rightPed = arena.platforms.find((p) => p.id === 'right_pedestal');
+    if (!centerDais || !leftPed || !rightPed) return false;
+
+    const pcx = pl.x + pl.w / 2, pcy = pl.y + pl.h / 2, feetY = pl.y + pl.h;
+    const onCenter = Math.abs(feetY - centerDais.y) < 6 &&
+      pcx > centerDais.x - 4 && pcx < centerDais.x + centerDais.w + 4;
+
+    if (!onCenter) {
+      this._climbToCenter(game, boss, pl, dt, centerDais, leftPed, rightPed);
+      return true;
+    }
+
+    const a = {};
+    const goalCx = centerDais.x + centerDais.w / 2;
+    if (Math.abs(pcx - goalCx) > 40) { a.right = pcx < goalCx; a.left = pcx > goalCx; }
+
+    // priorité à la parade d'un projectile proche (même fenêtre que le combat
+    // générique : portée 70px, bande verticale h/2+7)
+    if (pl.swordCd <= 0 && !pl.dashing) {
+      for (const proj of AR.Projectiles.list) {
+        if (proj.friendly) continue;
+        const dx = proj.x - pcx, dy = proj.y - pcy;
+        const incoming = (dx > 0 && proj.vx < 0) || (dx < 0 && proj.vx > 0);
+        if (incoming && Math.abs(dx) < 70 && Math.abs(dy) < pl.h / 2 + 7) {
+          a.left = proj.x < pcx; a.right = !a.left; a.sword = true;
+          this._applyJump(a, dt);
+          AR.Input.setVirtual(a, boss.centerX(), boss.centerY());
+          return true;
+        }
+      }
+    }
+
+    // un sbire vient nous chercher jusque sur le plateau : coup d'épée chargé,
+    // sans quitter la plateforme. Hauteur ET distance horizontale séparées
+    // (pas une simple distance à vol d'oiseau) : un sbire resté au sol, ~130px
+    // plus bas, ne doit pas compter comme "à portée" juste parce qu'il se
+    // tient sous la plateforme — le sabre chargé part à hauteur du joueur et
+    // ne peut de toute façon pas l'atteindre là en dessous.
+    const meleeMinion = game.enemies.find((e) => !e.dead && e.active && !e.isBoss &&
+      Math.abs(e.centerY() - pcy) < 60 && Math.abs(e.centerX() - pcx) < 110);
+    if (meleeMinion) {
+      this.bowPlan = 0;
+      if (this.swordPlan > 0) {
+        this.swordPlan -= dt;
+        a.sword = this.swordPlan > 0.02;
+      } else if (this.decideT <= 0) {
+        this.swordPlan = pl.stats.swordChargeTime + 0.1;
+        this.decideT = 0.2;
+      }
+      this._applyJump(a, dt);
+      AR.Input.setVirtual(a, meleeMinion.centerX(), meleeMinion.centerY());
+      return true;
+    }
+
+    // rien d'urgent : canarder le char sans relâche
+    if (this.bowPlan > 0) {
+      this.bowPlan -= dt;
+      a.bow = this.bowPlan > 0.02;
+    } else if (this.decideT <= 0) {
+      this.bowPlan = pl.stats.bowChargeTime + 0.15;
+      this.decideT = 0.3;
+    }
+    this._applyJump(a, dt);
+    AR.Input.setVirtual(a, boss.centerX(), boss.centerY());
+    return true;
+  },
+
+  // Grimpe du sol jusqu'à la plateforme centrale en deux temps : un saut simple
+  // jusqu'au piédestal latéral le plus proche, puis (depuis le piédestal) un
+  // double saut — 2e appui juste après l'apex du 1er (vy repasse au-dessus de
+  // -80), pas avant — plus un dash dès qu'il est disponible pour franchir
+  // l'écart horizontal jusqu'au bord proche du plateau central (viser son bord,
+  // pas son centre, pour ne pas avoir à parcourir plus de distance que nécessaire
+  // et risquer de le survoler). climbPhase distingue les deux sauts : sans lui,
+  // le petit saut vers le piédestal serait pris pour le grand saut vers le
+  // centre dès que vy repasse au-dessus de -80, et déclencherait un double saut
+  // + dash prématuré qui survole tout et retombe au sol plus loin.
+  _climbToCenter(game, boss, pl, dt, centerDais, leftPed, rightPed) {
+    const pcx = pl.x + pl.w / 2, feetY = pl.y + pl.h;
+    const fromLeft = pcx < centerDais.x + centerDais.w / 2;
+    const nearPed = fromLeft ? leftPed : rightPed;
+    const pedCx = nearPed.x + nearPed.w / 2;
+    // bord proche du plateau central, pas son centre : trajet minimal
+    const goalCx = fromLeft ? centerDais.x + 35 : centerDais.x + centerDais.w - 35;
+    const a = {};
+
+    if (pl.onGround) {
+      const onPed = Math.abs(feetY - nearPed.y) < 6;
+      if (onPed) {
+        this.climbPhase = 'toCenter';
+        a.right = goalCx > pcx; a.left = goalCx < pcx;
+        // Tenu court exprès (comme le double saut générique ailleurs dans le
+        // fichier) : le 2e appui se déclenche vers 0.3s (vy repasse au-dessus
+        // de -80), donc tenir plus longtemps que ça bloquerait sa mise en file
+        // (_queueJump refuse tant que le saut précédent est encore "tenu") et
+        // on n'obtiendrait jamais qu'un saut simple. La légère coupure du 1er
+        // saut n'a pas d'importance : le double saut relance sa propre vitesse.
+        this._queueJump(0.22);
+      } else {
+        this.climbPhase = 'toPedestal';
+        if (Math.abs(pcx - pedCx) > 12) { a.right = pcx < pedCx; a.left = pcx > pedCx; }
+        // idem : un saut coupé trop tôt (ex. 0.16s) plafonne bien en-deçà des
+        // ~100px du piédestal et boucle indéfiniment sans jamais l'atteindre.
+        if (Math.abs(pcx - pedCx) < nearPed.w * 0.5) this._queueJump(0.4);
+      }
+    } else if (this.climbPhase === 'toCenter') {
+      if (Math.abs(pcx - goalCx) > 20) { a.right = goalCx > pcx; a.left = goalCx < pcx; }
+      if (pl.jumpsUsed === 1 && pl.vy > -80) this._queueJump(0.3);
+      if (!pl.dashing && pl.dashCharges > 0 && pl.jumpsUsed >= 1 && !pl.airDashed) a.dash = true;
+    } else {
+      // en l'air vers le piédestal (petit saut) : viser l'atterrissage, pas de 2e saut
+      if (Math.abs(pcx - pedCx) > 10) { a.right = pedCx > pcx; a.left = pedCx < pcx; }
+    }
+    this._applyJump(a, dt);
+    AR.Input.setVirtual(a, boss.centerX(), boss.centerY());
+  },
+
   // Deux ripostes distinctes selon ce que la charge/saut/anneau punit réellement
   // (mesuré empiriquement) :
   //  - 'charge' est bloquée au plan du sol : monter sur un promontoire l'esquive
@@ -344,12 +575,13 @@ AR.DemoAI = {
 
     if (!this.bossEvade || this.bossEvade.mode !== (climbPattern ? 'climb' : 'retreat')) {
       if (climbPattern) {
-        const leftBase = arena.platforms.find((p) => p.id === 'left_step1');
-        const rightBase = arena.platforms.find((p) => p.id === 'right_step1');
-        if (!leftBase || !rightBase) { this.bossEvade = null; return false; }
-        const distL = Math.abs(pcx - (leftBase.x + leftBase.w / 2));
-        const distR = Math.abs(pcx - (rightBase.x + rightBase.w / 2));
-        this.bossEvade = { mode: 'climb', side: distL <= distR ? 'left' : 'right', stage: 0 };
+        const leftRoute = this._evadeRoute(arena, 'left');
+        const rightRoute = this._evadeRoute(arena, 'right');
+        if (!leftRoute.length || !rightRoute.length) { this.bossEvade = null; return false; }
+        const distL = Math.abs(pcx - (leftRoute[0].x + leftRoute[0].w / 2));
+        const distR = Math.abs(pcx - (rightRoute[0].x + rightRoute[0].w / 2));
+        const side = distL <= distR ? 'left' : 'right';
+        this.bossEvade = { mode: 'climb', side, stage: 0, route: side === 'left' ? leftRoute : rightRoute };
       } else {
         // Fuir à l'opposé de la cible verrouillée (stomp) ou du centre du boss
         // (arrowRing), vers le bord d'arène offrant le plus de recul.
@@ -363,21 +595,18 @@ AR.DemoAI = {
     const a = {};
     let aimX = boss.centerX(), aimY = boss.centerY();
     if (this.bossEvade.mode === 'climb') {
-      const ids = this.bossEvade.side === 'left'
-        ? ['left_step1', 'left_step2', 'left_mid']
-        : ['right_step1', 'right_step2', 'right_mid'];
-      const plats = ids.map((id) => arena.platforms.find((p) => p.id === id));
-      const stage = Math.min(this.bossEvade.stage, 2);
-      const plat = plats[stage];
+      const route = this.bossEvade.route;
+      const stage = Math.min(this.bossEvade.stage, route.length - 1);
+      const plat = route[stage];
       if (plat) {
         const feetY = pl.y + pl.h;
-        if (pl.onGround && this.bossEvade.stage < 3 && Math.abs(feetY - plat.y) < 5) this.bossEvade.stage++;
+        if (pl.onGround && this.bossEvade.stage < route.length && Math.abs(feetY - plat.y) < 5) this.bossEvade.stage++;
         const goalCx = plat.x + plat.w / 2;
         if (Math.abs(pcx - goalCx) > 14) { a.right = pcx < goalCx; a.left = pcx > goalCx; }
         if (pl.onGround && Math.abs(pcx - goalCx) < plat.w * 0.5) this._queueJump(0.16);
       }
       // depuis le promontoire final, continuer à tirer sur le boss si le tir est dégagé
-      if (this.bossEvade.stage >= 3 && this.decideT <= 0) {
+      if (this.bossEvade.stage >= route.length && this.decideT <= 0) {
         const clear = this._hasClearShot(game.level, pcx, pl.y + pl.h * 0.38, boss.centerX(), boss.centerY());
         if (clear && this._canCast(pl, 0, 0) && Math.random() < 0.4) a.spell1 = true;
         else { a.bow = true; this.decideT = 0.45; }
@@ -404,6 +633,7 @@ AR.DemoAI = {
       this.jumpHoldT = this.jumpReleaseT = this.navStuckT = 0;
       this.traversal = null;
       this._clearChestAttempt();
+      this._clearLootAttempt();
       this.uiT += dt;
       if (this.uiT > 1.1) { game.riftPick(Math.floor(Math.random() * game.riftChoices.length)); this.uiT = 0; }
       AR.Input.setVirtual(a, aimX, aimY);
@@ -413,6 +643,7 @@ AR.DemoAI = {
       this.jumpHoldT = this.jumpReleaseT = this.navStuckT = 0;
       this.traversal = null;
       this._clearChestAttempt();
+      this._clearLootAttempt();
       this.uiT += dt;
       if (this.uiT > 2.5) { this.uiT = 0; game.newRun(true); }
       AR.Input.setVirtual(a, aimX, aimY);
@@ -422,12 +653,14 @@ AR.DemoAI = {
       this.jumpHoldT = this.jumpReleaseT = this.navStuckT = 0;
       this.traversal = null;
       this._clearChestAttempt();
+      this._clearLootAttempt();
       AR.Input.setVirtual(a, aimX, aimY); return;
     }
     if (game.shopOpen) {
       this.jumpHoldT = this.jumpReleaseT = this.navStuckT = 0;
       this.traversal = null;
       this._clearChestAttempt();
+      this._clearLootAttempt();
       this.uiT += dt;
       const thinkT = Math.max(0.12, 0.45 / Math.sqrt(game.speed || 1));
       if (this.uiT > thinkT) { game.shopAutoBuy(); game.shopOpen = false; this.uiT = 0; }
@@ -438,8 +671,12 @@ AR.DemoAI = {
       this.jumpHoldT = this.jumpReleaseT = this.navStuckT = 0;
       this.traversal = null;
       this._clearChestAttempt();
+      this._clearLootAttempt();
       AR.Input.setVirtual(a, aimX, aimY); return;
     }
+
+    // ---------- module de stratégie propre au boss courant, s'il existe
+    if (this._bossStrategyUpdate(game, pl, dt)) return;
 
     // ---------- refuge sur les promontoires pendant une attaque de boss au sol
     // (charge / saut / anneau) : prend la main sur tout le reste tant que le
@@ -519,6 +756,7 @@ AR.DemoAI = {
     const interactive = AR.Pickups.nearestInteractive(pl);
     const portal = AR.Pickups.list.find((p) => p.type === 'portal');
     let chest = this._pickReachableChest(game, pl, pcx);
+    let loot = null;
     const wantShop = game.merchantPickup && !game.merchantPickup.used &&
       Math.abs(game.merchantPickup.x - pcx) < 520 &&
       (pl.hp < pl.maxHp * 0.75 || game.coins > 130);
@@ -528,7 +766,12 @@ AR.DemoAI = {
     else if (target && (target.isBoss || realTd < 520)) goalX = null; // on combat sur place
     else if (chest) goalX = chest.x;
     else if (wantShop) goalX = game.merchantPickup.x;
-    else goalX = pl.x + 400; // avancer vers la droite
+    else {
+      // ramasser l'or/les potions visibles à l'écran avant de reprendre la progression
+      loot = this._pickVisibleLoot(game, pcx, pcy);
+      if (loot && !this._trackLootAttempt(game, pl, loot, pcx, pcy, dt)) goalX = loot.x;
+      else { loot = null; this._clearLootAttempt(); goalX = pl.x + 400; } // avancer vers la droite
+    }
 
     // ---------- interaction
     if (interactive && (!target || realTd > 240 || interactive.type === 'portal')) {
@@ -543,7 +786,9 @@ AR.DemoAI = {
     const bypassTelegraph = avoidedThreat && ['tele', 'charge', 'attack', 'dash'].includes(avoidedThreat.state) && avoidedTd < 210;
     const telegraphed = targetTelegraph || bypassTelegraph;
     if ((threat || telegraphed) && this.decideT <= 0) {
-      if (Math.random() < 0.55) a.dash = true;
+      // le dash esquive aussi vite qu'un saut sans laisser l'IA suspendue en
+      // l'air ni interrompre son élan : on ne saute que s'il n'est pas dispo.
+      if (pl.dashCharges > 0 && !pl.dashing) a.dash = true;
       else this._queueJump(pl.onGround ? 0.24 : 0.20);
       this.decideT = 0.4;
     }
@@ -611,6 +856,16 @@ AR.DemoAI = {
           // foncer au contact des tireurs
           goalX = ex;
         }
+        // du butin visible resté derrière nous (à l'opposé de la cible) : autant
+        // le récupérer en mitraillant à l'arc plutôt que foncer et le perdre hors champ.
+        if (!target.isBoss && !telegraphed) {
+          const nearbyLoot = this._pickVisibleLoot(game, pcx, pcy);
+          if (nearbyLoot && AR.U.sign(nearbyLoot.x - pcx) !== AR.U.sign(dx) &&
+              !this._trackLootAttempt(game, pl, nearbyLoot, pcx, pcy, dt)) {
+            goalX = nearbyLoot.x;
+            loot = nearbyLoot;
+          }
+        }
       }
       // boss : garder une distance moyenne et frapper dans les fenêtres
       if (target.isBoss) {
@@ -647,12 +902,16 @@ AR.DemoAI = {
         this.traversal = { ...gap, dir: travelDir, t: 0, airDashUsed: !!pl.airDashed };
         this.bowPlan = 0;
         this.swordPlan = 0;
+        // saut+dash imprécis vers un butin (ex: pièce au bord d'une fosse sous
+        // une plateforme) : compter la tentative pour ne pas boucler dessus indéfiniment
+        if (loot && goalX === loot.x) this._recordLootJump(loot);
       }
     }
     if (this.traversal) {
       goalX = this.traversal.landingX;
       chest = null;
       this._clearChestAttempt();
+      this._clearLootAttempt();
     }
 
     const pursuingChest = chest && goalX === chest.x;
@@ -685,7 +944,11 @@ AR.DemoAI = {
 
       // Le dash lance ensuite un sprint s'il reste maintenu. On le réserve aux
       // portions de sol lisibles et on le relâche assez tôt avant un obstacle.
-      if (pl.onGround && Math.abs(goalX - pcx) > 300 && !target && !obstacleInDashRange) {
+      // Un ennemi simplement perçu mais trop loin pour qu'on l'engage (même
+      // seuil que la décision de combat plus haut) ne doit pas empêcher de
+      // filer en sprint sur du terrain dégagé.
+      const noRelevantTarget = !target || (!target.isBoss && realTd >= 520);
+      if (pl.onGround && Math.abs(goalX - pcx) > 300 && noRelevantTarget && !obstacleInDashRange) {
         a.dash = true;
       } else if ((blockedShot || projectileBlocker) && pl.onGround && Math.abs(goalDx) > 160 && !obstacleInDashRange) {
         a.dash = true;

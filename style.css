@@ -8,6 +8,7 @@ html, body {
   display: flex;
   align-items: center;
   justify-content: center;
+  overscroll-behavior: none;
 }
 
 #game {
@@ -16,4 +17,140 @@ html, body {
   image-rendering: auto;
   box-shadow: 0 0 60px rgba(53, 224, 192, 0.08);
   outline: none;
+  touch-action: none;
+}
+
+/* ================= Contrôles tactiles (mobile) ================= */
+
+#touchUI {
+  position: fixed;
+  z-index: 5;
+  touch-action: none;
+  font-family: "Segoe UI", sans-serif;
+  user-select: none;
+  -webkit-user-select: none;
+}
+#touchUI.hidden { display: none; }
+
+#touchUI .tzone {
+  position: absolute;
+  top: 0;
+  height: 100%;
+  width: 50%;
+  pointer-events: auto;
+}
+#touchUI .tzone-move { left: 0; }
+#touchUI .tzone-aim { right: 0; }
+
+#touchUI .tstick {
+  position: absolute;
+  width: 104px; height: 104px;
+  margin-left: -52px; margin-top: -52px;
+  border: 2px solid rgba(232, 226, 212, 0.25);
+  border-radius: 50%;
+  background: rgba(10, 14, 18, 0.25);
+  display: none;
+}
+#touchUI .tstick.show { display: block; }
+#touchUI .tknob {
+  position: absolute;
+  left: 50%; top: 50%;
+  width: 48px; height: 48px;
+  margin-left: -24px; margin-top: -24px;
+  border-radius: 50%;
+  background: rgba(53, 224, 192, 0.35);
+  border: 1px solid rgba(53, 224, 192, 0.7);
+  transition: transform 0.03s linear;
+}
+
+#touchUI .tbtn {
+  position: absolute;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  background: rgba(10, 14, 18, 0.55);
+  border: 1.5px solid rgba(232, 226, 212, 0.35);
+  color: #e8e2d4;
+  font-weight: bold;
+  font-size: 13px;
+  pointer-events: auto;
+  touch-action: none;
+  -webkit-tap-highlight-color: transparent;
+}
+#touchUI .tbtn.active {
+  background: rgba(53, 224, 192, 0.35);
+  border-color: #35e0c0;
+}
+
+#touchUI .tbtn-jump   { width: 76px; height: 76px; right: 12%; bottom: 4%; }
+#touchUI .tbtn-dash   { width: 62px; height: 62px; right: 15%; bottom: 30%; }
+#touchUI .tbtn-sword  { width: 68px; height: 68px; right: 26%; bottom: 16%; }
+#touchUI .tbtn-bow    { width: 68px; height: 68px; right: 2%;  bottom: 16%; }
+#touchUI .tbtn-potion { width: 48px; height: 48px; right: 38%; bottom: 4%; font-size: 11px; }
+#touchUI .tbtn-interact { width: 48px; height: 48px; right: 50%; bottom: 4%; font-size: 15px; }
+
+/* Pause / IA / vitesse : rassemblés dans le creux libre en haut du HUD (entre la
+   barre de vie à gauche et le panneau de caractéristiques à droite) */
+#touchUI .tbtn-pause {
+  width: 38px; height: 38px;
+  left: 42%; top: 1%;
+  transform: translateX(-50%);
+  font-size: 14px;
+}
+#touchUI .tbtn-demo {
+  width: 38px; height: 38px;
+  left: 58%; top: 1%;
+  transform: translateX(-50%);
+  overflow: hidden;
+  font-size: 11px;
+}
+#touchUI .tbtn-demo .tring {
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  background: rgba(255, 61, 110, 0.5);
+  transform: scale(0);
+  transform-origin: center;
+  transition: transform 0.6s linear;
+}
+#touchUI .tbtn-demo.charging .tring { transform: scale(1); }
+#touchUI .tbtn-demo.fired .tring { background: rgba(53, 224, 192, 0.6); }
+#touchUI .tbtn-demo .tlabel { position: relative; z-index: 1; }
+
+#touchUI .tspeed {
+  position: absolute;
+  left: 58%; top: 9%;
+  transform: translateX(-50%);
+  display: none;
+  align-items: center;
+  gap: 6px;
+  background: rgba(10, 14, 18, 0.55);
+  border: 1px solid rgba(232, 226, 212, 0.25);
+  border-radius: 20px;
+  padding: 4px 8px;
+  color: #e8e2d4;
+  font-size: 12px;
+  font-weight: bold;
+  pointer-events: none;
+}
+#touchUI .tspeed.show { display: flex; }
+#touchUI .tspeed .tbtn { position: static; width: 26px; height: 26px; font-size: 14px; pointer-events: auto; }
+
+/* Suggestion de rotation d'écran (mobile en portrait uniquement) */
+#rotateHint { display: none; }
+body.touch-mode #rotateHint {
+  display: block;
+  position: fixed;
+  top: 0; left: 0; right: 0;
+  z-index: 6;
+  text-align: center;
+  padding: 6px 10px;
+  font: bold 13px "Segoe UI", sans-serif;
+  color: #e8e2d4;
+  background: rgba(10, 14, 18, 0.85);
+  border-bottom: 1px solid rgba(53, 224, 192, 0.4);
+}
+@media (orientation: landscape) {
+  body.touch-mode #rotateHint { display: none; }
 }

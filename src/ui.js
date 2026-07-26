@@ -134,6 +134,77 @@ AR.UI = {
     ctx.fillText(AR.DIFFICULTIES[game.diffIdx].desc, W / 2, 536);
     ctx.restore();
 
+    // ---- sélecteur d'ère de départ : démarre avec le niveau/or/équipement
+    // représentatifs d'un joueur ayant naturellement atteint cette ère
+    ctx.save();
+    ctx.textAlign = 'center';
+    ctx.fillStyle = AR.C.COLORS.textDim;
+    ctx.font = 'bold 14px "Segoe UI", sans-serif';
+    ctx.fillText('— ÈRE DE DÉPART —', W / 2, 550);
+    ctx.restore();
+    const ebw = 76, egap = 8;
+    const etotal = AR.ERAS.length * ebw + (AR.ERAS.length - 1) * egap;
+    AR.ERAS.forEach((era, i) => {
+      const ex = W / 2 - etotal / 2 + i * (ebw + egap);
+      const selected = game.eraStartIdx === i;
+      const r = { x: ex, y: 562, w: ebw, h: 30 };
+      ctx.save();
+      ctx.fillStyle = selected ? 'rgba(53,224,192,0.14)' : 'rgba(10,14,18,0.85)';
+      ctx.fillRect(r.x, r.y, r.w, r.h);
+      ctx.strokeStyle = selected ? AR.C.COLORS.spirit : (this._hover(r) ? '#fff' : AR.C.COLORS.uiEdge);
+      ctx.lineWidth = selected ? 2.5 : 1;
+      ctx.strokeRect(r.x, r.y, r.w, r.h);
+      ctx.fillStyle = selected ? AR.C.COLORS.spirit : AR.C.COLORS.textDim;
+      ctx.font = 'bold 14px "Segoe UI", sans-serif';
+      ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+      ctx.fillText('Ère ' + (i + 1), r.x + r.w / 2, r.y + r.h / 2 + 1);
+      ctx.restore();
+      if (this._click(r)) { game.setEraStart(i); AR.Audio.sfx('ui'); }
+    });
+    ctx.save();
+    ctx.textAlign = 'center';
+    ctx.fillStyle = AR.C.COLORS.spirit;
+    ctx.font = 'italic 13px "Segoe UI", sans-serif';
+    const startEra = AR.ERAS[game.eraStartIdx];
+    const startProfile = AR.ERA_START_PROFILE[game.eraStartIdx];
+    ctx.fillText(game.eraStartIdx === 0
+      ? startEra.name + ' — départ classique (niveau 1, sans équipement)'
+      : startEra.name + ' — départ niveau ' + startProfile.level + ', ' + startProfile.coins + ' or, sabre ' +
+        (startProfile.swordTier + 1) + '/6, arc ' + (startProfile.bowTier + 1) + '/6',
+      W / 2, 610);
+    ctx.restore();
+
+    // ---- case à cocher : sauter directement à l'arène du boss de l'ère
+    // choisie (niveau/équipement encore un peu boostés pour compenser l'ère sautée)
+    ctx.save();
+    ctx.font = '13px "Segoe UI", sans-serif';
+    const cbLabel = 'Démarrer directement dans l\'arène du boss (niveau/équipement boostés)';
+    const cbSize = 15, cbGap = 8;
+    const cbTextW = ctx.measureText(cbLabel).width;
+    const cbTotalW = cbSize + cbGap + cbTextW;
+    const cbX = W / 2 - cbTotalW / 2, cbY = 622;
+    const cbBox = { x: cbX, y: cbY, w: cbSize, h: cbSize };
+    ctx.fillStyle = game.startAtBoss ? 'rgba(53,224,192,0.25)' : 'rgba(10,14,18,0.85)';
+    ctx.fillRect(cbBox.x, cbBox.y, cbBox.w, cbBox.h);
+    const cbClick = { x: cbX - 4, y: cbY - 4, w: cbTotalW + 8, h: cbSize + 8 };
+    ctx.strokeStyle = game.startAtBoss ? AR.C.COLORS.spirit : (this._hover(cbClick) ? '#fff' : AR.C.COLORS.uiEdge);
+    ctx.lineWidth = game.startAtBoss ? 2.5 : 1;
+    ctx.strokeRect(cbBox.x, cbBox.y, cbBox.w, cbBox.h);
+    if (game.startAtBoss) {
+      ctx.strokeStyle = AR.C.COLORS.spirit;
+      ctx.lineWidth = 2.5;
+      ctx.beginPath();
+      ctx.moveTo(cbBox.x + 3, cbBox.y + 8);
+      ctx.lineTo(cbBox.x + 6, cbBox.y + 11.5);
+      ctx.lineTo(cbBox.x + 12, cbBox.y + 3.5);
+      ctx.stroke();
+    }
+    ctx.fillStyle = AR.C.COLORS.text;
+    ctx.textAlign = 'left'; ctx.textBaseline = 'middle';
+    ctx.fillText(cbLabel, cbX + cbSize + cbGap, cbY + cbSize / 2 + 1);
+    ctx.restore();
+    if (this._click(cbClick)) { game.setStartAtBoss(!game.startAtBoss); AR.Audio.sfx('ui'); }
+
     // records
     const rec = AR.Save.data.records;
     ctx.save();
@@ -143,7 +214,7 @@ AR.UI = {
     if (rec.runs > 0) {
       ctx.fillText('Meilleure ère : ' + (rec.bestEra + 1) + '/6' +
         (rec.wins > 0 ? '  •  Victoires : ' + rec.wins : '') +
-        '  •  Ennemis vaincus : ' + rec.totalKills + '  •  Runs : ' + rec.runs, W / 2, 566);
+        '  •  Ennemis vaincus : ' + rec.totalKills + '  •  Runs : ' + rec.runs, W / 2, 650);
     }
     ctx.fillText('Sabre : clic gauche (maintenir = frappe traversante) • Arc : clic droit (maintenir = tir perçant)', W / 2, H - 46);
     ctx.fillText('ZQSD/WASD + Espace • Maj : dash / sprint • v' + AR.VERSION, W / 2, H - 26);

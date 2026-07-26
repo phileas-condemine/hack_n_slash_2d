@@ -36,6 +36,10 @@ AR.Game = class {
     // difficulté (persistée entre les sessions)
     this.diffIdx = AR.U.clamp(AR.Save.data.settings.difficulty | 0, 0, AR.DIFFICULTIES.length - 1);
     this.diff = AR.DIFFICULTIES[this.diffIdx];
+    // ère de départ choisie au menu titre (persistée entre les sessions)
+    this.eraStartIdx = AR.U.clamp(AR.Save.data.settings.eraStart | 0, 0, AR.ERAS.length - 1);
+    // démarrer directement dans l'arène du boss de l'ère choisie (persisté)
+    this.startAtBoss = !!AR.Save.data.settings.startAtBoss;
   }
 
   setDifficulty(i) {
@@ -45,29 +49,70 @@ AR.Game = class {
     AR.Save.save();
   }
 
+  setEraStart(i) {
+    this.eraStartIdx = AR.U.clamp(i, 0, AR.ERAS.length - 1);
+    AR.Save.data.settings.eraStart = this.eraStartIdx;
+    AR.Save.save();
+  }
+
+  setStartAtBoss(v) {
+    this.startAtBoss = !!v;
+    AR.Save.data.settings.startAtBoss = this.startAtBoss;
+    AR.Save.save();
+  }
+
+  // Applique le profil de progression "moyenne" de l'ère choisie au menu
+  // titre (niveau, or, crans d'armes, compétences, potions). Ère 1 = profil
+  // par défaut, identique à un départ classique. Quand on saute directement
+  // à l'arène du boss (atBoss), on compense l'XP/or/coffres manqués en route
+  // avec un profil un peu plus généreux que le simple début d'ère.
+  _applyEraStartProfile(eraIdx, atBoss) {
+    const base = AR.ERA_START_PROFILE[eraIdx] || AR.ERA_START_PROFILE[0];
+    const pl = this.player;
+    if (atBoss) {
+      pl.level = base.level + 3;
+      pl.skillPoints = base.skillPoints + 1;
+      pl.swordTier = Math.min(5, base.swordTier + 1);
+      pl.bowTier = Math.min(5, base.bowTier + 1);
+      pl.potions = 3;
+      this.coins = Math.round(base.coins * 1.6);
+    } else {
+      pl.level = base.level;
+      pl.skillPoints = base.skillPoints;
+      pl.swordTier = base.swordTier;
+      pl.bowTier = base.bowTier;
+      pl.potions = base.potions;
+      this.coins = base.coins;
+    }
+    pl.xp = 0;
+    pl.skills = new Set(base.skills);
+  }
+
   // ================================================== CYCLE DE VIE D'UNE RUN
   newRun(demo) {
+    AR.EventLog.startRun();
     this.demo = demo;
     AR.Input.virtual = demo;
     AR.DemoAI.reset(true);
     if (!demo) this.speed = 1;
     this.ngPlus = 0;
-    this.eraIdx = 0;
+    this.eraIdx = this.eraStartIdx || 0;
     this.runSeed = (Math.random() * 1e9) | 0;
     this.player = new AR.Player(0, 0);
-    this.coins = 60;
     this.diff = AR.DIFFICULTIES[this.diffIdx];
     this.mods = {
       dmgMult: 1, hpMult: 1, chargeMult: 1,
       goldMult: this.diff.goldMult, enemyDmg: this.diff.dmgMult,
       shopDiscount: 1, spiritBonus: 0,
     };
+    this._applyEraStartProfile(this.eraIdx, this.startAtBoss);
     this.player.recalcStats(this);
     this.player.hp = this.player.maxHp;
     this.stats = { kills: 0, time: 0, coinsEarned: 0, bosses: 0 };
     AR.Save.data.records.runs++;
     AR.Save.save();
     this.loadLevel();
+    if (this.startAtBoss) this._startBossFight();
     this.state = 'play';
     this.paused = false; this.skillOpen = false; this.shopOpen = false;
     if (demo) AR.HUD.notify('Plan IA équilibré — affinité ' + AR.DemoAI.focusLabel(), AR.C.COLORS.spirit);
@@ -138,6 +183,7 @@ AR.Game = class {
       if (!rec.bestTime || this.stats.time < rec.bestTime) rec.bestTime = this.stats.time;
     }
     AR.Save.save();
+    AR.EventLog.download(victory ? 'victory' : (this.player.dead ? 'death' : 'quit'));
   }
 
   // ================================================== SAUVEGARDES DE PARTIE
@@ -168,6 +214,7 @@ AR.Game = class {
   loadGame(id) {
     const s = AR.Save.data.saves.find((sv) => sv.id === id);
     if (!s) return false;
+    AR.EventLog.startRun();
     this.demo = false;
     AR.Input.virtual = false;
     this.speed = 1;
@@ -248,6 +295,10 @@ AR.Game = class {
       AR.Recorder.screenshot(this.canvas);
       AR.HUD.notify('Capture d\'écran enregistrée');
     }
+    if (In.pressed('log')) {
+      AR.EventLog.download('manual');
+      AR.HUD.notify('Journal de combat exporté');
+    }
     // bascule du mode démo en pleine partie
     if (In.pressed('demo') && this.state === 'play') {
       this.demo = !this.demo;
@@ -291,6 +342,18 @@ AR.Game = class {
     this.veilT = Math.max(0, this.veilT - dt);
     const pl = this.player;
     const lvl = this.level;
+
+    // pouls périodique : position/état du héros, pour visualiser les
+    // déplacements (ou leur absence) entre deux événements de dégâts.
+    this._logHbT = (this._logHbT || 0) - dt;
+    if (this._logHbT <= 0) {
+      this._logHbT = 1;
+      AR.EventLog.push('player', {
+        event: 'heartbeat', x: Math.round(pl.x), y: Math.round(pl.y),
+        vx: Math.round(pl.vx), vy: Math.round(pl.vy), hp: pl.hp,
+        onGround: pl.onGround, state: this.boss ? this.boss.state : null,
+      });
+    }
 
     AR.Audio.music(this.eraIdx, dt);
     pl.update(dt, this);
@@ -558,6 +621,11 @@ AR.Game = class {
       AR.Particles.burst(e.centerX(), e.centerY(), crit ? 10 : 5,
         { color: crit ? AR.C.COLORS.impact : AR.C.COLORS.hp, speed: 170, size: 3, life: 0.35, type: 'spark' });
       AR.Audio.sfx(crit ? 'crit' : 'hit');
+      AR.EventLog.push('player', {
+        event: 'attack_hit', target: e.spriteId || e.id, dealt, crit,
+        targetHp: e.hp, targetDead: e.dead,
+        px: Math.round(pl.x), py: Math.round(pl.y),
+      });
     }
     return dealt;
   }
@@ -568,6 +636,20 @@ AR.Game = class {
     if (dealt > 0) {
       this.camera.shake(4, 0.25);
       AR.Particles.text(this.player.x + this.player.w / 2, this.player.y - 10, '-' + dealt, AR.C.COLORS.hp);
+      // meilleur effort d'identification de la source : l'ennemi le plus
+      // proche du point d'origine du coup (fromX), aucun appelant ne passe
+      // sa propre référence à hitPlayer.
+      let source = null, bestD = 60;
+      for (const e of this.enemies) {
+        if (e.dead) continue;
+        const d = Math.abs(e.centerX() - fromX);
+        if (d < bestD) { bestD = d; source = e; }
+      }
+      AR.EventLog.push('enemy', {
+        event: 'damage_taken', source: source ? (source.spriteId || source.id) : null,
+        dealt, hpLeft: this.player.hp, playerDead: this.player.dead,
+        px: Math.round(this.player.x), py: Math.round(this.player.y),
+      });
     }
     return dealt;
   }

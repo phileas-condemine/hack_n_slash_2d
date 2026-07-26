@@ -23,9 +23,17 @@ AR.Pickups = {
   update(dt, game) {
     const pl = game.player;
     const pcx = pl.x + pl.w / 2, pcy = pl.y + pl.h / 2;
+    const T = AR.C.TILE;
     for (let i = this.list.length - 1; i >= 0; i--) {
       const p = this.list[i];
       p.t += dt;
+      // bug de rebond : une pièce peut finir encastrée dans un mur -> la faire
+      // ressortir latéralement vers le joueur jusqu'à ce qu'elle soit dégagée
+      if (p.type === 'coin' && game.level.solidAt(Math.floor(p.x / T), Math.floor(p.y / T))) {
+        p.x += (pcx >= p.x ? 1 : -1) * 220 * dt;
+        p.settled = false;
+        p.vy = 0;
+      }
       // physique simple pour les drops
       if (!p.settled && (p.type === 'coin' || p.type === 'heart' || p.type === 'potionDrop')) {
         p.x += p.vx * dt; p.y += p.vy * dt; p.vy += 1200 * dt;

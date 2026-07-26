@@ -9,6 +9,7 @@ AR.Input = {
   virtual: false,    // true = piloté par l'IA démo
   v: {},             // état virtuel des actions
   vAim: { x: 0, y: 0 },  // visée virtuelle (coordonnées monde)
+  touch: {},         // état des actions pilotées par les contrôles tactiles (s'ajoute au clavier, ne l'écrase pas)
   canvas: null,
   scale: 1, offX: 0, offY: 0,
   clicks: [],        // clics UI (consommés par les menus)
@@ -22,7 +23,7 @@ AR.Input = {
       AR.Audio.unlock();
     });
     window.addEventListener('keyup', (e) => { this.keys[e.code] = false; });
-    window.addEventListener('blur', () => { this.keys = {}; this.mouse.left = this.mouse.right = false; });
+    window.addEventListener('blur', () => { this.keys = {}; this.mouse.left = this.mouse.right = false; this.touch = {}; });
 
     canvas.addEventListener('mousemove', (e) => this._updateMouse(e));
     canvas.addEventListener('mousedown', (e) => {
@@ -37,6 +38,14 @@ AR.Input = {
       if (e.button === 2) this.mouse.right = false;
     });
     canvas.addEventListener('contextmenu', (e) => e.preventDefault());
+
+    // tap tactile hors des contrôles de jeu (menus/pause/titre) -> équivalent d'un clic gauche UI
+    canvas.addEventListener('pointerdown', (e) => {
+      if (e.pointerType !== 'touch' && e.pointerType !== 'pen') return;
+      this._updateMouse(e);
+      this.clicks.push({ x: this.mouse.x, y: this.mouse.y });
+      AR.Audio.unlock();
+    });
   },
 
   _updateMouse(e) {
@@ -55,9 +64,11 @@ AR.Input = {
     // la souris s'ajoute au clavier pour les attaques
     a.sword = a.sword || this.mouse.left;
     a.bow = a.bow || this.mouse.right;
+    // les contrôles tactiles s'ajoutent au clavier/souris (ne les remplacent pas)
+    for (const action in this.touch) { if (this.touch[action]) a[action] = true; }
     if (this.virtual) {
       // l'IA écrase les actions de gameplay, mais pas les touches "méta"
-      const meta = ['pause', 'demo', 'speedUp', 'speedDown', 'record', 'shot', 'mute', 'confirm', 'skills', 'toggleStats'];
+      const meta = ['pause', 'demo', 'speedUp', 'speedDown', 'record', 'shot', 'mute', 'log', 'confirm', 'skills', 'toggleStats'];
       for (const action in a) { if (!meta.includes(action)) a[action] = !!this.v[action]; }
     }
     this.actions = a;
