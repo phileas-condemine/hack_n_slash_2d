@@ -91,7 +91,7 @@ Constat : le système existe déjà partiellement (ex. `SEC_STONE_01` mur friabl
 
 ## Lisibilité des arènes
 
-- [ ] Afficher les plateformes par dessus les images des arènes afin de permettre au joueur de bien comprendre où il peut sauter.
+- [x] Afficher les plateformes par dessus les images des arènes afin de permettre au joueur de bien comprendre où il peut sauter. **Fait le 2026-07-26** (`src/level.js`, `_drawArenaLedges`) : bord lumineux fin (3px) + léger dégradé (couleur d'accent de l'ère) sur le bord praticable de chaque plateforme non-sol, dessiné par-dessus le fond illustré — contrairement à l'outil de debug existant (`_drawArenaDebug`, boîtes pleines + libellés), volontairement discret pour ne pas dénaturer l'image. Le sol principal n'est pas surligné (déjà visuellement évident). Vérifié en jeu sur R1 et R4 : les bords ressortent clairement sans gêner la lecture de l'illustration.
 
 - [x] Dans l'arène du boss 4/6 il manque 2 plateformes latérales au exterminés pour permettre d'atteindre ensuite les autres plateformes situées plus haut. L'image brute de l'arène prévoit 2 zones pour placer ces plateformes.
   - **Ajouté le 2026-07-26** (`src/arenas.js`, `war_engineer`) : `left_lower`/`right_lower`, calées par capture d'écran + recadrage sur les rampes en bois visibles de part et d'autre du fond illustré (le sol seul laissait ~226px à franchir jusqu'à `left_upper`/`right_upper`, hors de portée d'un double saut ; les rampes existaient dans l'image mais sans aucune collision dessus). Vérifié visuellement (overlay `AR.C.DEBUG_ARENA_PLATFORMS`) : les deux nouveaux paliers s'alignent précisément sur les rampes.

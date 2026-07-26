@@ -810,7 +810,35 @@ AR.Level = class {
       // caméra, comme les surfaces de collision et les combattants.
       ctx.drawImage(img, arena.x - cam.cx(), arena.y - cam.cy(), arena.width, arena.height);
     }
+    if (arena) this._drawArenaLedges(ctx, cam, arena);
     if (arena && AR.C.DEBUG_ARENA_PLATFORMS) this._drawArenaDebug(ctx, cam, arena);
+  }
+
+  // Surligne discrètement le bord praticable de chaque plateforme par-dessus
+  // le fond illustré de l'arène (retour joueur : sur une simple image de fond,
+  // difficile de deviner à l'œil où on peut effectivement sauter/atterrir).
+  // Contrairement à `_drawArenaDebug` (boîtes pleines + libellés, outil de
+  // calibrage), ici juste un bord lumineux fin + un léger dégradé, pour rester
+  // lisible sans dénaturer l'illustration. Le sol principal n'est pas
+  // surligné : il est déjà visuellement évident sur chaque fond d'arène.
+  _drawArenaLedges(ctx, cam, arena) {
+    const cx = cam.cx(), cy = cam.cy(), accent = this.era.accent;
+    ctx.save();
+    for (const p of arena.platforms) {
+      if (p.ground) continue;
+      const x = p.x - cx, y = p.y - cy;
+      if (x > AR.C.VIEW_W + 40 || x + p.w < -40) continue;
+      const glow = ctx.createLinearGradient(0, y, 0, y + 22);
+      glow.addColorStop(0, accent);
+      glow.addColorStop(1, 'rgba(0,0,0,0)');
+      ctx.globalAlpha = 0.45;
+      ctx.fillStyle = glow;
+      ctx.fillRect(x, y, p.w, 22);
+      ctx.globalAlpha = 0.85;
+      ctx.fillStyle = accent;
+      ctx.fillRect(x, y, p.w, 3);
+    }
+    ctx.restore();
   }
 
   // Surligne les plateformes de collision (invisibles en jeu normal) par-dessus
