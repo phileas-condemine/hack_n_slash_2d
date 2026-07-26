@@ -142,7 +142,14 @@
           const ids = wave.ids || [];
           ids.forEach((id, i) => {
             const tx = centerTx + (i - (ids.length - 1) / 2) * 3;
-            const x = tx * T, y = lvl.groundYAtEntity(x, 0);
+            const x = tx * T;
+            // fromY = le joueur au moment du déclenchement (cf. game.js::_spawnWave), qu'on
+            // n'a pas ici : on prend le haut de la zone de déclenchement comme point de départ
+            // le plus proche. Avec fromY=0 (haut de la carte), une grotte multi-étage renvoyait
+            // le premier surplomb rocheux croisé en descendant depuis la surface — pas le sol
+            // réel de la grotte, bien plus bas (repéré : embuscade "grottes profondes" placée
+            // hors de sa zone de déclenchement sur l'export).
+            const y = lvl.groundYAtEntity(x, tr.y * T);
             const isElite = (wave.elite && wave.elite.indexOf(id) >= 0) || !!(AR.ENEMIES[id] && AR.ENEMIES[id].elite);
             const wx = (x / T) * SCALE, wy = (y / T) * SCALE, r = isElite ? 3.5 : 2.2;
             ctx.fillStyle = C.danger;
