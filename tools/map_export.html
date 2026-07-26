@@ -28,7 +28,9 @@
     <code>tools/dev_server.py</code> fonctionne aussi). Génère les 6 cartes avec le vrai code de
     génération de niveau du jeu (<code>AR.Level</code>), sans brouillard de guerre : silhouette de
     terrain pixel-exacte + coffres / marchand / salles (ère 1 uniquement, les autres sont procédurales)
-    / zone de l'arène de boss / position d'apparition de chaque monstre. À chaque évolution des maps
+    / zone de l'arène de boss / position d'apparition de chaque monstre, y compris les monstres
+    d'embuscade (ère 1) qui émergent du sol au déclenchement plutôt que d'être placés d'avance.
+    À chaque évolution des maps
     (<code>level_specs.js</code>, génération
     procédurale dans <code>level.js</code>...), il suffit de recharger cette page (ou de cliquer sur
     « Régénérer ») pour obtenir des exports à jour — la seed fixe garantit un résultat reproductible
@@ -44,6 +46,8 @@
     <span><span class="swatch" style="background:#ffc94d;transform:rotate(45deg)"></span> marchand</span>
     <span><span class="swatch" style="background:#ff3d6e"></span> zone d'arène du boss</span>
     <span><span class="swatch" style="background:#ff3d6e;border-radius:50%"></span> apparition d'un monstre (plus gros si élite)</span>
+    <span><span class="swatch" style="background:#ff3d6e;border-radius:50%;box-shadow:0 0 0 2px #ffe9a3"></span> monstre d'embuscade — émerge du sol (ère 1)</span>
+    <span><span class="swatch" style="border:1px dashed #ffe9a3;background:none"></span> zone de déclenchement d'embuscade (ère 1)</span>
     <span><span class="swatch" style="border:1px solid #35e0c0;background:none"></span> salle "start" (ère 1)</span>
     <span><span class="swatch" style="border:1px solid #ffc94d;background:none"></span> salle "marchand" (ère 1)</span>
     <span><span class="swatch" style="border:1px solid #7ec8ff;background:none"></span> salle "sûre/hub" (ère 1)</span>
@@ -111,13 +115,42 @@
         ctx.fill();
       }
 
-      // position d'apparition de chaque monstre (donnée statique du niveau)
+      // position d'apparition de chaque monstre placé statiquement (donnée du niveau)
       ctx.fillStyle = C.danger;
       for (const s of lvl.spawns) {
         const sx = (s.x / T) * SCALE, sy = (s.y / T) * SCALE;
         ctx.beginPath();
         ctx.arc(sx, sy, s.elite ? 3.5 : 2.2, 0, Math.PI * 2);
         ctx.fill();
+      }
+
+      // embuscades (encounters, ère 1 uniquement) : ces monstres ne sont PAS dans lvl.spawns —
+      // ils émergent du sol (armEmergence) une fois le joueur entré dans la zone de déclenchement,
+      // à une position calculée à la volée par game.js::_spawnWave(). On reproduit exactement le
+      // même calcul ici pour les prévisualiser, avec un anneau distinctif ("caché tant que le
+      // trigger n'est pas franchi") autour du point plein habituel, plus la zone de déclenchement
+      // en pointillés.
+      for (const enc of lvl.encounters || []) {
+        const tr = enc.trigger;
+        ctx.strokeStyle = C.impact;
+        ctx.lineWidth = 1;
+        ctx.setLineDash([4, 3]);
+        ctx.strokeRect(tr.x * SCALE, tr.y * SCALE, tr.w * SCALE, tr.h * SCALE);
+        ctx.setLineDash([]);
+        const centerTx = tr.x + tr.w / 2;
+        for (const wave of enc.waves || []) {
+          const ids = wave.ids || [];
+          ids.forEach((id, i) => {
+            const tx = centerTx + (i - (ids.length - 1) / 2) * 3;
+            const x = tx * T, y = lvl.groundYAtEntity(x, 0);
+            const isElite = (wave.elite && wave.elite.indexOf(id) >= 0) || !!(AR.ENEMIES[id] && AR.ENEMIES[id].elite);
+            const wx = (x / T) * SCALE, wy = (y / T) * SCALE, r = isElite ? 3.5 : 2.2;
+            ctx.fillStyle = C.danger;
+            ctx.beginPath(); ctx.arc(wx, wy, r, 0, Math.PI * 2); ctx.fill();
+            ctx.strokeStyle = C.impact; ctx.lineWidth = 1;
+            ctx.beginPath(); ctx.arc(wx, wy, r + 2.5, 0, Math.PI * 2); ctx.stroke();
+          });
+        }
       }
 
       return { cnv, lvl };
@@ -129,12 +162,16 @@
       root.innerHTML = '';
       AR.ERAS.forEach((era, i) => {
         const { cnv, lvl } = buildEraCanvas(i, seed + i);
+        const ambushCount = (lvl.encounters || []).reduce((n, enc) =>
+          n + (enc.waves || []).reduce((m, w) => m + (w.ids || []).length, 0), 0);
         const box = document.createElement('div');
         box.className = 'era';
         box.innerHTML = `<h2>R${i + 1} — ${era.name}</h2>
           <div class="meta">${lvl.authored ? 'authored (level_specs)' : 'procédurale'} ·
             ${lvl.tilesW}×${lvl.worldH} tuiles · seed ${seed + i} ·
-            ${lvl.chestSpots.length} coffre(s) · ${lvl.spawns.length} monstre(s)</div>`;
+            ${lvl.chestSpots.length} coffre(s) · ${lvl.spawns.length} monstre(s)` +
+            (ambushCount ? ` · ${ambushCount} monstre(s) d'embuscade (${lvl.encounters.length} zone(s))` : '') +
+            `</div>`;
         const wrap = document.createElement('div');
         wrap.className = 'canvasWrap';
         cnv.dataset.filename = `minimap_R${i + 1}_${era.id}_seed${seed + i}.png`;

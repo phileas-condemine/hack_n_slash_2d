@@ -50,7 +50,9 @@ seule façon de voir à quoi ressemble une carte est de jouer une run complète 
 Chaque carte exportée montre : la silhouette de terrain complète (pas de brouillard de guerre,
 toute la carte d'un coup), les coffres (carré or), le marchand (losange or), les salles taguées
 (ère 1 uniquement), la zone de l'arène de boss (cadre rouge) et la position d'apparition de
-chaque monstre (point rouge, plus gros pour une élite).
+chaque monstre (point rouge, plus gros pour une élite) — y compris les monstres d'embuscade
+(ère 1, `level_specs.js::encounters`) qui n'émergent du sol qu'au déclenchement en jeu : point
+entouré d'un anneau, avec la zone de déclenchement en pointillés.
 
 ## dev_server.py
 
