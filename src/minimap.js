@@ -249,19 +249,21 @@ AR.Minimap = {
       }
     }
 
-    // sbires : position d'apparition de chaque monstre (donnée statique du niveau, indépendante
-    // de son état de vie/mort courant — utile pour repérer la densité/répartition des spawns),
-    // mêmes règles de repérage que les points d'intérêt ci-dessus.
-    for (const s of lvl.spawns) {
-      const stx = s.x / T, sty = s.y / T;
-      const scx = Math.floor(stx / poiCell), scy = Math.floor(sty / poiCell);
-      const seen = !!arena || (scx >= 0 && scy >= 0 && scx < this._cols && scy < this._rows &&
-        this._visited[scy * this._cols + scx]);
+    // sbires : position LIVE de chaque monstre encore en vie (pas sa position d'apparition —
+    // un monstre mort disparaît de la carte, un monstre vivant y suit son déplacement réel),
+    // mêmes règles de repérage que les points d'intérêt ci-dessus. Le boss a son propre marqueur
+    // dédié plus bas, donc exclu ici pour ne pas le doubler.
+    for (const e of game.enemies) {
+      if (e.dead || e.isBoss) continue;
+      const etx = e.centerX() / T, ety = e.centerY() / T;
+      const ecx = Math.floor(etx / poiCell), ecy = Math.floor(ety / poiCell);
+      const seen = !!arena || (ecx >= 0 && ecy >= 0 && ecx < this._cols && ecy < this._rows &&
+        this._visited[ecy * this._cols + ecx]);
       if (!seen) continue;
-      const sx = worldToX(stx), sy = worldToY(sty);
+      const ex = worldToX(etx), ey = worldToY(ety);
       ctx.fillStyle = C.danger;
       ctx.globalAlpha = 0.85;
-      ctx.beginPath(); ctx.arc(sx, sy, s.elite ? 3 : 2, 0, Math.PI * 2); ctx.fill();
+      ctx.beginPath(); ctx.arc(ex, ey, e.elite ? 3 : 2, 0, Math.PI * 2); ctx.fill();
       ctx.globalAlpha = 1;
     }
 
