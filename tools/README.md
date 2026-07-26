@@ -31,6 +31,13 @@ Trois façons de l'utiliser, de la plus manuelle à la plus rapide :
    génère et relance directement les 6 téléchargements. **Le plus simple : mettre cette URL en
    favori** et la rouvrir/recharger à chaque fois qu'on veut des exports à jour.
 
+Si le serveur n'est pas déjà lancé, cette commande PowerShell fait tout d'un coup (démarre
+`dev_server.py` en arrière-plan puis ouvre directement la page en mode zéro-clic ci-dessus) —
+à copier-coller telle quelle depuis la racine du projet :
+```powershell
+Start-Process python -ArgumentList "tools/dev_server.py"; Start-Sleep 1; Start-Process "http://localhost:8123/tools/map_export.html?autodownload=1"
+```
+
 La seed (champ en haut de page, fixe par défaut) garantit un résultat reproductible tant que le
 code de génération ne change pas — un export d'avant/après un changement de code est donc
 directement comparable, sans bruit dû au hasard. Pour comparer plusieurs variantes aléatoires
@@ -50,9 +57,10 @@ toute la carte d'un coup), les coffres (carré or), le marchand (losange or), le
 
 **Comment** :
 ```bash
-python tools/dev_server.py [port]   # port par défaut : 8123
+python tools/dev_server.py
 ```
-puis ouvrir `http://localhost:8123`.
+puis ouvrir `http://localhost:8123` (port par défaut ; passer un autre numéro en argument pour en
+changer, ex. `python tools/dev_server.py 8080`).
 
 **Pourquoi celui-ci plutôt que `http.server`** :
 - `Cache-Control: no-store` sur toutes les réponses — évite de tester par erreur une version mise
