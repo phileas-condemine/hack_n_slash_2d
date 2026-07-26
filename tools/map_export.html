@@ -1,0 +1,155 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<title>Arcane Rift — Export des cartes (debug)</title>
+<style>
+  body { background: #0a0e12; color: #e8e2d4; font: 14px "Segoe UI", sans-serif; margin: 0; padding: 20px; }
+  h1 { font-size: 18px; margin: 0 0 4px; }
+  p.hint { color: #9aa5a8; max-width: 780px; line-height: 1.5; }
+  #controls { display: flex; align-items: center; gap: 10px; margin: 16px 0; flex-wrap: wrap; }
+  #controls input { width: 110px; background: #14181e; color: #e8e2d4; border: 1px solid #3a4a52; border-radius: 4px; padding: 5px 8px; font: inherit; }
+  #controls button { background: #1a3a34; color: #35e0c0; border: 1px solid #35e0c0; border-radius: 4px; padding: 6px 14px; font: inherit; cursor: pointer; }
+  #controls button:hover { background: #204840; }
+  .legend { display: flex; gap: 18px; flex-wrap: wrap; color: #9aa5a8; font-size: 12px; margin-bottom: 18px; }
+  .legend span { display: inline-flex; align-items: center; gap: 5px; }
+  .swatch { width: 10px; height: 10px; display: inline-block; }
+  .era { margin-bottom: 26px; }
+  .era h2 { font-size: 14px; margin: 0 0 6px; color: #e8e2d4; }
+  .era .meta { color: #9aa5a8; font-size: 12px; margin-bottom: 6px; }
+  .canvasWrap { overflow-x: auto; border: 1px solid #3a4a52; background: #04060a; }
+  canvas { display: block; image-rendering: pixelated; }
+</style>
+</head>
+<body>
+  <h1>Export des cartes — Arcane Rift</h1>
+  <p class="hint">
+    Outil de debug local (à ouvrir directement dans un navigateur, aucun serveur requis — mais
+    <code>tools/dev_server.py</code> fonctionne aussi). Génère les 6 cartes avec le vrai code de
+    génération de niveau du jeu (<code>AR.Level</code>), sans brouillard de guerre : silhouette de
+    terrain pixel-exacte + coffres / marchand / salles (ère 1 uniquement, les autres sont procédurales)
+    / zone de l'arène de boss. À chaque évolution des maps (<code>level_specs.js</code>, génération
+    procédurale dans <code>level.js</code>...), il suffit de recharger cette page (ou de cliquer sur
+    « Régénérer ») pour obtenir des exports à jour — la seed fixe garantit un résultat reproductible
+    tant que le code de génération ne change pas.
+  </p>
+  <div id="controls">
+    <label>Seed : <input id="seedInput" type="number" value="12345"></label>
+    <button id="regenBtn">Régénérer</button>
+    <button id="dlAllBtn">Tout télécharger (PNG)</button>
+  </div>
+  <div class="legend">
+    <span><span class="swatch" style="background:#ffc94d"></span> coffre</span>
+    <span><span class="swatch" style="background:#ffc94d;transform:rotate(45deg)"></span> marchand</span>
+    <span><span class="swatch" style="background:#ff3d6e"></span> zone d'arène du boss</span>
+    <span><span class="swatch" style="border:1px solid #35e0c0;background:none"></span> salle "start" (ère 1)</span>
+    <span><span class="swatch" style="border:1px solid #ffc94d;background:none"></span> salle "marchand" (ère 1)</span>
+    <span><span class="swatch" style="border:1px solid #7ec8ff;background:none"></span> salle "sûre/hub" (ère 1)</span>
+    <span><span class="swatch" style="border:1px solid #ff3d6e;background:none"></span> salle "boss" (ère 1)</span>
+  </div>
+  <div id="eras"></div>
+
+  <!-- Sous-ensemble minimal de src/*.js nécessaire à la génération de niveau + à la miniature
+       de la minimap : pas de rendu de sprites/audio/UI, donc pas de chargement d'images/assets. -->
+  <script src="../src/config.js"></script>
+  <script src="../src/arenas.js"></script>
+  <script src="../src/utils.js"></script>
+  <script src="../src/data.js"></script>
+  <script src="../src/level_specs.js"></script>
+  <script src="../src/level.js"></script>
+  <script src="../src/minimap.js"></script>
+
+  <script>
+    const SCALE = 4; // agrandissement de la miniature (1px/tuile en natif -> illisible tel quel)
+
+    function buildEraCanvas(eraIdx, seed) {
+      const lvl = new AR.Level(eraIdx, seed);
+      const terrain = AR.Minimap._buildTerrainCanvas(lvl);
+      const T = AR.C.TILE, C = AR.C.COLORS;
+
+      const cnv = document.createElement('canvas');
+      cnv.width = terrain.width * SCALE;
+      cnv.height = terrain.height * SCALE;
+      const ctx = cnv.getContext('2d');
+      ctx.fillStyle = '#04060a';
+      ctx.fillRect(0, 0, cnv.width, cnv.height);
+      ctx.imageSmoothingEnabled = false;
+      ctx.drawImage(terrain, 0, 0, cnv.width, cnv.height);
+
+      // zone d'arène du boss (bande verticale, du début de l'arène jusqu'au bord droit de la carte)
+      ctx.strokeStyle = C.danger;
+      ctx.lineWidth = 2;
+      ctx.strokeRect(lvl.arenaStartTx * SCALE, 1, (lvl.tilesW - lvl.arenaStartTx) * SCALE - 2, cnv.height - 2);
+
+      // salles authored (ère 1 uniquement — les autres ères sont procédurales, pas de `rooms`)
+      if (lvl.authored) {
+        for (const room of lvl.rooms) {
+          ctx.strokeStyle = AR.Minimap._tagColor(room.tags, C);
+          ctx.lineWidth = 1;
+          ctx.globalAlpha = 0.85;
+          ctx.strokeRect(room.rect.x * SCALE, room.rect.y * SCALE, room.rect.w * SCALE, room.rect.h * SCALE);
+          ctx.globalAlpha = 1;
+        }
+      }
+
+      // coffres
+      ctx.fillStyle = C.gold;
+      for (const c of lvl.chestSpots) {
+        const cx = (c.x / T) * SCALE, cy = (c.y / T) * SCALE;
+        ctx.fillRect(cx - 3, cy - 3, 6, 6);
+      }
+
+      // marchand
+      if (lvl.merchantX) {
+        const mx = (lvl.merchantX / T) * SCALE;
+        const my = (lvl.groundYAtEntity(lvl.merchantX, 0) / T) * SCALE;
+        ctx.beginPath();
+        ctx.moveTo(mx, my - 5); ctx.lineTo(mx + 5, my); ctx.lineTo(mx, my + 5); ctx.lineTo(mx - 5, my);
+        ctx.closePath();
+        ctx.fill();
+      }
+
+      return { cnv, lvl };
+    }
+
+    function render() {
+      const seed = parseInt(document.getElementById('seedInput').value, 10) || 0;
+      const root = document.getElementById('eras');
+      root.innerHTML = '';
+      AR.ERAS.forEach((era, i) => {
+        const { cnv, lvl } = buildEraCanvas(i, seed + i);
+        const box = document.createElement('div');
+        box.className = 'era';
+        box.innerHTML = `<h2>R${i + 1} — ${era.name}</h2>
+          <div class="meta">${lvl.authored ? 'authored (level_specs)' : 'procédurale'} ·
+            ${lvl.tilesW}×${lvl.worldH} tuiles · seed ${seed + i} ·
+            ${lvl.chestSpots.length} coffre(s)</div>`;
+        const wrap = document.createElement('div');
+        wrap.className = 'canvasWrap';
+        cnv.dataset.filename = `minimap_R${i + 1}_${era.id}_seed${seed + i}.png`;
+        wrap.appendChild(cnv);
+        box.appendChild(wrap);
+        root.appendChild(box);
+      });
+    }
+
+    function downloadCanvas(cnv) {
+      cnv.toBlob((blob) => {
+        const a = document.createElement('a');
+        a.href = URL.createObjectURL(blob);
+        a.download = cnv.dataset.filename;
+        a.click();
+        setTimeout(() => URL.revokeObjectURL(a.href), 2000);
+      }, 'image/png');
+    }
+
+    document.getElementById('regenBtn').addEventListener('click', render);
+    document.getElementById('dlAllBtn').addEventListener('click', () => {
+      const canvases = document.querySelectorAll('#eras canvas');
+      canvases.forEach((cnv, i) => setTimeout(() => downloadCanvas(cnv), i * 200));
+    });
+
+    render();
+  </script>
+</body>
+</html>

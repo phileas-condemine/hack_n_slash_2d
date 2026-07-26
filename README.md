@@ -86,6 +86,7 @@ src/
 tools/
   build_sprite_meta.py   détourage/redimensionnement des assets + boîtes de découpe
   dev_server.py          serveur de dev local (fichiers statiques + écriture du journal de combat dans logs/)
+  map_export.html        export PNG des 6 cartes (terrain + coffres/marchand/salles/zone de boss), à ouvrir dans un navigateur
 assets/             sprites (héros, 36 ennemis + états, icônes de sorts, planches)
 ```
 
