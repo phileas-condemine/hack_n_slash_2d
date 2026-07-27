@@ -700,6 +700,11 @@ AR.Game = class {
     AR.Particles.burst(chest.x, chest.y - 16, 16, { color: [AR.C.COLORS.gold, '#fff'], speed: 200, size: 3, life: 0.6, up: 160 });
     const pl = this.player;
     // récompense garantie (ex. coffre de la grotte secrète SEC_STONE_04) : pas de tirage aléatoire
+    if (chest.guaranteed === 'skillPoint') {
+      pl.skillPoints++;
+      AR.HUD.notify('📜 Trésor de la grotte : +1 point de compétence !', AR.C.COLORS.xp);
+      return;
+    }
     if (chest.guaranteed === 'swordUp' || chest.guaranteed === 'bowUp') {
       const tierKey = chest.guaranteed === 'swordUp' ? 'swordTier' : 'bowTier';
       const weapons = chest.guaranteed === 'swordUp' ? AR.WEAPONS.sword : AR.WEAPONS.bow;
@@ -741,7 +746,43 @@ AR.Game = class {
       pl.recalcStats(this);
       return;
     }
+    // ère 1 : beaucoup moins de trésors "puissance" (crans d'arme/parchemin/babiole) dans les
+    // coffres normaux — retour joueur : trop de variété trop tôt, cf. section Économie du TODO.
+    // Les coffres garantis (grotte secrète, mini-boss) ne sont pas concernés (branche ci-dessus).
     const r = Math.random();
+    if (this.eraIdx === 0) {
+      if (r < 0.40) { AR.Pickups.drop('potionDrop', chest.x, chest.y - 10); return; }
+      if (r < 0.78) { AR.Pickups.drop('heart', chest.x, chest.y - 10); return; }
+      if (r < 0.86) {
+        if (Math.random() < 0.5 && pl.swordTier < 5) {
+          pl.swordTier++;
+          AR.HUD.notify('⚔ Nouvelle lame : ' + AR.WEAPONS.sword[pl.swordTier].name + ' !', AR.C.COLORS.impact);
+        } else if (pl.bowTier < 5) {
+          pl.bowTier++;
+          AR.HUD.notify('🏹 Nouvel arc : ' + AR.WEAPONS.bow[pl.bowTier].name + ' !', AR.C.COLORS.spirit);
+        } else {
+          AR.Pickups.coinBurst(chest.x, chest.y - 14, 14, 3);
+        }
+        pl.recalcStats(this);
+        return;
+      }
+      if (r < 0.93) {
+        pl.skillPoints++;
+        AR.HUD.notify('📜 Parchemin ancien : +1 point de compétence !', AR.C.COLORS.xp);
+        return;
+      }
+      const trinkets = [
+        ['crit', 'Amulette du prédateur : critique +10%'],
+        ['speed', 'Bottes de célérité : vitesse +10%'],
+        ['hpUp', 'Cœur robuste : PV max +25'],
+        ['spiritUp', 'Talisman spirituel : esprit max +30'],
+      ];
+      const [k, label] = trinkets[Math.floor(Math.random() * trinkets.length)];
+      pl.buffs[k]++;
+      pl.recalcStats(this);
+      AR.HUD.notify('✨ ' + label, AR.C.COLORS.magic);
+      return;
+    }
     if (r < 0.22) {
       AR.Pickups.drop('potionDrop', chest.x, chest.y - 10);
     } else if (r < 0.42) {

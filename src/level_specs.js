@@ -38,6 +38,13 @@ const STONE = {
     { x: 66, y: 16, w: 30, h: 3 },        // rebord haut au-dessus de la descente
     { x: 96, y: 16, w: 36, h: 9 },        // plateau gauche (grotte S05 en dessous)
     { x: 138, y: 16, w: 12, h: 9 },       // plateau droit (gap 132-138 = pont d'os ; finit avant l'escalier)
+    // SEC_STONE_05 : plancher de la grotte secrète sous le pont d'os (tx132-138, retour joueur
+    // 2026-07-27 : "au lieu de nous faire tomber dans la zone par défaut en dessous [la route
+    // basse], celà doit nous faire atterrir dans une grotte secrète entre les 2 niveaux"). Le
+    // puits vertical est déjà naturellement muré des deux côtés par les plateaux voisins
+    // (x96-132 et x138-150, tous deux solides jusqu'à y25) ; ce plancher ferme la chute à
+    // mi-hauteur (y23) au lieu de laisser tomber jusqu'à la route basse (y29) plus bas.
+    { x: 132, y: 23, w: 6, h: 2 },
     // route basse : sol de grotte continu (rattrape toutes les chutes du canyon)
     { x: 61, y: 29, w: 89, h: 3 },
     // S06 convergence : escalier solide qui remonte de la grotte (ty29) au camp (ty22)
@@ -121,6 +128,11 @@ const STONE = {
       camera: { minX: 66, maxX: 156, minY: 4, maxY: 26 }, safeRespawn: [{ x: 100, y: 16, priority: 6 }] },
     { id: 'S04_CAVE_SHAFT', rect: { x: 61, y: 19, w: 35, h: 13 }, tags: ['branch', 'descent'],
       camera: { minX: 61, maxX: 96, minY: 14, maxY: 32 }, safeRespawn: [{ x: 80, y: 29, priority: 7 }] },
+    // Doit précéder S05_DEEP_CAVES dans ce tableau : les deux rects se chevauchent sur
+    // x132-138/y21-23 (le fond de la chute du pont), et currentRoomAt() retient le premier
+    // match — la petite poche doit gagner sur la grande salle qui l'englobe partiellement.
+    { id: 'SEC_STONE_05_BRIDGE_FALL', rect: { x: 131, y: 16, w: 8, h: 9 }, tags: ['secret', 'cave', 'dark'],
+      camera: { minX: 126, maxX: 144, minY: 12, maxY: 28 }, safeRespawn: [{ x: 134, y: 23, priority: 9 }] },
     { id: 'S05_DEEP_CAVES', rect: { x: 96, y: 21, w: 58, h: 11 }, tags: ['branch', 'low_route', 'dark'],
       camera: { minX: 96, maxX: 156, minY: 18, maxY: 32 }, safeRespawn: [{ x: 120, y: 29, priority: 6 }] },
     { id: 'S06_HUNTERS_EXIT', rect: { x: 146, y: 13, w: 38, h: 19 }, tags: ['convergence', 'loop'],
@@ -207,6 +219,12 @@ const STONE = {
     { tx: 271, ty: 27, id: 'stone_cave_stalker', suspended: true, activate: 'sec04_stalkers' },
     { tx: 277, ty: 27, id: 'stone_cave_stalker', suspended: true, activate: 'sec04_stalkers' },
     { tx: 282, ty: 27, id: 'stone_cave_stalker', suspended: true, activate: 'sec04_stalkers' },
+    // SEC_STONE_05 — poche du pont d'os effondré : mêmes monstres dédiés que SEC_STONE_04
+    // (déjà les ennemis "de grotte" de l'ère, pas besoin d'en recréer d'autres pour une si
+    // petite poche) ; statiques (pas suspendus), la salle est trop petite pour une embuscade.
+    { tx: 133, ty: 23, id: 'stone_cave_stalker' },
+    { tx: 134, ty: 19, id: 'stone_cave_bats' },
+    { tx: 136, ty: 20, id: 'stone_cave_bats' },
   ],
 
   // ---- coffres ----
@@ -218,6 +236,7 @@ const STONE = {
     { x: 178, y: 23 },                    // SEC_STONE_03 : cache d'or (alcôve du levier, plain-pied)
     { x: 312, y: 20 },                    // coffre de préparation (antichambre)
     { x: 306, y: 30, guaranteed: 'swordUp' }, // SEC_STONE_04 : récompense garantie, derrière le mini-boss
+    { x: 135, y: 23, guaranteed: 'skillPoint' }, // SEC_STONE_05 : trésor garanti de la poche du pont effondré
   ],
 
   merchant: { x: 198, y: 22 },
@@ -232,6 +251,10 @@ const STONE = {
   localPortals: [
     { x: 229, y: 30, returnTo: { x: 241, y: 22 } }, // SEC_STONE_04 : sortie rapide au pied du puits
     { x: 312, y: 30, returnTo: { x: 241, y: 22 } }, // SEC_STONE_04 : sortie finale, après le mini-boss
+    // SEC_STONE_05 : remonte sur S06_LANDING (x150,y21, plateforme one-way déjà existante de la
+    // route haute) — seule sortie de la poche, condition explicite du TODO ("pas de cul-de-sac
+    // sans retour") : sans ce portail, retomber au fond via le pont cassé serait un aller simple.
+    { x: 134, y: 23, returnTo: { x: 150, y: 21 } },
   ],
 
   // ---- poches sombres : ambiance de caverne (cf. drawDarkZones) ----
@@ -241,6 +264,7 @@ const STONE = {
     // dans le réseau souterrain (zone du dessous) la visibilité est maintenant bonne.
     { x: 227, y: 20, w: 6, h: 4, tint: 0.8 },
     { x: 225, y: 24, w: 93, h: 8 },   // réseau souterrain (zones 1-4), sous le puits — bien éclairé
+    { x: 131, y: 17, w: 8, h: 6 },    // SEC_STONE_05 : poche du pont effondré
   ],
 
   // ---- décor ----
@@ -273,6 +297,7 @@ const STONE = {
     { type: 'fire', tx: 286, ty: 30, s: 0.85 },
     { type: 'fire', tx: 297, ty: 30, s: 0.9 },
     { type: 'fire', tx: 309, ty: 30, s: 1.1 },    // éclaire le coffre final
+    { type: 'fire', tx: 134, ty: 23, s: 0.8 },    // SEC_STONE_05 : poche du pont effondré
   ],
 
   // ---- indices pour l'IA de démonstration ----
@@ -286,9 +311,160 @@ const STONE = {
   },
 };
 
+// ========================================================= NIVEAU 2 : ANTIQUITÉ
+// « Les Catacombes de l'Acropole » — première carte authored de l'ère 2, sur le même
+// modèle que STONE (cf. section "Zones secrètes et grottes" du TODO, 2026-07-27) :
+// terrain simple à un seul chemin (pas de double route haute/basse comme STONE, pour
+// rester dans un périmètre raisonnable), une seule grotte secrète bien formée plutôt
+// que plusieurs poches disparates. R3-R6 restent procédurales (`_buildProcedural`) et
+// suivront le même patron, une ère à la fois (cf. TODO).
+// Structure : A01 forecourt -> A02 hub (combat + puits vers la crypte secrète) ->
+//   A03 marché -> A04 passe élite -> arène.
+const ANTIQUITY = {
+  id: 'antiquity',
+  tilesW: 244,
+  worldH: 32,
+  spawnX: 3,
+  startRoom: 'A01_FORECOURT',
+  bossArenaRoom: 'A06_ACROPOLIS_ARENA',
+  arenaStartTx: 210,
+  gateTx: 211,
+  arenaGy: 23,
+  fallDamageRatio: 0.10,
+
+  // ---- terrain solide ----
+  solids: [
+    { x: 0, y: 22, w: 16, h: 10 },        // A01 forecourt d'arrivée
+    { x: 16, y: 21, w: 2, h: 11 },        // marche
+    { x: 18, y: 20, w: 2, h: 12 },        // marche
+    // A02 hub + crypte : bloc plein x20-100, creusé en dessous (cf. `empties`) — même
+    // technique que S08_TOTEM_PASS/SEC_STONE_04 dans STONE (croûte de surface préservée,
+    // réseau souterrain creusé dedans, plancher préservé).
+    { x: 20, y: 20, w: 80, h: 12 },
+    { x: 100, y: 20, w: 40, h: 12 },      // A03 marché (sol continu, pas de crypte dessous)
+    { x: 140, y: 20, w: 50, h: 12 },      // A04 passe élite
+    { x: 190, y: 21, w: 3, h: 11 },       // descente vers l'arène
+    { x: 193, y: 22, w: 3, h: 10 },
+    { x: 196, y: 23, w: 14, h: 9 },       // antichambre d'arène
+    { x: 210, y: 23, w: 34, h: 9 },       // A06 sol d'arène (l'image d'arène prend le relais)
+  ],
+
+  // ---- creusements (crypte SEC_ANTIQUITY_01) ----
+  empties: [
+    // puits d'entrée (x45-49) : perce la croûte de surface (y20-24) du bloc A02.
+    { x: 45, y: 20, w: 5, h: 5 },
+    // réseau souterrain horizontal (x22-98, y25-29) : plafond à y25 (croûte y20-24
+    // préservée), plancher à y30-31 préservé (fait partie du même bloc plein).
+    { x: 22, y: 25, w: 76, h: 5 },
+  ],
+
+  // ---- plateformes traversables (one-way) ----
+  oneWay: [
+    { x: 106, y: 16, w: 4, id: 'A_HIGH_LEDGE' }, // corniche du coffre haut (double saut, avant le marché)
+  ],
+
+  climbables: [],
+  breakables: [],
+  interactables: [],
+
+  // ---- rooms ----
+  rooms: [
+    { id: 'A01_FORECOURT', rect: { x: 0, y: 16, w: 20, h: 16 }, tags: ['start'],
+      camera: { minX: 0, maxX: 22, minY: 12, maxY: 32 }, safeRespawn: [{ x: 3, y: 22, priority: 10 }] },
+    { id: 'A02_HUB', rect: { x: 20, y: 14, w: 80, h: 8 }, tags: ['hub'],
+      camera: { minX: 20, maxX: 100, minY: 10, maxY: 26 }, safeRespawn: [{ x: 26, y: 20, priority: 8 }] },
+    { id: 'SEC_ANTIQUITY_CRYPT', rect: { x: 20, y: 22, w: 80, h: 10 }, tags: ['secret', 'cave', 'dark'],
+      camera: { minX: 20, maxX: 100, minY: 18, maxY: 32 },
+      safeRespawn: [{ x: 47, y: 29, priority: 9 }, { x: 90, y: 29, priority: 7 }] },
+    { id: 'A03_MARKET', rect: { x: 100, y: 14, w: 40, h: 18 }, tags: ['safe', 'no_enemy', 'merchant'],
+      camera: { minX: 100, maxX: 140, minY: 10, maxY: 32 }, safeRespawn: [{ x: 120, y: 20, priority: 10 }] },
+    { id: 'A04_ELITE_PASS', rect: { x: 140, y: 10, w: 70, h: 22 }, tags: ['tension'],
+      camera: { minX: 140, maxX: 210, minY: 8, maxY: 32 }, safeRespawn: [{ x: 146, y: 20, priority: 7 }, { x: 200, y: 23, priority: 8 }] },
+    { id: 'A06_ACROPOLIS_ARENA', rect: { x: 210, y: 8, w: 34, h: 24 }, tags: ['boss'],
+      camera: { minX: 210, maxX: 244, minY: 6, maxY: 32 }, safeRespawn: [{ x: 214, y: 23, priority: 10 }] },
+  ],
+
+  // ---- encounters verrouillés ----
+  encounters: [
+    { id: 'E_ANTIQUITY_HUB', roomId: 'A02_HUB',
+      trigger: { x: 26, y: 12, w: 14, h: 10 },
+      gates: [{ x: 25, y: 10, w: 1, h: 12 }, { x: 41, y: 10, w: 1, h: 12 }],
+      waves: [{ ids: ['hoplite', 'hoplite'] }, { ids: ['archer_auxilia', 'desert_raider'] }],
+      reward: { coins: 15 } },
+    // SEC_ANTIQUITY_01 — crypte : gantelet verrouillé avec les monstres dédiés (jamais sur la surface).
+    { id: 'E_ANTIQUITY_CRYPT', roomId: 'SEC_ANTIQUITY_CRYPT',
+      trigger: { x: 58, y: 25, w: 20, h: 5 },
+      gates: [{ x: 57, y: 25, w: 1, h: 5 }, { x: 79, y: 25, w: 1, h: 5 }],
+      waves: [{ ids: ['crypt_wraith', 'crypt_wraith', 'tomb_scarabs', 'tomb_scarabs'] }],
+      reward: { coins: 18 } },
+    { id: 'E_ANTIQUITY_ELITE', roomId: 'A04_ELITE_PASS',
+      trigger: { x: 150, y: 12, w: 16, h: 10 },
+      gates: [{ x: 148, y: 10, w: 1, h: 12 }, { x: 168, y: 10, w: 1, h: 12 }],
+      waves: [{ ids: ['temple_guardian', 'hoplite', 'hoplite'], elite: ['temple_guardian'] }],
+      reward: { coins: 25 } },
+  ],
+
+  triggers: [],
+
+  // ---- ennemis libres ----
+  spawns: [
+    { tx: 10, ty: 22, id: 'hoplite' },
+    { tx: 70, ty: 20, id: 'archer_auxilia' },
+    { tx: 125, ty: 20, id: 'desert_raider' },
+    { tx: 175, ty: 20, id: 'hoplite' },
+    { tx: 200, ty: 23, id: 'archer_auxilia' },
+    // SEC_ANTIQUITY_01 — zone 1 : garde d'entrée au pied du puits (monstre dédié de crypte).
+    { tx: 47, ty: 29, id: 'crypt_wraith' },
+  ],
+
+  // ---- coffres ----
+  chests: [
+    { x: 12, y: 22 },
+    { x: 107, y: 16, high: true },        // corniche A_HIGH_LEDGE
+    { x: 130, y: 20 },                    // coffre du marché
+    { x: 180, y: 20 },                    // coffre de la passe élite
+    { x: 205, y: 23 },                    // coffre de préparation (antichambre)
+    { x: 90, y: 29, guaranteed: 'bowUp' }, // SEC_ANTIQUITY_01 : récompense garantie de la crypte
+  ],
+
+  merchant: { x: 120, y: 20 },
+
+  // ---- mini-portails locaux (remontée depuis la crypte secrète) ----
+  localPortals: [
+    { x: 47, y: 29, returnTo: { x: 61, y: 20 } },  // sortie rapide au pied du puits
+    { x: 90, y: 29, returnTo: { x: 61, y: 20 } },  // sortie après la salle du trésor
+  ],
+
+  // ---- poches sombres ----
+  darkZones: [
+    { x: 45, y: 20, w: 5, h: 4, tint: 0.8 },  // capuchon du puits
+    { x: 22, y: 24, w: 76, h: 6 },            // réseau souterrain, bien éclairé
+  ],
+
+  // ---- décor ----
+  props: [
+    { type: 'column', tx: 8, ty: 22 },
+    { type: 'amphora', tx: 30, ty: 20 },
+    { type: 'banner', tx: 65, ty: 20 },
+    { type: 'column', tx: 104, ty: 20 },
+    { type: 'banner', tx: 118, ty: 20 },
+    { type: 'laurel', tx: 122, ty: 20 },
+    { type: 'column', tx: 155, ty: 20 },
+    { type: 'column', tx: 185, ty: 20 },
+    { type: 'fire', tx: 214, ty: 23, s: 1.2 },
+    { type: 'fire', tx: 240, ty: 23, s: 1.2 },
+    // torches de la crypte
+    { type: 'fire', tx: 47, ty: 29, s: 0.75 },
+    { type: 'fire', tx: 60, ty: 29, s: 0.85 },
+    { type: 'fire', tx: 70, ty: 29, s: 0.85 },
+    { type: 'fire', tx: 80, ty: 29, s: 0.85 },
+    { type: 'fire', tx: 90, ty: 29, s: 0.9 },     // met en valeur le coffre du trésor
+  ],
+};
+
 AR.LEVEL_SPECS = {
   stone: STONE,
-  antiquity: null,
+  antiquity: ANTIQUITY,
   medieval: null,
   renaissance: null,
   diesel: null,
