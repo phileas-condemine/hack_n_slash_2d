@@ -73,8 +73,15 @@ AR.ENEMIES = {
   // Nouveaux monstres de l'extension (âge de pierre) — cf. 01_niveau_age_de_pierre.md §6
   stone_cave_stalker: { name: 'Traqueur des cavernes', hp: 40, dmg: 12, speed: 72, xp: 34, coins: 14, h: 96, behavior: 'assassin', range: 66, aggro: 500, atkCd: 1.9, tele: 0.45, blinkCd: 2.8, facing: 'l', parry: true },
   stone_cave_bats:    { name: 'Nuée de chauves-souris', hp: 22, dmg: 8, speed: 150, xp: 16, coins: 6, h: 72, behavior: 'flyer', range: 60, aggro: 520, atkCd: 1.6, tele: 0.35, dive: true, flyH: 150 },
-  // Sbire dédié du Chef Mammouth (summon uniquement, cf. _specs/07_boss_minions_art_brief.md)
-  totem_bearer:   { name: 'Porteur de totem', hp: 38, dmg: 13, speed: 85, xp: 18, coins: 7, h: 88, behavior: 'melee', range: 80, aggro: 450, atkCd: 1.6, tele: 0.5 },
+  // Sbires dédiés du Chef Mammouth (summon uniquement, cf. _specs/07_boss_minions_art_brief.md).
+  // Remplacent `totem_bearer` (retour joueur : mourait en une flèche, pas assez intéressant) par
+  // une vraie formation : 2 porteurs de bouclier qui encaissent/bloquent au front + 1 joueur de
+  // tambour protégé derrière eux qui buffe ses alliés (résistance + dégâts) — cf. `_execPattern`
+  // (`summon:warband`) et `takeDamage`/`update` pour le mécanisme de buff.
+  bone_shield_bearer: { name: 'Porteur de bouclier', hp: 70, dmg: 11, speed: 55, xp: 20, coins: 8, h: 90, behavior: 'shield', range: 62, aggro: 420, atkCd: 1.6, tele: 0.5, block: 0.7, knock: 260 },
+  // hp=130 * eraScale(0.8, cf. sbires de boss) ≈ 104 PV réels — >= 4 flèches chargées (~25 dgts
+  // au tout début de l'ère 1) pour l'abattre, comme demandé (c'est la cible prioritaire).
+  war_drummer:    { name: 'Joueur de tambour', hp: 130, dmg: 6, speed: 50, xp: 26, coins: 10, h: 92, behavior: 'caster', range: 700, keep: 380, aggro: 620, atkCd: 3.2, tele: 0.6, proj: 'warBuff' },
 
   // --- Antiquité
   hoplite:        { name: 'Hoplite', hp: 40, dmg: 12, speed: 90, xp: 16, coins: 6, h: 82, behavior: 'shield', range: 64, aggro: 430, atkCd: 1.4, tele: 0.45, block: 0.6 },
@@ -133,9 +140,10 @@ AR.ENEMY_FALLBACK = {
 AR.BOSSES = {
   mammoth_chief: {
     name: 'CHEF MAMMOUTH', hp: 5500, dmg: 24, h: 210, speed: 90, xp: 220, coins: 120,
-    // `summon:totem_bearer` ajouté (seul boss avec R5 sans aucun sbire jusqu'ici, cf. TODO.md).
-    patterns: ['charge', 'stomp', 'arrowRing', 'summon:totem_bearer'],
-    phase2: 0.5, p2patterns: ['arrowRing', 'stomp', 'charge', 'summon:totem_bearer', 'arrowRing'],
+    // `summon:warband` : formation dédiée (2 `bone_shield_bearer` en flanc-garde + 1
+    // `war_drummer` protégé derrière, qui buffe ses alliés) — cf. `_execPattern` dans enemy.js.
+    patterns: ['charge', 'stomp', 'arrowRing', 'summon:warband'],
+    phase2: 0.5, p2patterns: ['arrowRing', 'stomp', 'charge', 'summon:warband', 'arrowRing'],
     // Les deux promontoires de l'arène (cf. arenas.js) doivent rester une échappatoire
     // réelle pendant une charge au sol (§8/§13 du spec niveau 1) : platformChase ferait
     // sauter le boss sur la même plateforme et neutraliserait tout refuge.

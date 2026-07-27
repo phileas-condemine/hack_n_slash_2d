@@ -53,19 +53,31 @@ boss précis, et le prompt prêt à copier-coller dans ChatGPT (ou un autre gén
 
 ## R1 — Âge de Pierre — Chef Mammouth (`mammoth_chief`)
 
-**Concept : le Porteur de Totem** (`totem_bearer`). Un jeune guerrier tribal marqué des mêmes
-peintures d'ocre rouge que le chef, brandissant un petit fétiche/idole reprenant les motifs
-peints sur le mammouth de cérémonie et le bâton-crâne du chef — visuellement, on doit reconnaître
-tout de suite qu'il appartient à l'entourage direct du chef, pas juste un guerrier de tribu
-lambda (déjà couvert par `stone_spear`/`stone_brute`/`beast_hunter`).
+**Révisé le 2026-07-27** : le premier concept (`totem_bearer`, un porteur de totem seul) mourait en
+une flèche chargée et n'apportait pas assez de gameplay. Remplacé par `summon:warband`, une vraie
+formation à 3 unités — 2 **Porteurs de Bouclier** (`bone_shield_bearer`) en flanc-garde qui
+bloquent 70% des dégâts de face (flèches comprises) + 1 **Joueur de Tambour** (`war_drummer`)
+caché derrière eux, cible prioritaire, qui buffe les alliés à portée (dégâts +30%, dégâts subis
+-30%) tant qu'il est vivant. PV du tambour calibrés pour exiger ≥ 4 flèches chargées. Mécanisme de
+buff générique ajouté dans `src/enemy.js` (`case 'warBuff'` dans `_fire()`, champ `buffResist`).
 
 ```
 [Coller le gabarit commun ci-dessus, puis :]
-A young tribal warrior, bare-chested, wearing bone jewelry and the same red-ochre ritual paint
-markings as a mammoth war-chief, carrying a small carved bone totem/fetish staff (not a spear —
-distinct silhouette from a spear-thrower) topped with feathers and a tiny skull, echoing the
-chief's own skull-staff and the ceremonial red tribal patterns painted on his war-mammoth's hide.
-Primitive stone-age tribal aesthetic: fur, hide, bone, wood, torchlight — no metal.
+BONE SHIELD BEARER — A stone-age tribal warrior carrying a large heavy shield made of overlapping
+bone plates and thick hide over a wood frame, with a prized ceremonial rim/inlay of hammered gold
+running around its edge (the only gold accent in an otherwise primitive fur/hide/bone/wood
+outfit). Plants the shield forward defensively, short bone club/spear in the other hand for close
+jabs. Sturdy front-line tank, stocky and imposing, comparable in scale to the "Club Brute".
+```
+
+```
+[Coller le gabarit commun ci-dessus, puis :]
+WAR DRUMMER — A stone-age tribal shaman-musician carrying TWO large war drums made of stretched
+hide over hollowed logs, mounted on a wooden frame strapped to his front/sides (one drum on each
+side), a drumstick in each hand. Support caster who plays a war rhythm empowering his allies — he
+does not fight directly, stays back and drums. Attack pose: both drumsticks striking both drums at
+once with a visible rhythmic energy/sound-wave burst radiating outward. Lightly-built support
+unit, leaner than the "Club Brute".
 ```
 
 ## R2 — Antiquité — Commandant de Char (`chariot_commander`)

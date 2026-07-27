@@ -52,6 +52,11 @@ AR.Enemy = class {
     this.tpCd = 5 + Math.random() * 4;
     this.tpTarget = null;
     this.airJumped = false;
+    // buff de soutien (ex. tambour de guerre) : dégâts/résistance temporaires accordés par un
+    // allié ; baseDmg permet de revenir à la valeur d'origine quand le buff expire.
+    this.baseDmg = this.dmg;
+    this.buffT = 0;
+    this.buffResist = 0;
   }
 
   centerX() { return this.x + this.w / 2; }
@@ -91,6 +96,10 @@ AR.Enemy = class {
     this.dodgeCd -= dt;
     this.dashCd -= dt;
     this.tpCd -= dt;
+    if (this.buffT > 0) {
+      this.buffT -= dt;
+      if (this.buffT <= 0) { this.buffT = 0; this.dmg = this.baseDmg; this.buffResist = 0; }
+    }
 
     const pl = game.player;
     const d = AR.U.dist(this.centerX(), this.centerY(), pl.x + pl.w / 2, pl.y + pl.h / 2);
@@ -455,9 +464,10 @@ AR.Enemy = class {
     const sy = this.y + this.h * 0.35;
     const txx = pl.x + pl.w / 2, tyy = pl.y + pl.h / 2;
     const ang = AR.U.angle(sx, sy, txx, tyy);
-    // conscience du tir ami : ne pas arroser ses propres rangs
+    // conscience du tir ami : ne pas arroser ses propres rangs (non pertinent pour un buff
+    // de soutien sans dégâts — le tambour est justement voulu derrière ses alliés)
     const diff = game.diff || AR.DIFFICULTIES[0];
-    if (Math.random() < diff.ffAware) {
+    if (def.proj !== 'warBuff' && Math.random() < diff.ffAware) {
       const splash = (def.proj === 'bomb' || def.proj === 'mortar');
       const friendlyRisk = splash
         ? game.enemies.some((e) => e !== this && !e.dead && e.active &&
@@ -544,6 +554,27 @@ AR.Enemy = class {
           });
         }
         break;
+      // Tambour de guerre : pas de projectile, buffe les alliés vivants à portée (dégâts +30%,
+      // dégâts subis -30%, se rafraîchit tant qu'il reste en vie et à portée) — cf. takeDamage
+      // (buffResist) et update (retour à baseDmg quand le buff expire).
+      case 'warBuff': {
+        const R = 260;
+        let buffed = 0;
+        for (const e of game.enemies) {
+          if (e === this || e.dead || e.isBoss || !e.active) continue;
+          if (AR.U.dist(this.centerX(), this.centerY(), e.centerX(), e.centerY()) > R) continue;
+          if (e.buffT <= 0) e.dmg = Math.round(e.baseDmg * 1.3);
+          e.buffResist = 0.3;
+          e.buffT = 5;
+          buffed++;
+        }
+        if (buffed) {
+          AR.Particles.shockwave(this.centerX(), this.centerY(), R, '#ffce6a');
+          AR.Particles.burst(this.centerX(), this.centerY(), 14, { color: '#ffce6a', speed: 160, size: 3, life: 0.5 });
+        }
+        AR.Audio.sfx('spell');
+        break;
+      }
     }
   }
 
@@ -570,6 +601,8 @@ AR.Enemy = class {
           { color: '#ffe9a3', speed: 200, size: 3, life: 0.25, type: 'spark' });
       }
     }
+    // résistance accordée par un allié (ex. tambour de guerre) : cf. constructeur/update
+    if (this.buffResist > 0) dmg = Math.round(dmg * (1 - this.buffResist));
     this.hp -= dmg;
     this.flash = 1; this.hurtT = 3;
     if (opts.knockX && !this.isBoss && def.behavior !== 'charger') this.kvx = opts.knockX;
@@ -1043,6 +1076,26 @@ AR.Boss = class extends AR.Enemy {
             x: this.centerX() + (i - 1) * 40, y: this.y + 20, kind: 'wisp', friendly: false,
             dmg: Math.round(this.dmg * 0.5), r: 8, vx: (i - 1) * 160, vy: -160, homing: 2.8, life: 5, color: '#c05cff',
           });
+        }
+      } else if (what === 'warband') {
+        // Chef Mammouth : formation dédiée plutôt que 2 copies du même sbire — 2 porteurs de
+        // bouclier en flanc-garde (encaissent/bloquent au front) + 1 joueur de tambour planqué
+        // du côté opposé au joueur (buffe les alliés tant qu'il est en vie, cible prioritaire).
+        if (game.enemies.filter((e) => !e.dead && !e.isBoss).length < 3) {
+          const scale = AR.ERA_SCALE[game.eraIdx] * 0.8 * (game.diff ? game.diff.hpMult : 1);
+          const backDir = -(AR.U.sign(pl.x - this.centerX()) || this.facing || 1);
+          const spots = [
+            { id: 'bone_shield_bearer', dx: -140 },
+            { id: 'bone_shield_bearer', dx: 140 },
+            { id: 'war_drummer', dx: backDir * 70 },
+          ];
+          for (const s of spots) {
+            const mx = this.centerX() + s.dx;
+            const m = new AR.Enemy(s.id, mx, game.level.groundYAtEntity(mx, this.y), false, scale);
+            m.active = true;
+            game.enemies.push(m);
+            AR.Particles.burst(mx, m.y + m.h / 2, 12, { color: AR.C.COLORS.magic, speed: 180, size: 4, life: 0.5 });
+          }
         }
       } else if (game.enemies.filter((e) => !e.dead && !e.isBoss).length < 4) {
         for (let i = 0; i < 2; i++) {
