@@ -429,6 +429,13 @@ const ANTIQUITY = {
     // gradins du Forum : verticalité de combat + coffre perché
     { x: 330, y: 6, w: 6, id: 'FORUM_STEPS_1' },
     { x: 350, y: 4, w: 6, id: 'FORUM_STEPS_2' },
+    // Passerelle de la Fosse des Esclaves (x145-178, y20) : sans elle, la moitié gauche de la
+    // fosse (x110-145, coffre x125) n'est reliée à rien — l'escalier descend vers le tunnel, pas
+    // vers cette moitié, et le mur qui la borde (x145, du plancher y20 jusqu'au fond) est trop
+    // haut pour être escaladé (trouvé via retour joueur : « les 2 zones sont séparées par un
+    // grand trou »). Plateforme traversable au niveau du plancher, par-dessus l'escalier, pour
+    // pouvoir aussi descendre à travers si besoin.
+    { x: 145, y: 20, w: 33, id: 'SLAVE_PIT_BRIDGE' },
   ],
 
   climbables: [],
