@@ -126,7 +126,7 @@ AR.ENEMIES = {
   shield_drone:   { name: 'Drone bouclier', hp: 90, dmg: 10, speed: 100, xp: 42, coins: 18, h: 86, behavior: 'flyer', range: 420, keep: 260, aggro: 600, atkCd: 2.2, tele: 0.5, proj: 'plasma', flyH: 110, shielded: 40 },
   mech_assassin:  { name: 'Assassin mécanisé', hp: 120, dmg: 22, speed: 220, xp: 65, coins: 28, h: 94, behavior: 'assassin', range: 70, aggro: 700, atkCd: 1.3, tele: 0.26, blinkCd: 2.4, elite: true, parry: true },
   // Sbire dédié de l'IA Suprême (summon uniquement)
-  core_shard:     { name: 'Éclat du noyau', hp: 26, dmg: 11, speed: 110, xp: 26, coins: 11, h: 56, behavior: 'ranged', range: 480, keep: 300, aggro: 640, atkCd: 1.8, tele: 0.45, proj: 'plasma', float: true },
+  core_shard:     { name: 'Éclat du noyau', hp: 26, dmg: 11, speed: 110, xp: 26, coins: 11, h: 56, behavior: 'ranged', range: 480, keep: 300, aggro: 640, atkCd: 1.8, tele: 0.45, proj: 'plasma', float: true, shielded: 25 },
 };
 
 // Sprite de repli si l'image d'un ennemi est absente (le comportement/les stats
@@ -181,8 +181,10 @@ AR.BOSSES = {
     name: 'INGÉNIEUR DE GUERRE', hp: 14000, dmg: 26, h: 205, speed: 60, xp: 400, coins: 220,
     // summon passé de `musketeer`/`pikeman` (ennemis de terrain génériques) au sbire dédié
     // `gear_servitor`, qui reprend `renaissance_gear_servitor` (nommé dans le spec, jamais dessiné).
-    patterns: ['volley', 'mortars', 'turretSweep', 'summon:gear_servitor'],
-    phase2: 0.5, p2patterns: ['turretSweep', 'mortars', 'volley', 'summon:gear_servitor', 'turretSweep'],
+    // `mineField` ajouté le 2026-07-27 (audit winrate : IA gagnait 10/10) — mines statiques
+    // réparties sur tout le sol de l'arène, cf. `_execPattern` dans enemy.js.
+    patterns: ['volley', 'mortars', 'turretSweep', 'mineField', 'summon:gear_servitor'],
+    phase2: 0.5, p2patterns: ['turretSweep', 'mineField', 'mortars', 'volley', 'summon:gear_servitor', 'turretSweep', 'mineField'],
   },
   diesel_behemoth: {
     name: 'BÉHÉMOTH DIESEL', hp: 12000, dmg: 30, h: 195, speed: 70, xp: 480, coins: 260, armored: true,
@@ -194,8 +196,10 @@ AR.BOSSES = {
     name: 'IA SUPRÊME', hp: 15000, dmg: 28, h: 230, speed: 110, xp: 600, coins: 400, floats: true, flyH: 150,
     // summon passé de `drone_swarm`/`shield_drone` (ennemis de terrain génériques) au sbire
     // dédié `core_shard`, un fragment du noyau/bouclier hexagonal du boss lui-même.
-    patterns: ['beam', 'ring', 'summon:core_shard', 'beam'],
-    phase2: 0.5, p2patterns: ['beam', 'ring', 'ring', 'blink', 'beam', 'summon:core_shard'],
+    // `overloadPulse` ajouté le 2026-07-27 (audit winrate : IA gagnait 10/10) — verrouille la
+    // position du héros puis fait détoner une sphère à forte puissance, cf. `_execPattern`.
+    patterns: ['beam', 'ring', 'overloadPulse', 'summon:core_shard', 'beam'],
+    phase2: 0.5, p2patterns: ['beam', 'overloadPulse', 'ring', 'ring', 'blink', 'beam', 'overloadPulse', 'summon:core_shard'],
   },
 };
 

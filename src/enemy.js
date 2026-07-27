@@ -777,7 +777,7 @@ AR.Enemy = class {
 // rapides, aucune fenêtre réelle pour esquiver).
 const BOSS_TELE_DURATIONS = {
   charge: 1.3, sweep: 1.3, stomp: 1.2, arrowRing: 1.6,
-  shadowStrike: 0.9, turretSweep: 0.85,
+  shadowStrike: 0.9, turretSweep: 0.85, overloadPulse: 0.9,
 };
 AR.Boss = class extends AR.Enemy {
   constructor(id, x, footY, game) {
@@ -1011,6 +1011,26 @@ AR.Boss = class extends AR.Enemy {
         if (this.sweepT >= DURATION + 0.15) { this.state = 'move'; this.t = 0; }
         break;
       }
+      case 'overloadPulse': {
+        this.vx = 0;
+        this.pulseT += dt;
+        if (this.pulseT > 0.7) {
+          const tgt = this.pulseTarget || { x: pl.x + pl.w / 2, y: pl.y + pl.h / 2 };
+          AR.Particles.shockwave(tgt.x, tgt.y, 100, '#e35cff');
+          AR.Particles.burst(tgt.x, tgt.y, 22, { color: ['#e35cff', '#fff'], speed: 300, size: 5, life: 0.5 });
+          AR.Audio.sfx('boom');
+          game.camera.shake(6, 0.3);
+          if (!pl.dead) {
+            const d = AR.U.dist(tgt.x, tgt.y, pl.x + pl.w / 2, pl.y + pl.h / 2);
+            if (d < 130) {
+              game.hitPlayer(Math.round(this.dmg * 1.1), tgt.x);
+              pl.knock(AR.U.sign(pl.x + pl.w / 2 - tgt.x || 1) * 300);
+            }
+          }
+          this.state = 'move'; this.t = 0;
+        }
+        break;
+      }
     }
 
     // physique au sol pour les boss terrestres
@@ -1061,6 +1081,14 @@ AR.Boss = class extends AR.Enemy {
     } else if (this.pattern === 'arrowRing') {
       AR.Particles.convergingRing(this.centerX(), this.centerY(), 210, this.phase === 2 ? 20 : 14,
         this.teleDuration, AR.C.COLORS.impact);
+    } else if (this.pattern === 'overloadPulse') {
+      // Pas de verrouillage ici (contrairement à stomp) : la retraite générique
+      // à 200px pendant tout état 'tele' (cf. demoai.js) viderait sinon
+      // systématiquement la zone avant même que la cible soit fixée, rendant
+      // l'attaque inoffensive à tous les coups. La position n'est verrouillée
+      // qu'à la fin du télégraphe, dans `_execPattern` — la lecture visuelle
+      // (bruit d'alerte + pose) reste pendant tout `tele`, seul le point exact
+      // se décide au dernier moment.
     }
   }
 
@@ -1101,6 +1129,19 @@ AR.Boss = class extends AR.Enemy {
             game.enemies.push(m);
             AR.Particles.burst(mx, m.y + m.h / 2, 12, { color: AR.C.COLORS.magic, speed: 180, size: 4, life: 0.5 });
           }
+        }
+      } else if (what === 'core_shard' && game.enemies.filter((e) => !e.dead && !e.isBoss).length < 4) {
+        // IA suprême : 3 éclats au lieu de 2 (audit winrate du 2026-07-27 : l'IA
+        // gagnait 10/10 en kitant en permanence à distance, ce qui esquive
+        // n'importe quelle attaque visant une position unique — un troisième
+        // tireur à distance ajoute une pression constante qui ne dépend pas
+        // d'un seul projectile évitable).
+        for (const dx of [-160, 0, 160]) {
+          const mx = this.centerX() + dx;
+          const m = new AR.Enemy(what, mx, game.level.groundYAtEntity(mx, this.y), false, AR.ERA_SCALE[game.eraIdx] * 0.8 * (game.diff ? game.diff.hpMult : 1));
+          m.active = true;
+          game.enemies.push(m);
+          AR.Particles.burst(mx, m.y + m.h / 2, 12, { color: AR.C.COLORS.magic, speed: 180, size: 4, life: 0.5 });
         }
       } else if (game.enemies.filter((e) => !e.dead && !e.isBoss).length < 4) {
         for (let i = 0; i < 2; i++) {
@@ -1243,6 +1284,48 @@ AR.Boss = class extends AR.Enemy {
         this.sweepDir = this.centerX() < (game.arena.x0 + game.arena.x1) / 2 ? 1 : -1;
         AR.Audio.sfx('bossRoar');
         break;
+      case 'mineField': {
+        // Ingénieur de guerre : mines statiques dispersées sur toute la largeur
+        // du sol de l'arène (contrairement aux mortiers, qui ciblent la zone du
+        // héros) — oblige à rester conscient de tout le terrain, pas seulement
+        // à esquiver latéralement pendant turretSweep.
+        this.attackPoseT = Math.max(this.attackPoseT, 0.32);
+        const n = this.phase === 2 ? 6 : 4;
+        for (let i = 0; i < n; i++) {
+          const lx = game.arena.x0 + 70 + Math.random() * (game.arena.x1 - game.arena.x0 - 140);
+          const gy = game.level.groundYAtEntity(lx, this.baseY);
+          const t = 1.3 + Math.random() * 0.5;
+          AR.Particles.telegraphCircle(lx, gy - 4, 60, t, AR.C.COLORS.danger);
+          AR.Projectiles.spawn({ owner: this,
+            x: lx, y: gy - 4, kind: 'mortar', friendly: false,
+            dmg: Math.round(this.dmg * 0.65), r: 8, explodeR: 60,
+            vx: 0, vy: 0, g: 0, life: t,
+          });
+        }
+        AR.Audio.sfx('enemyShoot');
+        this.state = 'move'; this.t = 0;
+        break;
+      }
+      case 'overloadPulse': {
+        // IA suprême : verrouille la position du héros à la FIN du télégraphe
+        // (pas au début, contrairement à stomp) puis fait détoner une sphère à
+        // forte puissance après un court temps de résolution — contrairement à
+        // beam/ring (zone étendue mais dégâts dilués), punit directement qui
+        // reste immobile ou colle le boss. Verrouiller dès `_armTelegraph`
+        // serait sans effet : la retraite générique à 200px pendant tout état
+        // 'tele' (cf. demoai.js) viderait systématiquement la zone avant même
+        // l'exécution. État dédié (comme `stomp`/`shadowStrike`) plutôt qu'un
+        // projectile : un projectile stationnaire créé pile sur la position du
+        // joueur serait touché dès la frame suivante, sans fenêtre d'esquive.
+        this.attackPoseT = Math.max(this.attackPoseT, 0.32);
+        const tx = pl.x + pl.w / 2, ty = pl.y + pl.h / 2;
+        this.pulseTarget = { x: tx, y: ty };
+        AR.Particles.telegraphCircle(tx, ty, 100, 0.7, '#e35cff');
+        this.state = 'overloadPulse';
+        this.pulseT = 0;
+        AR.Audio.sfx('spell');
+        break;
+      }
       default:
         this.state = 'move'; this.t = 0;
     }
