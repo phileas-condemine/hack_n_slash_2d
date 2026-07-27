@@ -326,12 +326,17 @@ const STONE = {
 // grande (564 tuiles avant l'arène, contre 354 pour STONE) et structurellement originale —
 // pas juste « encore une grotte » mais une vraie descente (Quartier des Esclaves, souterrain,
 // sombre, oppressant) ET une vraie ascension (Forum civique en hauteur -> Arène des Gladiateurs,
-// duels enchaînés), en plus d'une petite cache secrète classique. Chaque zone a son identité
-// propre (terrain, ambiance, monstres) plutôt que de réutiliser le même schéma partout.
+// duels enchaînés). Chaque zone a son identité propre (terrain, ambiance, monstres) plutôt que
+// de réutiliser le même schéma partout.
 // Structure : A01 forecourt -> A02 rue haute (combat) -> DESCENTE -> A03 Quartier des Esclaves
-//   (souterrain, + cache secrète SEC_ANTIQUITY_02) -> REMONTÉE -> A04 marché -> MONTÉE ->
-//   A05 Forum (plaza civique, plateformes étagées) -> A06 Arène des Gladiateurs (duels en
-//   série, du solo à la bête finale) -> DESCENTE -> A07 passe élite -> arène du boss.
+//   (souterrain, + A03B_SLAVE_PIT : la Fosse des Esclaves, une salle d'arène creusée dans la
+//   croûte au-dessus du tunnel, reliée par un escalier ET un monte-charge — retour joueur
+//   2026-07-27 après une 1ère version jugée trop discrète : « le rectangle du milieu avec la
+//   petite cache secrète est sous-utilisé, je veux une arène au-dessus, en plus grand/profond,
+//   avec le monte-charge au-dessus des escaliers pour choisir entre monter par l'un ou l'autre »)
+//   -> REMONTÉE -> A04 marché -> MONTÉE -> A05 Forum (plaza civique, plateformes étagées) ->
+//   A06 Arène des Gladiateurs (duels en série, du solo à la bête finale) -> DESCENTE ->
+//   A07 passe élite -> arène du boss.
 const ANTIQUITY = {
   id: 'antiquity',
   tilesW: 564,
@@ -357,11 +362,14 @@ const ANTIQUITY = {
     { x: 88, y: 27, w: 3, h: 5 }, { x: 91, y: 28, w: 3, h: 4 }, { x: 94, y: 29, w: 3, h: 3 },
     { x: 97, y: 30, w: 3, h: 2 },
 
-    // A03 Quartier des Esclaves : masse pleine x100-220, creusée en dessous (cf. `empties`) —
-    // même technique que S08_TOTEM_PASS/SEC_STONE_04 dans STONE (croûte préservée, réseau
-    // souterrain creusé dedans, plancher préservé) — mais ici c'est le chemin PRINCIPAL
-    // (obligatoire), pas une poche secrète optionnelle.
-    { x: 100, y: 16, w: 120, h: 16 },
+    // A03 Quartier des Esclaves : masse pleine x100-220, creusée en dessous ET au-dessus (cf.
+    // `empties`) — même technique que S08_TOTEM_PASS/SEC_STONE_04 dans STONE (croûte/plancher
+    // préservés), mais ici c'est le chemin PRINCIPAL (obligatoire), pas une poche secrète. Le
+    // bloc part de y4 (au lieu de y16) : la croûte au-dessus du tunnel n'est plus juste de la
+    // roche pleine inutilisée, elle loge maintenant la Fosse des Esclaves (cf. plus bas — retour
+    // joueur 2026-07-27 : « le rectangle du milieu avec la petite cache secrète est sous-utilisé,
+    // je veux une arène au-dessus, tu peux l'agrandir et l'approfondir »).
+    { x: 100, y: 4, w: 120, h: 28 },
 
     // ---- remontée vers la surface (x220-250, y30->21) ----
     { x: 220, y: 30, w: 3, h: 2 }, { x: 223, y: 29, w: 3, h: 3 }, { x: 226, y: 28, w: 3, h: 4 },
@@ -393,44 +401,66 @@ const ANTIQUITY = {
     { x: 530, y: 22, w: 34, h: 10 },      // A08 sol d'arène (l'image d'arène prend le relais)
   ],
 
-  // ---- creusements (Quartier des Esclaves + cache secrète SEC_ANTIQUITY_02) ----
+  // ---- creusements (Quartier des Esclaves + Fosse des Esclaves au-dessus du tunnel) ----
   empties: [
-    // réseau souterrain principal (x100-220, y25-29) : plafond à y25 (croûte y16-24 préservée
-    // au-dessus — c'est elle qui porte la rue/l'escalier), plancher y30-31 préservé.
+    // réseau souterrain principal (x100-220, y25-29) : plafond à y25, plancher y30-31 préservé.
     { x: 100, y: 25, w: 120, h: 5 },
-    // SEC_ANTIQUITY_02 : petite cache cachée dans la croûte, au-dessus du tunnel (x158-164,
-    // y18-23) — atteinte via un mur friable percé dans le plafond du tunnel (cf. `breakables`),
-    // avec une corniche de repos à mi-hauteur (cf. `oneWay`) pour rendre le double saut fiable.
-    { x: 158, y: 18, w: 6, h: 6 },
+    // A03B_SLAVE_PIT : la Fosse des Esclaves, une vraie salle d'arène creusée dans la croûte
+    // au-dessus du tunnel (x110-210, y6-19 ; plancher préservé à y20). Anciennement une petite
+    // cache (SEC_ANTIQUITY_02, 1 mur friable + 3 monstres) jugée sous-utilisée par le joueur —
+    // remplacée par une vraie salle de combat, beaucoup plus grande et profonde.
+    { x: 110, y: 6, w: 100, h: 14 },
+    // Escalier praticable reliant le sol du tunnel (y29, cf. réseau souterrain ci-dessus) au
+    // plancher de la fosse (y20) : 9 marches creusées individuellement (et non un seul puits
+    // rectangulaire) pour que chaque marche garde une base solide sous les pieds — cf. le
+    // commentaire détaillé sur ce même besoin pour SEC_STONE_05 (level_specs STONE).
+    { x: 145, y: 6, w: 3, h: 23 }, { x: 148, y: 6, w: 3, h: 22 }, { x: 151, y: 6, w: 3, h: 21 },
+    { x: 154, y: 6, w: 3, h: 20 }, { x: 157, y: 6, w: 3, h: 19 }, { x: 160, y: 6, w: 3, h: 18 },
+    { x: 163, y: 6, w: 3, h: 17 }, { x: 166, y: 6, w: 3, h: 16 }, { x: 169, y: 6, w: 3, h: 15 },
+    // Puits du monte-charge (SLAVE_PIT_LIFT ci-dessous), juste après l'escalier : « les monte-
+    // charges doivent être au-dessus des escaliers, il faut choisir entre monter par le monte-
+    // charge ou descendre par l'escalier » (retour joueur) — les deux options partent donc du
+    // même point du tunnel et remontent côte à côte jusqu'à la fosse.
+    { x: 178, y: 6, w: 4, h: 23 },
   ],
 
   // ---- plateformes traversables (one-way) ----
   oneWay: [
-    // corniche de repos sous la cache secrète (double saut tunnel -> corniche -> mur friable)
-    { x: 159, y: 27, w: 3, id: 'SLAVE_POCKET_STEP' },
     // gradins du Forum : verticalité de combat + coffre perché
     { x: 330, y: 6, w: 6, id: 'FORUM_STEPS_1' },
     { x: 350, y: 4, w: 6, id: 'FORUM_STEPS_2' },
   ],
 
   climbables: [],
+  breakables: [],
 
-  // ---- destructibles ----
-  breakables: [
-    { id: 'SEC_ANTIQUITY_02', type: 'wall', rect: { x: 160, y: 24, w: 2, h: 1 }, hp: 45 },
+  // ---- monte-charge de la Fosse des Esclaves : une manivelle à chaque extrémité (même
+  // mécanisme `activateLift`, qui envoie toujours vers l'extrémité opposée à la position
+  // actuelle — pas besoin de logique différente pour la manivelle du haut et celle du bas).
+  interactables: [
+    // x180 (pas x176) : dans l'emprise du monte-charge (tx178-182), pas juste à côté — sinon un
+    // joueur monté sur la plateforme est hors de portée (rayon d'interaction ~70px/1.5 tuile)
+    // de sa propre manivelle (trouvé en testant : le monte-charge montait, le joueur restait
+    // planté à côté au lieu d'être dessus pour l'actionner).
+    { id: 'CRANK_SLAVE_PIT_BOTTOM', type: 'crank', x: 180, y: 29, lift: 'SLAVE_PIT_LIFT', prompt: 'Actionner la manivelle' },
+    { id: 'CRANK_SLAVE_PIT_TOP', type: 'crank', x: 180, y: 20, lift: 'SLAVE_PIT_LIFT', prompt: 'Actionner la manivelle' },
   ],
 
-  interactables: [],
+  // ---- monte-charges à corde ----
+  lifts: [
+    { id: 'SLAVE_PIT_LIFT', x: 178, w: 4, bottomY: 29, topY: 20, startY: 29, speed: 2.2 },
+  ],
 
-  // ---- rooms ---- (SEC_ANTIQUITY_02 doit précéder A03_SLAVE_QUARTER : les rects se
+  // ---- rooms ---- (A03B_SLAVE_PIT doit précéder A03_SLAVE_QUARTER : les rects se
   // chevauchent et currentRoomAt() retient le premier match)
   rooms: [
     { id: 'A01_FORECOURT', rect: { x: 0, y: 16, w: 24, h: 16 }, tags: ['start'],
       camera: { minX: 0, maxX: 26, minY: 12, maxY: 32 }, safeRespawn: [{ x: 3, y: 22, priority: 10 }] },
     { id: 'A02_UPPER_STREET', rect: { x: 24, y: 8, w: 76, h: 24 }, tags: ['hub'],
       camera: { minX: 24, maxX: 100, minY: 6, maxY: 32 }, safeRespawn: [{ x: 30, y: 20, priority: 8 }] },
-    { id: 'SEC_ANTIQUITY_02', rect: { x: 156, y: 16, w: 10, h: 10 }, tags: ['secret', 'cave', 'dark'],
-      camera: { minX: 150, maxX: 172, minY: 12, maxY: 28 }, safeRespawn: [{ x: 160, y: 24, priority: 9 }] },
+    { id: 'A03B_SLAVE_PIT', rect: { x: 108, y: 4, w: 104, h: 25 }, tags: ['secret', 'tension', 'dark'],
+      camera: { minX: 104, maxX: 216, minY: 0, maxY: 32 },
+      safeRespawn: [{ x: 150, y: 20, priority: 9 }, { x: 190, y: 20, priority: 7 }] },
     { id: 'A03_SLAVE_QUARTER', rect: { x: 100, y: 16, w: 150, h: 16 }, tags: ['branch', 'low_route', 'dark'],
       camera: { minX: 100, maxX: 250, minY: 12, maxY: 32 },
       safeRespawn: [{ x: 110, y: 29, priority: 7 }, { x: 200, y: 29, priority: 6 }] },
@@ -472,6 +502,23 @@ const ANTIQUITY = {
               { ids: ['chain_overseer', 'chain_overseer', 'pit_vermin', 'pit_vermin'] },
               { ids: ['manacled_brute'] }],
       reward: { coins: 20 } },
+    // A03B_SLAVE_PIT — la Fosse des Esclaves : combat clandestin forcé, atteint par l'escalier
+    // ou le monte-charge (cf. `lifts`/`interactables` ci-dessus). Distinct de l'Arène des
+    // Gladiateurs (spectacle civique près du Forum) : ici c'est le roster souterrain de l'ère
+    // (contremaîtres/vermine/forçat + les revenants de l'ancienne petite cache), pas les
+    // soldats réguliers. Portes à hauteur nulle sur le sol (cf. commentaire détaillé plus haut) ;
+    // l'escalier/le monte-charge restent utilisables pendant le combat (fuite possible).
+    { id: 'E_SLAVE_PIT', roomId: 'A03B_SLAVE_PIT',
+      trigger: { x: 115, y: 8, w: 90, h: 10 },
+      // x111/x208 (pas x109/x210, hors de la plage creusée x110-209) ET y6-20 (pas y4 : le
+      // plafond de la fosse commence à y6, y4-5 est de la roche pleine) — même souci de
+      // chevauchement avec du terrain permanent que documenté plus haut, ici sur deux axes.
+      gates: [{ x: 111, y: 6, w: 1, h: 14 }, { x: 208, y: 6, w: 1, h: 14 }],
+      waves: [{ ids: ['pit_vermin', 'pit_vermin', 'pit_vermin', 'pit_vermin'] },
+              { ids: ['chain_overseer', 'chain_overseer', 'tomb_scarabs', 'tomb_scarabs'] },
+              { ids: ['crypt_wraith', 'crypt_wraith'] },
+              { ids: ['manacled_brute', 'chain_overseer'] }],
+      reward: { coins: 35 } },
     // Forum — plaza civique : combat à ciel ouvert sur plusieurs vagues, gradins praticables.
     { id: 'E_FORUM_PLAZA', roomId: 'A05_FORUM',
       trigger: { x: 320, y: 6, w: 60, h: 16 },
@@ -537,10 +584,7 @@ const ANTIQUITY = {
     { tx: 207, ty: 29, id: 'pit_vermin' },
     { tx: 213, ty: 29, id: 'chain_overseer' },
     { tx: 216, ty: 29, id: 'pit_vermin' },
-    // SEC_ANTIQUITY_02 — cache secrète (monstres dédiés, jamais utilisés ailleurs)
-    { tx: 160, ty: 24, id: 'crypt_wraith' },
-    { tx: 159, ty: 20, id: 'tomb_scarabs' },
-    { tx: 162, ty: 21, id: 'tomb_scarabs' },
+    // (crypt_wraith/tomb_scarabs désormais dans les vagues d'E_SLAVE_PIT, pas en spawn libre)
     // Quartier des Esclaves — vermine suspendue au plafond, réveillée par SLAVE_VERMIN_WAKE
     { tx: 182, ty: 27, id: 'pit_vermin', suspended: true, activate: 'slave_vermin' },
     { tx: 186, ty: 27, id: 'pit_vermin', suspended: true, activate: 'slave_vermin' },
@@ -566,8 +610,9 @@ const ANTIQUITY = {
     { x: 331, y: 6, high: true },          // Forum, gradins FORUM_STEPS_1
     { x: 351, y: 4, high: true },          // Forum, gradins FORUM_STEPS_2
     { x: 500, y: 22 },                     // passe élite
-    { x: 161, y: 24, guaranteed: 'skillPoint' }, // SEC_ANTIQUITY_02 : trésor garanti de la cache
-    { x: 448, y: 14, guaranteed: 'swordUp' },    // Arène des Gladiateurs : récompense du champion
+    { x: 125, y: 20 },                            // Fosse des Esclaves : coffre d'appoint
+    { x: 200, y: 20, guaranteed: 'skillPoint' },  // Fosse des Esclaves : trésor garanti du vainqueur
+    { x: 448, y: 14, guaranteed: 'swordUp' },     // Arène des Gladiateurs : récompense du champion
   ],
 
   merchant: { x: 265, y: 20 },
@@ -576,8 +621,8 @@ const ANTIQUITY = {
 
   // ---- poches sombres ----
   darkZones: [
-    { x: 100, y: 25, w: 120, h: 5 },          // Quartier des Esclaves : tunnel principal, bien éclairé
-    { x: 158, y: 18, w: 6, h: 6, tint: 0.8 }, // SEC_ANTIQUITY_02 : cache plus opaque
+    { x: 100, y: 25, w: 120, h: 5 },  // Quartier des Esclaves : tunnel principal, bien éclairé
+    { x: 110, y: 6, w: 100, h: 14, tint: 0.55 }, // Fosse des Esclaves : ambiance dure, sans être aveugle
   ],
 
   // ---- décor ----
@@ -596,6 +641,13 @@ const ANTIQUITY = {
     { type: 'bones', tx: 190, ty: 29 },
     { type: 'fire', tx: 205, ty: 29, s: 0.8 },
     { type: 'fire', tx: 215, ty: 29, s: 0.85 },
+    // Fosse des Esclaves : braseros autour de la fosse + repères lumineux le long de l'escalier
+    { type: 'fire', tx: 115, ty: 20, s: 1.0 },
+    { type: 'fire', tx: 145, ty: 20, s: 0.9 },
+    { type: 'fire', tx: 175, ty: 20, s: 0.9 },
+    { type: 'fire', tx: 205, ty: 20, s: 1.0 },
+    { type: 'fire', tx: 150, ty: 27, s: 0.6 },
+    { type: 'fire', tx: 166, ty: 24, s: 0.6 },
     { type: 'stall', tx: 265, ty: 20 },
     { type: 'fire', tx: 263, ty: 20, s: 1.1 },
     // Forum : grandeur civique
