@@ -340,6 +340,11 @@ AR.DemoAI = {
       if (!['coin', 'heart', 'potionDrop'].includes(p.type) || this.lootIgnore.has(p)) continue;
       if (p.x < cam.x - margin || p.x > cam.x + cam.vw + margin) continue;
       if (p.y < cam.y - margin || p.y > cam.y + cam.vh + margin) continue;
+      // Même filtre que pour le ciblage de combat (cf. plus bas) : une carte multi-étage (grotte
+      // sous un chemin de surface) peut montrer les deux dans la même caméra — "visible à l'écran"
+      // ne veut pas dire "atteignable". Sans ça l'IA visait une pièce à la surface depuis le
+      // tunnel en contrebas et bouclait sans jamais pouvoir la ramasser (retour joueur).
+      if (Math.abs(p.y - pcy) > AR.C.TILE * 3 && !this._hasClearShot(game.level, pcx, pcy, p.x, p.y)) continue;
       const d = AR.U.dist(pcx, pcy, p.x, p.y);
       if (d < bestD) { bestD = d; best = p; }
     }

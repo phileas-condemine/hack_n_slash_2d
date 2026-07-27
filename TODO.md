@@ -174,6 +174,29 @@ pour enrichir l'expérience de jeu, sur le modèle de ce qui marche déjà bien.
   que le tunnel en contrebas, filtre de ciblage confirmé sur le scénario exact du rapport (garde du
   puits à 7.7 tuiles de distance verticale, aucune ligne de tir dégagée → `wouldBeFiltered: true`),
   aucune erreur console.
+- [x] **Suite (2/2), retour joueur 2026-07-27** : capture d'écran à l'appui — "l'ombre du héros
+  semble être à la surface alors qu'il avance (en sautant !) dans la grotte (...) l'IA dans la
+  grotte boucle pour essayer d'attraper l'or qui est à la surface, juste à côté de son ombre
+  étrangement située à la surface". Le joueur avait vu juste sur le lien entre les deux symptômes,
+  bien qu'ils viennent de deux endroits différents dans le code — même cause racine que les bugs
+  ci-dessus (aucune notion de sol/plafond solide entre deux points, juste une distance/position
+  brute) :
+  - **Ombre du héros** (`src/player.js`, `draw()`) : utilisait `level.groundYpx(x)`, qui renvoie
+    toujours la surface la plus haute de la colonne (la surface, pas le tunnel), au lieu de
+    `groundYAtEntity(x, y)` (déjà utilisé partout ailleurs — ennemis, IA — précisément pour lever
+    cette ambiguïté multi-étage). Résultat : sous terre, l'ombre se dessinait à la ligne du sol de
+    surface, potentiellement à l'écran mais à des tuiles du héros. Remplacé par `groundYAtEntity`.
+  - **IA bloquée sur du butin à la surface depuis le tunnel** (`src/demoai.js`,
+    `_pickVisibleLoot`) : ne filtrait le butin que par présence dans le rectangle caméra + distance
+    brute, sans vérifier de ligne de vue dégagée — or une carte multi-étage peut cadrer surface et
+    tunnel dans la même caméra (cf. bug de ciblage de combat ci-dessus). Même filtre appliqué ici :
+    au-delà de 3 tuiles verticales, il faut une ligne de tir dégagée (`_hasClearShot`) pour qu'un
+    butin reste éligible.
+  Vérifié via Playwright sur le scénario exact du rapport : ancienne formule plaçait l'ombre à
+  `ty22.00` (surface) pour un héros à `ty27.00` (tunnel) ; nouvelle formule la place correctement à
+  `ty30.00` (sol du tunnel juste sous ses pieds). Pièce à la surface depuis le tunnel :
+  `surfaceCoinFilteredOut: true` ; pièce dans le même tunnel : `tunnelCoinFilteredOut: false`
+  (toujours ramassable normalement). Aucune erreur console.
 
 ## 🗺️ Minimap / brouillard de guerre
 

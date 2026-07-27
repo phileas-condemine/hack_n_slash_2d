@@ -565,7 +565,11 @@ AR.Player = class {
     ctx.save();
     ctx.globalAlpha = 0.3;
     ctx.fillStyle = '#000';
-    const gy = game.level.groundYpx(this.x + this.w / 2) - cy;
+    // groundYAtEntity (pas groundYpx, qui ne renvoie que la surface primaire/la plus haute) lève
+    // l'ambiguïté multi-étage : sous terre (grottes), groundYpx collait l'ombre au sol de surface
+    // au-dessus de la tête du héros au lieu du sol de la pièce où il se trouve vraiment (retour
+    // joueur : ombre visible en l'air à la surface pendant qu'il saute dans la grotte).
+    const gy = game.level.groundYAtEntity(this.x + this.w / 2, this.y) - cy;
     if (gy - fy < 300) {
       ctx.beginPath(); ctx.ellipse(fx, gy + 2, 20 * (1 - AR.U.clamp((gy - fy) / 300, 0, 0.6)), 5, 0, 0, Math.PI * 2); ctx.fill();
     }
