@@ -152,7 +152,7 @@ const STONE = {
   encounters: [
     { id: 'E_STONE_HUB', roomId: 'S02_CANYON_HUB',
       trigger: { x: 40, y: 16, w: 16, h: 10 },
-      gates: [{ x: 38, y: 15, w: 1, h: 9 }, { x: 60, y: 14, w: 1, h: 10 }],
+      gates: [],
       waves: [{ ids: ['stone_spear', 'stone_spear'] }, { ids: ['stone_slinger', 'beast_hunter'] }],
       reward: { coins: 15 } },
     { id: 'E_STONE_CAVES', roomId: 'S05_DEEP_CAVES',
@@ -162,19 +162,19 @@ const STONE = {
       reward: { coins: 14 } },
     { id: 'E_STONE_ELITE', roomId: 'S08_TOTEM_PASS',
       trigger: { x: 252, y: 16, w: 18, h: 8 },
-      gates: [{ x: 248, y: 14, w: 1, h: 10 }, { x: 285, y: 14, w: 1, h: 10 }],
+      gates: [],
       waves: [{ ids: ['mammoth_rider', 'stone_spear', 'stone_spear'], elite: ['mammoth_rider'] }],
       reward: { coins: 25 } },
     // SEC_STONE_04 — zone 2 du réseau souterrain : chauves-souris + frondeurs en retrait, verrouillé.
     { id: 'E_SEC04_GAUNTLET', roomId: 'SEC_STONE_04_DEPTHS',
       trigger: { x: 240, y: 25, w: 20, h: 5 },
-      gates: [{ x: 239, y: 25, w: 1, h: 5 }, { x: 261, y: 25, w: 1, h: 5 }],
+      gates: [],
       waves: [{ ids: ['stone_cave_bats', 'stone_cave_bats', 'stone_slinger', 'stone_slinger'] }],
       reward: { coins: 18 } },
     // SEC_STONE_04 — zone 4 (antre finale) : mini-boss à taille humaine, salle sans issue tant qu'il vit.
     { id: 'E_SEC04_MAMMOTH', roomId: 'SEC_STONE_04_DEPTHS',
       trigger: { x: 293, y: 25, w: 21, h: 5 },
-      gates: [{ x: 292, y: 25, w: 1, h: 5 }],
+      gates: [],
       waves: [{ ids: ['mammoth_rider'], elite: ['mammoth_rider'] }],
       reward: { coins: 30 } },
   ],
@@ -482,38 +482,26 @@ const ANTIQUITY = {
   encounters: [
     { id: 'E_ANTIQUITY_HUB', roomId: 'A02_UPPER_STREET',
       trigger: { x: 32, y: 10, w: 14, h: 12 },
-      // hauteur pile jusqu'au sol (y20), sans mordre dedans : `setGateSolid(false)` efface le
-      // SOLID sur tout le rect à l'ouverture, y compris le terrain permanent en dessous s'il y a
-      // chevauchement (creuse une entaille fine et profonde, cf. bug trouvé et corrigé sur les
-      // portes du Forum/de l'Arène plus bas — ici on l'évite dès le départ, chevauchement nul).
-      gates: [{ x: 30, y: 8, w: 1, h: 12 }, { x: 48, y: 8, w: 1, h: 12 }],
+      gates: [],
       waves: [{ ids: ['hoplite', 'hoplite'] }, { ids: ['archer_auxilia', 'desert_raider'] }],
       reward: { coins: 15 } },
-    // Quartier des Esclaves — gantelet verrouillé : contremaîtres + vermine, puis un forçat qui a
-    // brisé ses chaînes en finale (monstres dédiés, jamais utilisés en surface).
+    // Quartier des Esclaves — gantelet : contremaîtres + vermine, puis un forçat qui a brisé
+    // ses chaînes en finale (monstres dédiés, jamais utilisés en surface).
     { id: 'E_SLAVE_GAUNTLET', roomId: 'A03_SLAVE_QUARTER',
       trigger: { x: 121, y: 25, w: 18, h: 5 },
-      // hauteur limitée à la bande ouverte du tunnel (y25-29) : un ouvrant qui mord trop
-      // profondément dans le terrain permanent (croûte/plancher) y creuserait un puits fin et
-      // profond en s'ouvrant (`setGateSolid` efface le SOLID sur tout le rect, pas seulement la
-      // barrière temporaire) — piège découvert en testant la même erreur sur le Forum ci-dessous.
-      gates: [{ x: 119, y: 25, w: 1, h: 5 }, { x: 141, y: 25, w: 1, h: 5 }],
+      gates: [],
       waves: [{ ids: ['pit_vermin', 'pit_vermin', 'pit_vermin', 'chain_overseer'] },
               { ids: ['chain_overseer', 'chain_overseer', 'pit_vermin', 'pit_vermin'] },
               { ids: ['manacled_brute'] }],
       reward: { coins: 20 } },
-    // A03B_SLAVE_PIT — la Fosse des Esclaves : combat clandestin forcé, atteint par l'escalier
-    // ou le monte-charge (cf. `lifts`/`interactables` ci-dessus). Distinct de l'Arène des
-    // Gladiateurs (spectacle civique près du Forum) : ici c'est le roster souterrain de l'ère
+    // A03B_SLAVE_PIT — la Fosse des Esclaves : combat clandestin, atteint par l'escalier ou le
+    // monte-charge (cf. `lifts`/`interactables` ci-dessus). Distinct de l'Arène des Gladiateurs
+    // (spectacle civique près du Forum) : ici c'est le roster souterrain de l'ère
     // (contremaîtres/vermine/forçat + les revenants de l'ancienne petite cache), pas les
-    // soldats réguliers. Portes à hauteur nulle sur le sol (cf. commentaire détaillé plus haut) ;
-    // l'escalier/le monte-charge restent utilisables pendant le combat (fuite possible).
+    // soldats réguliers.
     { id: 'E_SLAVE_PIT', roomId: 'A03B_SLAVE_PIT',
       trigger: { x: 115, y: 8, w: 90, h: 10 },
-      // x111/x208 (pas x109/x210, hors de la plage creusée x110-209) ET y6-20 (pas y4 : le
-      // plafond de la fosse commence à y6, y4-5 est de la roche pleine) — même souci de
-      // chevauchement avec du terrain permanent que documenté plus haut, ici sur deux axes.
-      gates: [{ x: 111, y: 6, w: 1, h: 14 }, { x: 208, y: 6, w: 1, h: 14 }],
+      gates: [],
       waves: [{ ids: ['pit_vermin', 'pit_vermin', 'pit_vermin', 'pit_vermin'] },
               { ids: ['chain_overseer', 'chain_overseer', 'tomb_scarabs', 'tomb_scarabs'] },
               { ids: ['crypt_wraith', 'crypt_wraith'] },
@@ -522,23 +510,17 @@ const ANTIQUITY = {
     // Forum — plaza civique : combat à ciel ouvert sur plusieurs vagues, gradins praticables.
     { id: 'E_FORUM_PLAZA', roomId: 'A05_FORUM',
       trigger: { x: 320, y: 6, w: 60, h: 16 },
-      // hauteur pile jusqu'au sol (y10), chevauchement nul avec le terrain permanent (cf.
-      // commentaire détaillé sur les portes de la rue haute ci-dessus).
-      gates: [{ x: 318, y: 2, w: 1, h: 8 }, { x: 382, y: 2, w: 1, h: 8 }],
+      gates: [],
       waves: [{ ids: ['hoplite', 'hoplite', 'hoplite'] },
               { ids: ['archer_auxilia', 'archer_auxilia', 'desert_raider'] },
               { ids: ['hoplite', 'archer_auxilia', 'desert_raider'] }],
       reward: { coins: 30 } },
     // Arène des Gladiateurs — LE set-piece original de cette ère : 5 duels enchaînés dans une
-    // fosse fermée, du combattant solo à la bête finale (même mécanisme de vagues séquentielles
-    // que les autres encounters, mais utilisé ici pour simuler de vrais « rounds » d'arène).
+    // fosse, du combattant solo à la bête finale (même mécanisme de vagues séquentielles que les
+    // autres encounters, mais utilisé ici pour simuler de vrais « rounds » d'arène).
     { id: 'E_GLADIATOR_ARENA', roomId: 'A06_GLADIATOR_ARENA',
       trigger: { x: 414, y: 4, w: 36, h: 26 },
-      // hauteur pile jusqu'au sol (y14), chevauchement nul avec le terrain permanent (cf.
-      // commentaire détaillé sur les portes de la rue haute ci-dessus).
-      // x407 est sur la marche de transition (sol y13, une tuile plus haut que le sol d'arène
-      // y14) : h ajustée à 11 pile pour ce côté précisément (12 aurait mordu 1 rangée).
-      gates: [{ x: 407, y: 2, w: 1, h: 11 }, { x: 455, y: 2, w: 1, h: 13 }],
+      gates: [],
       waves: [{ ids: ['hoplite'] },
               { ids: ['desert_raider', 'desert_raider'] },
               { ids: ['temple_guardian'], elite: ['temple_guardian'] },
@@ -547,7 +529,7 @@ const ANTIQUITY = {
       reward: { coins: 40 } },
     { id: 'E_ANTIQUITY_ELITE', roomId: 'A07_ELITE_PASS',
       trigger: { x: 488, y: 12, w: 16, h: 10 },
-      gates: [{ x: 486, y: 10, w: 1, h: 12 }, { x: 506, y: 10, w: 1, h: 12 }],
+      gates: [],
       waves: [{ ids: ['temple_guardian', 'hoplite', 'hoplite'], elite: ['temple_guardian'] }],
       reward: { coins: 25 } },
   ],

@@ -457,7 +457,11 @@ AR.Game = class {
     }
   }
 
-  // Encounters verrouillés : entrée -> fermeture des barrières -> vagues -> ouverture + récompense.
+  // Encounters : entrée dans le trigger -> vagues -> récompense. `gates` (barrière solide
+  // temporaire) reste supporté par `setGateSolid` mais n'est plus utilisé par aucun niveau
+  // (retour joueur 2026-07-27 : enfermer le héros pendant le combat piège l'IA de démo, qui
+  // veut avancer et reste juste bloquée contre le mur au lieu de se battre efficacement) —
+  // le joueur/l'IA peut désormais ignorer ou fuir un combat déclenché.
   _updateEncounters(dt) {
     const lvl = this.level, pl = this.player, T = AR.C.TILE;
     const pcx = pl.x + pl.w / 2, pcy = pl.y + pl.h / 2;
@@ -488,7 +492,7 @@ AR.Game = class {
     enc.waveIdx = 0;
     enc._live = [];
     for (const g of enc.gates) this.level.setGateSolid(g, true);
-    AR.HUD.notify('Embuscade ! Les barrières se ferment', AR.C.COLORS.danger);
+    AR.HUD.notify('Embuscade !', AR.C.COLORS.danger);
     AR.Audio.sfx('gate');
     if (enc.waves && enc.waves[0]) this._spawnWave(enc, enc.waves[0]);
   }
@@ -521,7 +525,7 @@ AR.Game = class {
       AR.Pickups.coinBurst(this.player.x + this.player.w / 2, this.player.y - 20,
         Math.round(enc.reward.coins * (this.mods.goldMult || 1)), 2);
     }
-    AR.HUD.notify('Zone sécurisée — les barrières s\'ouvrent', AR.C.COLORS.spirit);
+    AR.HUD.notify('Zone sécurisée', AR.C.COLORS.spirit);
     AR.Audio.sfx('gate');
   }
 
@@ -1043,6 +1047,11 @@ AR.Game = class {
       lvl.drawBackground(ctx, cam);
       lvl.drawTerrain(ctx, cam);
       lvl.drawProps(ctx, cam, this.time);
+      // Le voile des poches sombres doit assombrir le DÉCOR, pas les personnages : appliqué ici,
+      // avant les pickups/ennemis/héros, jamais après (retour joueur 2026-07-27 : "les personnages
+      // sont noircis, c'est moche" — c'était un filtre plaqué par-dessus tout le monde, alors que
+      // le rendu de la roche/des stalactites suffit déjà à donner l'ambiance grotte).
+      lvl.drawDarkZones(ctx, cam);
     }
     AR.Pickups.draw(ctx, cam, this.time, lvl.era);
     for (const e of this.enemies) e.draw(ctx, cam, this.time);
@@ -1051,7 +1060,6 @@ AR.Game = class {
     AR.Projectiles.draw(ctx, cam);
     AR.Particles.draw(ctx, cam);
     lvl.drawAmbient(ctx);
-    lvl.drawDarkZones(ctx, cam);
 
     // teinte du Voile temporel
     if (this.veilT > 0) {

@@ -98,7 +98,7 @@ AR.ENEMIES = {
   // Monstres dédiés du Quartier des Esclaves (SEC_ANTIQUITY souterrain, cf. level_specs.js) —
   // jamais utilisés en surface (forum/rue/arène), pour donner à cette zone sa propre identité.
   chain_overseer: { name: 'Contremaître enchaîné', hp: 110, dmg: 16, speed: 70, xp: 28, coins: 11, h: 90, behavior: 'shield', range: 70, aggro: 440, atkCd: 1.6, tele: 0.5, block: 0.65, knock: 300 },
-  pit_vermin:     { name: 'Vermine des fosses', hp: 30, dmg: 7, speed: 170, xp: 8, coins: 3, h: 50, behavior: 'melee', range: 50, aggro: 460, atkCd: 1.0, tele: 0.25, facing: 'l' },
+  pit_vermin:     { name: 'Vermine des fosses', hp: 30, dmg: 7, speed: 170, xp: 8, coins: 3, h: 64, behavior: 'melee', range: 50, aggro: 460, atkCd: 1.0, tele: 0.25, facing: 'l' },
   manacled_brute: { name: 'Forçat brisant ses chaînes', hp: 180, dmg: 20, speed: 60, xp: 35, coins: 14, h: 100, behavior: 'brute', range: 95, aggro: 400, atkCd: 1.8, tele: 0.6, facing: 'l', knock: 340 },
 
   // --- Japon médiéval

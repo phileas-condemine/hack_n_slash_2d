@@ -1120,13 +1120,13 @@ AR.Level = class {
     }
   }
 
-  // Poches sombres (grottes profondes) : légère teinte froide d'ambiance (on voit tout, ce
-  // n'est pas un filtre qui cache la scène) + halos chauds additifs autour des torches, qui
-  // agissent comme de vraies sources de lumière plutôt que des trous découpés dans un voile
-  // opaque. La roche/les stalactites (cf. _drawTerrainGrid/_drawStalactite) portent l'essentiel
-  // de l'identité "grotte" ; cette passe ne fait plus que l'éclairage. `z.tint` permet à une
-  // zone donnée (ex. le capuchon d'un puits, qui doit rester un mystère vu d'en haut) de
-  // s'écarter de la teinte par défaut, plus claire, du reste du réseau souterrain.
+  // Poches sombres (grottes profondes) : légère teinte froide d'ambiance sur le DÉCOR + halos
+  // chauds additifs autour des torches. Appelée par `Game.render()` juste après le terrain/les
+  // props et AVANT les pickups/ennemis/héros — jamais après, sinon le voile se plaque sur les
+  // personnages et les noircit (retour joueur 2026-07-27). La roche/les stalactites (cf.
+  // _drawTerrainGrid/_drawStalactite) portent l'essentiel de l'identité "grotte" ; cette passe
+  // ne fait qu'assombrir légèrement ce décor. `z.tint` permet à une zone donnée (ex. le capuchon
+  // d'un puits, qui doit rester un mystère vu d'en haut) de s'écarter de la teinte par défaut.
   drawDarkZones(ctx, cam) {
     if (!this.darkZones.length) return;
     const cx = cam.cx(), cy = cam.cy(), W = AR.C.VIEW_W, H = AR.C.VIEW_H;
