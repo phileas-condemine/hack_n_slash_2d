@@ -91,10 +91,15 @@ AR.ENEMIES = {
   temple_guardian:{ name: 'Gardien du temple', hp: 130, dmg: 20, speed: 45, xp: 50, coins: 22, h: 118, behavior: 'shield', range: 88, aggro: 380, atkCd: 2.1, tele: 0.65, block: 0.85, knock: 340, elite: true },
   // Sbire dédié du Commandant de Char (summon uniquement)
   standard_bearer:{ name: 'Porte-étendard', hp: 36, dmg: 13, speed: 95, xp: 18, coins: 7, h: 84, behavior: 'melee', range: 85, aggro: 460, atkCd: 1.5, tele: 0.45 },
-  // Monstres dédiés de la crypte secrète SEC_ANTIQUITY_01 (cf. level_specs.js) — jamais utilisés
-  // sur le chemin de surface, comme stone_cave_stalker/stone_cave_bats pour l'ère 1.
+  // Monstres dédiés de la petite cache secrète SEC_ANTIQUITY_02 (cf. level_specs.js) — jamais
+  // utilisés ailleurs, comme stone_cave_stalker/stone_cave_bats pour l'ère 1.
   crypt_wraith:   { name: 'Spectre des catacombes', hp: 95, dmg: 13, speed: 135, xp: 24, coins: 10, h: 88, behavior: 'assassin', range: 64, aggro: 520, atkCd: 1.7, tele: 0.4, blinkCd: 3.0, facing: 'l', parry: true },
   tomb_scarabs:   { name: 'Nuée de scarabées', hp: 48, dmg: 9, speed: 145, xp: 14, coins: 5, h: 60, behavior: 'flyer', range: 58, aggro: 520, atkCd: 1.6, tele: 0.35, dive: true, flyH: 140 },
+  // Monstres dédiés du Quartier des Esclaves (SEC_ANTIQUITY souterrain, cf. level_specs.js) —
+  // jamais utilisés en surface (forum/rue/arène), pour donner à cette zone sa propre identité.
+  chain_overseer: { name: 'Contremaître enchaîné', hp: 110, dmg: 16, speed: 70, xp: 28, coins: 11, h: 90, behavior: 'shield', range: 70, aggro: 440, atkCd: 1.6, tele: 0.5, block: 0.65, knock: 300 },
+  pit_vermin:     { name: 'Vermine des fosses', hp: 30, dmg: 7, speed: 170, xp: 8, coins: 3, h: 50, behavior: 'melee', range: 50, aggro: 460, atkCd: 1.0, tele: 0.25, facing: 'l' },
+  manacled_brute: { name: 'Forçat brisant ses chaînes', hp: 180, dmg: 20, speed: 60, xp: 35, coins: 14, h: 100, behavior: 'brute', range: 95, aggro: 400, atkCd: 1.8, tele: 0.6, facing: 'l', knock: 340 },
 
   // --- Japon médiéval
   ronin:          { name: 'Rônin', hp: 110, dmg: 15, speed: 130, xp: 22, coins: 9, h: 80, behavior: 'melee', range: 78, aggro: 480, atkCd: 1.0, tele: 0.32, combo2: true, parry: true },
@@ -140,6 +145,9 @@ AR.ENEMY_FALLBACK = {
   stone_cave_bats: 'war_shaman',
   crypt_wraith: 'desert_raider',
   tomb_scarabs: 'war_shaman',
+  chain_overseer: 'temple_guardian',
+  pit_vermin: 'desert_raider',
+  manacled_brute: 'hoplite',
 };
 
 // ------------------------------------------------------------------ LES BOSS

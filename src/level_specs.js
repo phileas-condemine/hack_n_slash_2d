@@ -320,145 +320,299 @@ const STONE = {
 // suivront le même patron, une ère à la fois (cf. TODO).
 // Structure : A01 forecourt -> A02 hub (combat + puits vers la crypte secrète) ->
 //   A03 marché -> A04 passe élite -> arène.
+// Retour joueur 2026-07-27 (2e passe) : la 1ère version (une seule petite crypte, ~17
+// monstres) était jugée trop proche du patron de l'ère 1 et trop en retrait par rapport à la
+// densité procédurale historique (~70-80 monstres/ère). Refonte complète : carte beaucoup plus
+// grande (564 tuiles avant l'arène, contre 354 pour STONE) et structurellement originale —
+// pas juste « encore une grotte » mais une vraie descente (Quartier des Esclaves, souterrain,
+// sombre, oppressant) ET une vraie ascension (Forum civique en hauteur -> Arène des Gladiateurs,
+// duels enchaînés), en plus d'une petite cache secrète classique. Chaque zone a son identité
+// propre (terrain, ambiance, monstres) plutôt que de réutiliser le même schéma partout.
+// Structure : A01 forecourt -> A02 rue haute (combat) -> DESCENTE -> A03 Quartier des Esclaves
+//   (souterrain, + cache secrète SEC_ANTIQUITY_02) -> REMONTÉE -> A04 marché -> MONTÉE ->
+//   A05 Forum (plaza civique, plateformes étagées) -> A06 Arène des Gladiateurs (duels en
+//   série, du solo à la bête finale) -> DESCENTE -> A07 passe élite -> arène du boss.
 const ANTIQUITY = {
   id: 'antiquity',
-  tilesW: 244,
+  tilesW: 564,
   worldH: 32,
   spawnX: 3,
   startRoom: 'A01_FORECOURT',
-  bossArenaRoom: 'A06_ACROPOLIS_ARENA',
-  arenaStartTx: 210,
-  gateTx: 211,
-  arenaGy: 23,
+  bossArenaRoom: 'A08_ACROPOLIS_ARENA',
+  arenaStartTx: 530,
+  gateTx: 531,
+  arenaGy: 22,
   fallDamageRatio: 0.10,
 
   // ---- terrain solide ----
   solids: [
-    { x: 0, y: 22, w: 16, h: 10 },        // A01 forecourt d'arrivée
-    { x: 16, y: 21, w: 2, h: 11 },        // marche
-    { x: 18, y: 20, w: 2, h: 12 },        // marche
-    // A02 hub + crypte : bloc plein x20-100, creusé en dessous (cf. `empties`) — même
-    // technique que S08_TOTEM_PASS/SEC_STONE_04 dans STONE (croûte de surface préservée,
-    // réseau souterrain creusé dedans, plancher préservé).
-    { x: 20, y: 20, w: 80, h: 12 },
-    { x: 100, y: 20, w: 40, h: 12 },      // A03 marché (sol continu, pas de crypte dessous)
-    { x: 140, y: 20, w: 50, h: 12 },      // A04 passe élite
-    { x: 190, y: 21, w: 3, h: 11 },       // descente vers l'arène
-    { x: 193, y: 22, w: 3, h: 10 },
-    { x: 196, y: 23, w: 14, h: 9 },       // antichambre d'arène
-    { x: 210, y: 23, w: 34, h: 9 },       // A06 sol d'arène (l'image d'arène prend le relais)
+    { x: 0, y: 22, w: 20, h: 10 },        // A01 forecourt d'arrivée
+    { x: 20, y: 21, w: 2, h: 11 },        // marche
+    { x: 22, y: 20, w: 2, h: 12 },        // marche
+    { x: 24, y: 20, w: 46, h: 12 },       // A02 rue haute (combat)
+
+    // ---- descente vers le Quartier des Esclaves (escalier praticable, x70-100, y21->30) ----
+    { x: 70, y: 21, w: 3, h: 11 }, { x: 73, y: 22, w: 3, h: 10 }, { x: 76, y: 23, w: 3, h: 9 },
+    { x: 79, y: 24, w: 3, h: 8 }, { x: 82, y: 25, w: 3, h: 7 }, { x: 85, y: 26, w: 3, h: 6 },
+    { x: 88, y: 27, w: 3, h: 5 }, { x: 91, y: 28, w: 3, h: 4 }, { x: 94, y: 29, w: 3, h: 3 },
+    { x: 97, y: 30, w: 3, h: 2 },
+
+    // A03 Quartier des Esclaves : masse pleine x100-220, creusée en dessous (cf. `empties`) —
+    // même technique que S08_TOTEM_PASS/SEC_STONE_04 dans STONE (croûte préservée, réseau
+    // souterrain creusé dedans, plancher préservé) — mais ici c'est le chemin PRINCIPAL
+    // (obligatoire), pas une poche secrète optionnelle.
+    { x: 100, y: 16, w: 120, h: 16 },
+
+    // ---- remontée vers la surface (x220-250, y30->21) ----
+    { x: 220, y: 30, w: 3, h: 2 }, { x: 223, y: 29, w: 3, h: 3 }, { x: 226, y: 28, w: 3, h: 4 },
+    { x: 229, y: 27, w: 3, h: 5 }, { x: 232, y: 26, w: 3, h: 6 }, { x: 235, y: 25, w: 3, h: 7 },
+    { x: 238, y: 24, w: 3, h: 8 }, { x: 241, y: 23, w: 3, h: 9 }, { x: 244, y: 22, w: 3, h: 10 },
+    { x: 247, y: 21, w: 3, h: 11 },
+
+    { x: 250, y: 20, w: 30, h: 12 },      // A04 marché (safe)
+
+    // ---- montée vers le Forum (x280-310, y19->10) ----
+    { x: 280, y: 19, w: 3, h: 13 }, { x: 283, y: 18, w: 3, h: 14 }, { x: 286, y: 17, w: 3, h: 15 },
+    { x: 289, y: 16, w: 3, h: 16 }, { x: 292, y: 15, w: 3, h: 17 }, { x: 295, y: 14, w: 3, h: 18 },
+    { x: 298, y: 13, w: 3, h: 19 }, { x: 301, y: 12, w: 3, h: 20 }, { x: 304, y: 11, w: 3, h: 21 },
+    { x: 307, y: 10, w: 3, h: 22 },
+
+    { x: 310, y: 10, w: 90, h: 22 },      // A05 Forum : grande plaza civique en hauteur
+
+    // ---- transition vers l'Arène des Gladiateurs (x400-409, léger contrebas) ----
+    { x: 400, y: 11, w: 3, h: 21 }, { x: 403, y: 12, w: 3, h: 20 }, { x: 406, y: 13, w: 3, h: 19 },
+
+    { x: 409, y: 14, w: 45, h: 18 },      // A06 Arène des Gladiateurs : fosse fermée, duels en série
+
+    // ---- descente vers la rue (x454-478, y15->22) ----
+    { x: 454, y: 15, w: 3, h: 17 }, { x: 457, y: 16, w: 3, h: 16 }, { x: 460, y: 17, w: 3, h: 15 },
+    { x: 463, y: 18, w: 3, h: 14 }, { x: 466, y: 19, w: 3, h: 13 }, { x: 469, y: 20, w: 3, h: 12 },
+    { x: 472, y: 21, w: 3, h: 11 }, { x: 475, y: 22, w: 3, h: 10 },
+
+    { x: 478, y: 22, w: 52, h: 10 },      // A07 passe élite + antichambre d'arène
+    { x: 530, y: 22, w: 34, h: 10 },      // A08 sol d'arène (l'image d'arène prend le relais)
   ],
 
-  // ---- creusements (crypte SEC_ANTIQUITY_01) ----
+  // ---- creusements (Quartier des Esclaves + cache secrète SEC_ANTIQUITY_02) ----
   empties: [
-    // puits d'entrée (x45-49) : perce la croûte de surface (y20-24) du bloc A02.
-    { x: 45, y: 20, w: 5, h: 5 },
-    // réseau souterrain horizontal (x22-98, y25-29) : plafond à y25 (croûte y20-24
-    // préservée), plancher à y30-31 préservé (fait partie du même bloc plein).
-    { x: 22, y: 25, w: 76, h: 5 },
+    // réseau souterrain principal (x100-220, y25-29) : plafond à y25 (croûte y16-24 préservée
+    // au-dessus — c'est elle qui porte la rue/l'escalier), plancher y30-31 préservé.
+    { x: 100, y: 25, w: 120, h: 5 },
+    // SEC_ANTIQUITY_02 : petite cache cachée dans la croûte, au-dessus du tunnel (x158-164,
+    // y18-23) — atteinte via un mur friable percé dans le plafond du tunnel (cf. `breakables`),
+    // avec une corniche de repos à mi-hauteur (cf. `oneWay`) pour rendre le double saut fiable.
+    { x: 158, y: 18, w: 6, h: 6 },
   ],
 
   // ---- plateformes traversables (one-way) ----
   oneWay: [
-    { x: 106, y: 16, w: 4, id: 'A_HIGH_LEDGE' }, // corniche du coffre haut (double saut, avant le marché)
+    // corniche de repos sous la cache secrète (double saut tunnel -> corniche -> mur friable)
+    { x: 159, y: 27, w: 3, id: 'SLAVE_POCKET_STEP' },
+    // gradins du Forum : verticalité de combat + coffre perché
+    { x: 330, y: 6, w: 6, id: 'FORUM_STEPS_1' },
+    { x: 350, y: 4, w: 6, id: 'FORUM_STEPS_2' },
   ],
 
   climbables: [],
-  breakables: [],
+
+  // ---- destructibles ----
+  breakables: [
+    { id: 'SEC_ANTIQUITY_02', type: 'wall', rect: { x: 160, y: 24, w: 2, h: 1 }, hp: 45 },
+  ],
+
   interactables: [],
 
-  // ---- rooms ----
+  // ---- rooms ---- (SEC_ANTIQUITY_02 doit précéder A03_SLAVE_QUARTER : les rects se
+  // chevauchent et currentRoomAt() retient le premier match)
   rooms: [
-    { id: 'A01_FORECOURT', rect: { x: 0, y: 16, w: 20, h: 16 }, tags: ['start'],
-      camera: { minX: 0, maxX: 22, minY: 12, maxY: 32 }, safeRespawn: [{ x: 3, y: 22, priority: 10 }] },
-    { id: 'A02_HUB', rect: { x: 20, y: 14, w: 80, h: 8 }, tags: ['hub'],
-      camera: { minX: 20, maxX: 100, minY: 10, maxY: 26 }, safeRespawn: [{ x: 26, y: 20, priority: 8 }] },
-    { id: 'SEC_ANTIQUITY_CRYPT', rect: { x: 20, y: 22, w: 80, h: 10 }, tags: ['secret', 'cave', 'dark'],
-      camera: { minX: 20, maxX: 100, minY: 18, maxY: 32 },
-      safeRespawn: [{ x: 47, y: 29, priority: 9 }, { x: 90, y: 29, priority: 7 }] },
-    { id: 'A03_MARKET', rect: { x: 100, y: 14, w: 40, h: 18 }, tags: ['safe', 'no_enemy', 'merchant'],
-      camera: { minX: 100, maxX: 140, minY: 10, maxY: 32 }, safeRespawn: [{ x: 120, y: 20, priority: 10 }] },
-    { id: 'A04_ELITE_PASS', rect: { x: 140, y: 10, w: 70, h: 22 }, tags: ['tension'],
-      camera: { minX: 140, maxX: 210, minY: 8, maxY: 32 }, safeRespawn: [{ x: 146, y: 20, priority: 7 }, { x: 200, y: 23, priority: 8 }] },
-    { id: 'A06_ACROPOLIS_ARENA', rect: { x: 210, y: 8, w: 34, h: 24 }, tags: ['boss'],
-      camera: { minX: 210, maxX: 244, minY: 6, maxY: 32 }, safeRespawn: [{ x: 214, y: 23, priority: 10 }] },
+    { id: 'A01_FORECOURT', rect: { x: 0, y: 16, w: 24, h: 16 }, tags: ['start'],
+      camera: { minX: 0, maxX: 26, minY: 12, maxY: 32 }, safeRespawn: [{ x: 3, y: 22, priority: 10 }] },
+    { id: 'A02_UPPER_STREET', rect: { x: 24, y: 8, w: 76, h: 24 }, tags: ['hub'],
+      camera: { minX: 24, maxX: 100, minY: 6, maxY: 32 }, safeRespawn: [{ x: 30, y: 20, priority: 8 }] },
+    { id: 'SEC_ANTIQUITY_02', rect: { x: 156, y: 16, w: 10, h: 10 }, tags: ['secret', 'cave', 'dark'],
+      camera: { minX: 150, maxX: 172, minY: 12, maxY: 28 }, safeRespawn: [{ x: 160, y: 24, priority: 9 }] },
+    { id: 'A03_SLAVE_QUARTER', rect: { x: 100, y: 16, w: 150, h: 16 }, tags: ['branch', 'low_route', 'dark'],
+      camera: { minX: 100, maxX: 250, minY: 12, maxY: 32 },
+      safeRespawn: [{ x: 110, y: 29, priority: 7 }, { x: 200, y: 29, priority: 6 }] },
+    { id: 'A04_MARKET', rect: { x: 250, y: 6, w: 60, h: 26 }, tags: ['safe', 'no_enemy', 'merchant'],
+      camera: { minX: 250, maxX: 310, minY: 2, maxY: 32 }, safeRespawn: [{ x: 265, y: 20, priority: 10 }] },
+    { id: 'A05_FORUM', rect: { x: 310, y: 0, w: 99, h: 32 }, tags: ['tension'],
+      camera: { minX: 310, maxX: 409, minY: 0, maxY: 32 },
+      safeRespawn: [{ x: 315, y: 10, priority: 7 }, { x: 395, y: 10, priority: 6 }] },
+    { id: 'A06_GLADIATOR_ARENA', rect: { x: 409, y: 0, w: 69, h: 32 }, tags: ['tension'],
+      camera: { minX: 409, maxX: 478, minY: 0, maxY: 32 }, safeRespawn: [{ x: 414, y: 14, priority: 8 }] },
+    { id: 'A07_ELITE_PASS', rect: { x: 478, y: 6, w: 52, h: 26 }, tags: ['tension'],
+      camera: { minX: 478, maxX: 530, minY: 4, maxY: 32 },
+      safeRespawn: [{ x: 482, y: 22, priority: 7 }, { x: 520, y: 22, priority: 8 }] },
+    { id: 'A08_ACROPOLIS_ARENA', rect: { x: 530, y: 0, w: 34, h: 32 }, tags: ['boss'],
+      camera: { minX: 530, maxX: 564, minY: 0, maxY: 32 }, safeRespawn: [{ x: 534, y: 22, priority: 10 }] },
   ],
 
   // ---- encounters verrouillés ----
   encounters: [
-    { id: 'E_ANTIQUITY_HUB', roomId: 'A02_HUB',
-      trigger: { x: 26, y: 12, w: 14, h: 10 },
-      gates: [{ x: 25, y: 10, w: 1, h: 12 }, { x: 41, y: 10, w: 1, h: 12 }],
+    { id: 'E_ANTIQUITY_HUB', roomId: 'A02_UPPER_STREET',
+      trigger: { x: 32, y: 10, w: 14, h: 12 },
+      // hauteur pile jusqu'au sol (y20), sans mordre dedans : `setGateSolid(false)` efface le
+      // SOLID sur tout le rect à l'ouverture, y compris le terrain permanent en dessous s'il y a
+      // chevauchement (creuse une entaille fine et profonde, cf. bug trouvé et corrigé sur les
+      // portes du Forum/de l'Arène plus bas — ici on l'évite dès le départ, chevauchement nul).
+      gates: [{ x: 30, y: 8, w: 1, h: 12 }, { x: 48, y: 8, w: 1, h: 12 }],
       waves: [{ ids: ['hoplite', 'hoplite'] }, { ids: ['archer_auxilia', 'desert_raider'] }],
       reward: { coins: 15 } },
-    // SEC_ANTIQUITY_01 — crypte : gantelet verrouillé avec les monstres dédiés (jamais sur la surface).
-    { id: 'E_ANTIQUITY_CRYPT', roomId: 'SEC_ANTIQUITY_CRYPT',
-      trigger: { x: 58, y: 25, w: 20, h: 5 },
-      gates: [{ x: 57, y: 25, w: 1, h: 5 }, { x: 79, y: 25, w: 1, h: 5 }],
-      waves: [{ ids: ['crypt_wraith', 'crypt_wraith', 'tomb_scarabs', 'tomb_scarabs'] }],
-      reward: { coins: 18 } },
-    { id: 'E_ANTIQUITY_ELITE', roomId: 'A04_ELITE_PASS',
-      trigger: { x: 150, y: 12, w: 16, h: 10 },
-      gates: [{ x: 148, y: 10, w: 1, h: 12 }, { x: 168, y: 10, w: 1, h: 12 }],
+    // Quartier des Esclaves — gantelet verrouillé : contremaîtres + vermine, puis un forçat qui a
+    // brisé ses chaînes en finale (monstres dédiés, jamais utilisés en surface).
+    { id: 'E_SLAVE_GAUNTLET', roomId: 'A03_SLAVE_QUARTER',
+      trigger: { x: 121, y: 25, w: 18, h: 5 },
+      // hauteur limitée à la bande ouverte du tunnel (y25-29) : un ouvrant qui mord trop
+      // profondément dans le terrain permanent (croûte/plancher) y creuserait un puits fin et
+      // profond en s'ouvrant (`setGateSolid` efface le SOLID sur tout le rect, pas seulement la
+      // barrière temporaire) — piège découvert en testant la même erreur sur le Forum ci-dessous.
+      gates: [{ x: 119, y: 25, w: 1, h: 5 }, { x: 141, y: 25, w: 1, h: 5 }],
+      waves: [{ ids: ['pit_vermin', 'pit_vermin', 'pit_vermin', 'chain_overseer'] },
+              { ids: ['chain_overseer', 'chain_overseer', 'pit_vermin', 'pit_vermin'] },
+              { ids: ['manacled_brute'] }],
+      reward: { coins: 20 } },
+    // Forum — plaza civique : combat à ciel ouvert sur plusieurs vagues, gradins praticables.
+    { id: 'E_FORUM_PLAZA', roomId: 'A05_FORUM',
+      trigger: { x: 320, y: 6, w: 60, h: 16 },
+      // hauteur pile jusqu'au sol (y10), chevauchement nul avec le terrain permanent (cf.
+      // commentaire détaillé sur les portes de la rue haute ci-dessus).
+      gates: [{ x: 318, y: 2, w: 1, h: 8 }, { x: 382, y: 2, w: 1, h: 8 }],
+      waves: [{ ids: ['hoplite', 'hoplite', 'hoplite'] },
+              { ids: ['archer_auxilia', 'archer_auxilia', 'desert_raider'] },
+              { ids: ['hoplite', 'archer_auxilia', 'desert_raider'] }],
+      reward: { coins: 30 } },
+    // Arène des Gladiateurs — LE set-piece original de cette ère : 5 duels enchaînés dans une
+    // fosse fermée, du combattant solo à la bête finale (même mécanisme de vagues séquentielles
+    // que les autres encounters, mais utilisé ici pour simuler de vrais « rounds » d'arène).
+    { id: 'E_GLADIATOR_ARENA', roomId: 'A06_GLADIATOR_ARENA',
+      trigger: { x: 414, y: 4, w: 36, h: 26 },
+      // hauteur pile jusqu'au sol (y14), chevauchement nul avec le terrain permanent (cf.
+      // commentaire détaillé sur les portes de la rue haute ci-dessus).
+      // x407 est sur la marche de transition (sol y13, une tuile plus haut que le sol d'arène
+      // y14) : h ajustée à 11 pile pour ce côté précisément (12 aurait mordu 1 rangée).
+      gates: [{ x: 407, y: 2, w: 1, h: 11 }, { x: 455, y: 2, w: 1, h: 13 }],
+      waves: [{ ids: ['hoplite'] },
+              { ids: ['desert_raider', 'desert_raider'] },
+              { ids: ['temple_guardian'], elite: ['temple_guardian'] },
+              { ids: ['hoplite', 'archer_auxilia'] },
+              { ids: ['elephant_guard'] }],
+      reward: { coins: 40 } },
+    { id: 'E_ANTIQUITY_ELITE', roomId: 'A07_ELITE_PASS',
+      trigger: { x: 488, y: 12, w: 16, h: 10 },
+      gates: [{ x: 486, y: 10, w: 1, h: 12 }, { x: 506, y: 10, w: 1, h: 12 }],
       waves: [{ ids: ['temple_guardian', 'hoplite', 'hoplite'], elite: ['temple_guardian'] }],
       reward: { coins: 25 } },
   ],
 
-  triggers: [],
+  // ---- déclencheurs de scène ----
+  triggers: [
+    // Quartier des Esclaves — vermine suspendue au plafond du tunnel, tombe une fois le joueur
+    // au centre (même mécanisme que BATS_WAKE/SEC04_STALKERS_WAKE dans STONE).
+    { id: 'SLAVE_VERMIN_WAKE', rect: { x: 180, y: 25, w: 16, h: 5 }, action: 'wakeSpawns', group: 'slave_vermin' },
+  ],
 
   // ---- ennemis libres ----
   spawns: [
-    { tx: 10, ty: 22, id: 'hoplite' },
-    { tx: 70, ty: 20, id: 'archer_auxilia' },
-    { tx: 125, ty: 20, id: 'desert_raider' },
-    { tx: 175, ty: 20, id: 'hoplite' },
-    { tx: 200, ty: 23, id: 'archer_auxilia' },
-    // SEC_ANTIQUITY_01 — zone 1 : garde d'entrée au pied du puits (monstre dédié de crypte).
-    { tx: 47, ty: 29, id: 'crypt_wraith' },
+    { tx: 8, ty: 22, id: 'hoplite' },
+    { tx: 14, ty: 22, id: 'archer_auxilia' },
+    // A02 rue haute
+    { tx: 26, ty: 20, id: 'archer_auxilia' },
+    { tx: 55, ty: 20, id: 'desert_raider' },
+    { tx: 62, ty: 20, id: 'hoplite' },
+    // A03 Quartier des Esclaves — patrouilles libres (contremaîtres + vermine des fosses)
+    { tx: 105, ty: 29, id: 'pit_vermin' },
+    { tx: 108, ty: 29, id: 'pit_vermin' },
+    { tx: 110, ty: 29, id: 'pit_vermin' },
+    { tx: 112, ty: 29, id: 'chain_overseer' },
+    { tx: 145, ty: 29, id: 'chain_overseer' },
+    { tx: 149, ty: 29, id: 'pit_vermin' },
+    { tx: 153, ty: 29, id: 'pit_vermin' },
+    { tx: 156, ty: 29, id: 'chain_overseer' },
+    { tx: 166, ty: 29, id: 'chain_overseer' },
+    { tx: 170, ty: 29, id: 'pit_vermin' },
+    { tx: 197, ty: 29, id: 'pit_vermin' },
+    { tx: 200, ty: 29, id: 'pit_vermin' },
+    { tx: 203, ty: 29, id: 'pit_vermin' },
+    { tx: 207, ty: 29, id: 'pit_vermin' },
+    { tx: 213, ty: 29, id: 'chain_overseer' },
+    { tx: 216, ty: 29, id: 'pit_vermin' },
+    // SEC_ANTIQUITY_02 — cache secrète (monstres dédiés, jamais utilisés ailleurs)
+    { tx: 160, ty: 24, id: 'crypt_wraith' },
+    { tx: 159, ty: 20, id: 'tomb_scarabs' },
+    { tx: 162, ty: 21, id: 'tomb_scarabs' },
+    // Quartier des Esclaves — vermine suspendue au plafond, réveillée par SLAVE_VERMIN_WAKE
+    { tx: 182, ty: 27, id: 'pit_vermin', suspended: true, activate: 'slave_vermin' },
+    { tx: 186, ty: 27, id: 'pit_vermin', suspended: true, activate: 'slave_vermin' },
+    { tx: 190, ty: 27, id: 'pit_vermin', suspended: true, activate: 'slave_vermin' },
+    { tx: 194, ty: 27, id: 'pit_vermin', suspended: true, activate: 'slave_vermin' },
+    // A05 Forum
+    { tx: 313, ty: 10, id: 'archer_auxilia' },
+    { tx: 317, ty: 10, id: 'hoplite' },
+    { tx: 390, ty: 10, id: 'hoplite' },
+    { tx: 395, ty: 10, id: 'archer_auxilia' },
+    { tx: 398, ty: 10, id: 'archer_auxilia' },
+    // A07 passe élite + approche
+    { tx: 482, ty: 22, id: 'archer_auxilia' },
+    { tx: 512, ty: 22, id: 'desert_raider' },
+    { tx: 522, ty: 22, id: 'hoplite' },
   ],
 
   // ---- coffres ----
   chests: [
-    { x: 12, y: 22 },
-    { x: 107, y: 16, high: true },        // corniche A_HIGH_LEDGE
-    { x: 130, y: 20 },                    // coffre du marché
-    { x: 180, y: 20 },                    // coffre de la passe élite
-    { x: 205, y: 23 },                    // coffre de préparation (antichambre)
-    { x: 90, y: 29, guaranteed: 'bowUp' }, // SEC_ANTIQUITY_01 : récompense garantie de la crypte
+    { x: 12, y: 22 },                      // forecourt
+    { x: 108, y: 29 },                     // Quartier des Esclaves
+    { x: 265, y: 20 },                     // marché
+    { x: 331, y: 6, high: true },          // Forum, gradins FORUM_STEPS_1
+    { x: 351, y: 4, high: true },          // Forum, gradins FORUM_STEPS_2
+    { x: 500, y: 22 },                     // passe élite
+    { x: 161, y: 24, guaranteed: 'skillPoint' }, // SEC_ANTIQUITY_02 : trésor garanti de la cache
+    { x: 448, y: 14, guaranteed: 'swordUp' },    // Arène des Gladiateurs : récompense du champion
   ],
 
-  merchant: { x: 120, y: 20 },
+  merchant: { x: 265, y: 20 },
 
-  // ---- mini-portails locaux (remontée depuis la crypte secrète) ----
-  localPortals: [
-    { x: 47, y: 29, returnTo: { x: 61, y: 20 } },  // sortie rapide au pied du puits
-    { x: 90, y: 29, returnTo: { x: 61, y: 20 } },  // sortie après la salle du trésor
-  ],
+  localPortals: [],
 
   // ---- poches sombres ----
   darkZones: [
-    { x: 45, y: 20, w: 5, h: 4, tint: 0.8 },  // capuchon du puits
-    { x: 22, y: 24, w: 76, h: 6 },            // réseau souterrain, bien éclairé
+    { x: 100, y: 25, w: 120, h: 5 },          // Quartier des Esclaves : tunnel principal, bien éclairé
+    { x: 158, y: 18, w: 6, h: 6, tint: 0.8 }, // SEC_ANTIQUITY_02 : cache plus opaque
   ],
 
   // ---- décor ----
   props: [
     { type: 'column', tx: 8, ty: 22 },
-    { type: 'amphora', tx: 30, ty: 20 },
-    { type: 'banner', tx: 65, ty: 20 },
-    { type: 'column', tx: 104, ty: 20 },
-    { type: 'banner', tx: 118, ty: 20 },
-    { type: 'laurel', tx: 122, ty: 20 },
-    { type: 'column', tx: 155, ty: 20 },
-    { type: 'column', tx: 185, ty: 20 },
-    { type: 'fire', tx: 214, ty: 23, s: 1.2 },
-    { type: 'fire', tx: 240, ty: 23, s: 1.2 },
-    // torches de la crypte
-    { type: 'fire', tx: 47, ty: 29, s: 0.75 },
-    { type: 'fire', tx: 60, ty: 29, s: 0.85 },
-    { type: 'fire', tx: 70, ty: 29, s: 0.85 },
-    { type: 'fire', tx: 80, ty: 29, s: 0.85 },
-    { type: 'fire', tx: 90, ty: 29, s: 0.9 },     // met en valeur le coffre du trésor
+    { type: 'amphora', tx: 16, ty: 22 },
+    { type: 'banner', tx: 26, ty: 20 },
+    { type: 'column', tx: 40, ty: 20 },
+    { type: 'amphora', tx: 60, ty: 20 },
+    // Quartier des Esclaves : torches rares (ambiance dure, moins chaleureuse que la crypte de l'ère 1)
+    { type: 'fire', tx: 104, ty: 29, s: 0.8 },
+    { type: 'bones', tx: 115, ty: 29 },
+    { type: 'fire', tx: 135, ty: 29, s: 0.8 },
+    { type: 'rock', tx: 150, ty: 29 },
+    { type: 'fire', tx: 165, ty: 29, s: 0.7 },
+    { type: 'bones', tx: 190, ty: 29 },
+    { type: 'fire', tx: 205, ty: 29, s: 0.8 },
+    { type: 'fire', tx: 215, ty: 29, s: 0.85 },
+    { type: 'stall', tx: 265, ty: 20 },
+    { type: 'fire', tx: 263, ty: 20, s: 1.1 },
+    // Forum : grandeur civique
+    { type: 'column', tx: 315, ty: 10 },
+    { type: 'banner', tx: 325, ty: 10 },
+    { type: 'laurel', tx: 340, ty: 10 },
+    { type: 'column', tx: 360, ty: 10 },
+    { type: 'banner', tx: 375, ty: 10 },
+    { type: 'column', tx: 392, ty: 10 },
+    // Arène des Gladiateurs : braseros
+    { type: 'fire', tx: 414, ty: 14, s: 1.2 },
+    { type: 'fire', tx: 449, ty: 14, s: 1.2 },
+    // passe élite + arène du boss
+    { type: 'column', tx: 482, ty: 22 },
+    { type: 'column', tx: 520, ty: 22 },
+    { type: 'fire', tx: 532, ty: 22, s: 1.2 },
+    { type: 'fire', tx: 560, ty: 22, s: 1.2 },
   ],
 };
 
