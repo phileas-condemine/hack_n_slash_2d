@@ -68,17 +68,36 @@ AR.Enemy = class {
   // apparaissaient ou s'activaient instantanément sans aucun signal.
   armEmergence(duration) {
     this.emergeT = duration || 1.7;
+    this._emergeTotal = this.emergeT;
     this.state = 'idle';
+    this._nextDirtPuff = 0;
   }
 
   update(dt, game) {
     if (this.dead) { this.deadT += dt; return; }
     if (this.emergeT > 0) {
       this.emergeT -= dt;
+      const grounded = !(this.def.behavior === 'flyer' || this.def.float);
+      if (grounded) {
+        // jets de terre continus pendant le creusement, de plus en plus fréquents/violents
+        // à mesure que la sortie approche, pour bien lire "il creuse" avant "il apparaît".
+        const total = this._emergeTotal || 1.7;
+        const prog = 1 - AR.U.clamp(this.emergeT / total, 0, 1);
+        this._nextDirtPuff -= dt;
+        if (this._nextDirtPuff <= 0) {
+          this._nextDirtPuff = 0.16 - prog * 0.08 + Math.random() * 0.05;
+          AR.Particles.burst(this.centerX() + (Math.random() - 0.5) * this.w * 0.4, this.y + this.h - 2,
+            1 + Math.round(prog * 2),
+            { color: ['#7a6a52', '#a89a80', '#57503a'], speed: 90 + prog * 140, size: 3 + prog * 1.5,
+              life: 0.45, up: 60 + prog * 100, spread: 1.6, g: 380 });
+        }
+      }
       if (this.emergeT <= 0) {
         this.emergeT = 0;
-        AR.Particles.burst(this.centerX(), this.y + this.h, 16,
-          { color: ['#7a6a52', '#a89a80', '#57503a'], speed: 220, size: 4, life: 0.6, up: 120 });
+        AR.Particles.burst(this.centerX(), this.y + this.h, grounded ? 24 : 16,
+          { color: ['#7a6a52', '#a89a80', '#57503a'], speed: 260, size: 5, life: 0.7, up: 150 });
+        if (grounded) AR.Particles.burst(this.centerX(), this.y + this.h, 6,
+          { color: 'rgba(90,75,55,0.6)', speed: 60, size: 16, life: 0.55, up: 40, type: 'smoke', g: 0 });
         AR.Audio.sfx('boom');
       }
       return; // invisible au combat et immobile tant que la sortie de terre n'est pas finie
@@ -654,7 +673,7 @@ AR.Enemy = class {
   // Les ennemis volants/flottants (suspendus dans les airs) n'ont pas de sol
   // sous eux : un frémissement lumineux remplace la craquelure au sol.
   _drawEmergence(ctx, fx, fy, time) {
-    const total = 1.7, prog = 1 - AR.U.clamp(this.emergeT / total, 0, 1);
+    const total = this._emergeTotal || 1.7, prog = 1 - AR.U.clamp(this.emergeT / total, 0, 1);
     if (this.def.behavior === 'flyer' || this.def.float) {
       const scy = fy - this.h / 2;
       ctx.save();
@@ -664,21 +683,28 @@ AR.Enemy = class {
       ctx.restore();
       return;
     }
-    const shake = (Math.random() - 0.5) * 3 * prog;
+    // taupinière : un monticule de terre remuée grossit progressivement autour
+    // d'un trou sombre, avec des fissures et des jets de terre (cf. update()) qui
+    // suggèrent qu'un monstre creuse activement pour sortir — pas juste une ombre.
+    const shake = (Math.random() - 0.5) * 4 * prog;
+    const mw = this.w * (0.58 + prog * 0.32);
+    const mh = 5 + prog * 12;
     ctx.save();
-    ctx.globalAlpha = 0.55 + prog * 0.35;
-    ctx.fillStyle = 'rgba(40,28,16,0.5)';
-    ctx.beginPath(); ctx.ellipse(fx + shake, fy - 2, this.w * 0.5, 6, 0, 0, Math.PI * 2); ctx.fill();
-    ctx.strokeStyle = 'rgba(90,70,45,0.8)'; ctx.lineWidth = 2;
+    ctx.globalAlpha = 0.85;
+    ctx.fillStyle = '#4a3a24';
+    ctx.beginPath(); ctx.ellipse(fx + shake, fy - mh * 0.28, mw, mh, 0, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = '#6b5433';
+    ctx.beginPath(); ctx.ellipse(fx + shake, fy - mh * 0.55, mw * 0.72, mh * 0.65, 0, 0, Math.PI * 2); ctx.fill();
+    ctx.globalAlpha = 0.9;
+    ctx.fillStyle = 'rgba(15,10,5,0.85)';
+    ctx.beginPath(); ctx.ellipse(fx + shake, fy - mh * 0.6, mw * 0.32, mh * 0.4, 0, 0, Math.PI * 2); ctx.fill();
+    ctx.globalAlpha = 0.5 + prog * 0.35;
+    ctx.strokeStyle = 'rgba(90,70,45,0.85)'; ctx.lineWidth = 2;
     ctx.beginPath();
-    ctx.moveTo(fx - this.w * 0.4, fy); ctx.lineTo(fx - this.w * 0.1, fy - 6);
-    ctx.moveTo(fx + this.w * 0.4, fy); ctx.lineTo(fx + this.w * 0.15, fy - 5);
+    ctx.moveTo(fx - mw * 0.95, fy); ctx.lineTo(fx - mw * 0.32, fy - mh * 0.4);
+    ctx.moveTo(fx + mw * 0.95, fy); ctx.lineTo(fx + mw * 0.38, fy - mh * 0.3);
+    ctx.moveTo(fx - mw * 0.5, fy + 2); ctx.lineTo(fx - mw * 0.15, fy - mh * 0.2);
     ctx.stroke();
-    if (Math.random() < 0.35 + prog * 0.4) {
-      ctx.globalAlpha = 0.4 * prog;
-      ctx.fillStyle = '#8a7a5c';
-      ctx.beginPath(); ctx.arc(fx + (Math.random() - 0.5) * this.w, fy - Math.random() * 14, 3 + Math.random() * 3, 0, Math.PI * 2); ctx.fill();
-    }
     ctx.restore();
   }
 

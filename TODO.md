@@ -81,7 +81,19 @@ pour enrichir l'expérience de jeu, sur le modèle de ce qui marche déjà bien.
   - [ ] Ninja : téléportation sur/derrière le joueur
   - [ ] (compléter au fur et à mesure des idées)
 - [ ] Faire une passe générale : lister tous les types d'ennemis actuels et vérifier lesquels n'ont encore aucune attaque/mécanique distinctive
-- [ ] Améliorer l'animation de "sortie de terre" pour les monstres qui apparaissent par surprise, on voit juste une ombre (ellipse grise transparente) puis ils apparaissent, je préférerait voir aussi comme un trou de taupe avec de la terre qui vole au tour et suggère qu'ils creusent pour sortir de terre.
+- [x] Améliorer l'animation de "sortie de terre" pour les monstres qui apparaissent par surprise, on voit juste une ombre (ellipse grise transparente) puis ils apparaissent, je préférerait voir aussi comme un trou de taupe avec de la terre qui vole au tour et suggère qu'ils creusent pour sortir de terre.
+  - **Fait le 2026-07-27** : `AR.Enemy#_drawEmergence` (`src/enemy.js`) dessine désormais une vraie
+    taupinière au sol (monticule de terre à deux tons + trou sombre au centre + fissures qui
+    rayonnent, tout grossit progressivement avec `prog`) au lieu d'une simple ellipse grise plate.
+    En complément, `update()` émet en continu de petits jets de terre (`AR.Particles.burst`) pendant
+    tout le creusement — de plus en plus fréquents/violents à l'approche de la sortie — puis une
+    explosion de poussière + un nuage de fumée plus marqué au moment où le monstre apparaît. La
+    version "flotteur/volant" (simple lueur tremblante, pas de sol sous les pieds) est inchangée,
+    elle n'a pas de sens à transformer en taupinière. Durée totale pilotée par `_emergeTotal`
+    (stocké dans `armEmergence(duration)`, remplace l'ancienne constante 1.7 codée en dur pour rester
+    cohérent avec les appels à durée custom dans `game.js`). Vérifié visuellement via Playwright
+    (mound visible dès ~15% de progression, jets de terre confirmés par instrumentation, explosion
+    finale + apparition normale de l'ennemi sans erreur console).
 
 ## 🗺️ Minimap / brouillard de guerre
 
