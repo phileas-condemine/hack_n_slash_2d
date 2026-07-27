@@ -73,6 +73,8 @@ AR.ENEMIES = {
   // Nouveaux monstres de l'extension (âge de pierre) — cf. 01_niveau_age_de_pierre.md §6
   stone_cave_stalker: { name: 'Traqueur des cavernes', hp: 40, dmg: 12, speed: 72, xp: 34, coins: 14, h: 96, behavior: 'assassin', range: 66, aggro: 500, atkCd: 1.9, tele: 0.45, blinkCd: 2.8, facing: 'l', parry: true },
   stone_cave_bats:    { name: 'Nuée de chauves-souris', hp: 22, dmg: 8, speed: 150, xp: 16, coins: 6, h: 72, behavior: 'flyer', range: 60, aggro: 520, atkCd: 1.6, tele: 0.35, dive: true, flyH: 150 },
+  // Sbire dédié du Chef Mammouth (summon uniquement, cf. _specs/07_boss_minions_art_brief.md)
+  totem_bearer:   { name: 'Porteur de totem', hp: 38, dmg: 13, speed: 85, xp: 18, coins: 7, h: 88, behavior: 'melee', range: 80, aggro: 450, atkCd: 1.6, tele: 0.5 },
 
   // --- Antiquité
   hoplite:        { name: 'Hoplite', hp: 40, dmg: 12, speed: 90, xp: 16, coins: 6, h: 82, behavior: 'shield', range: 64, aggro: 430, atkCd: 1.4, tele: 0.45, block: 0.6 },
@@ -80,6 +82,8 @@ AR.ENEMIES = {
   desert_raider:  { name: 'Pillard du désert', hp: 34, dmg: 13, speed: 160, xp: 18, coins: 8, h: 84, behavior: 'melee', range: 60, aggro: 500, atkCd: 0.9, tele: 0.28, facing: 'l', parry: true },
   elephant_guard: { name: 'Garde à éléphant', hp: 170, dmg: 24, speed: 60, xp: 55, coins: 20, h: 132, behavior: 'charger', range: 460, aggro: 540, atkCd: 2.8, tele: 0.8, chargeSpeed: 380, knock: 400 },
   temple_guardian:{ name: 'Gardien du temple', hp: 130, dmg: 20, speed: 45, xp: 50, coins: 22, h: 118, behavior: 'shield', range: 88, aggro: 380, atkCd: 2.1, tele: 0.65, block: 0.85, knock: 340, elite: true },
+  // Sbire dédié du Commandant de Char (summon uniquement)
+  standard_bearer:{ name: 'Porte-étendard', hp: 36, dmg: 13, speed: 95, xp: 18, coins: 7, h: 84, behavior: 'melee', range: 85, aggro: 460, atkCd: 1.5, tele: 0.45 },
 
   // --- Japon médiéval
   ronin:          { name: 'Rônin', hp: 44, dmg: 15, speed: 130, xp: 22, coins: 9, h: 80, behavior: 'melee', range: 78, aggro: 480, atkCd: 1.0, tele: 0.32, combo2: true, parry: true },
@@ -87,6 +91,8 @@ AR.ENEMIES = {
   tengu_archer:   { name: 'Archer tengu', hp: 34, dmg: 12, speed: 100, xp: 24, coins: 10, h: 92, behavior: 'ranged', range: 600, keep: 380, aggro: 660, atkCd: 1.5, tele: 0.45, proj: 'arrow', hop: true },
   spirit_caster:  { name: 'Invocateur d\'esprits', hp: 40, dmg: 11, speed: 60, xp: 30, coins: 13, h: 100, behavior: 'caster', range: 620, keep: 380, aggro: 680, atkCd: 2.4, tele: 0.65, proj: 'wisp', float: true },
   oni_brute:      { name: 'Brute oni', hp: 130, dmg: 24, speed: 75, xp: 55, coins: 22, h: 108, behavior: 'brute', range: 100, aggro: 420, atkCd: 1.7, tele: 0.55, knock: 380, elite: true, facing: 'l' },
+  // Sbire dédié du Seigneur Yōkai (summon uniquement)
+  lantern_wisp:   { name: 'Feu-follet', hp: 28, dmg: 10, speed: 55, xp: 22, coins: 9, h: 70, behavior: 'caster', range: 520, keep: 340, aggro: 600, atkCd: 2.1, tele: 0.55, proj: 'wisp', float: true },
 
   // --- Renaissance
   pikeman:        { name: 'Piquier', hp: 48, dmg: 14, speed: 85, xp: 24, coins: 10, h: 84, behavior: 'melee', range: 105, aggro: 440, atkCd: 1.5, tele: 0.5 },
@@ -94,12 +100,16 @@ AR.ENEMIES = {
   bombardier:     { name: 'Bombardier', hp: 36, dmg: 18, speed: 75, xp: 28, coins: 12, h: 84, behavior: 'artillery', range: 520, keep: 320, aggro: 600, atkCd: 2.6, tele: 0.6, proj: 'bomb' },
   mortar_crew:    { name: 'Servants de mortier', hp: 60, dmg: 20, speed: 40, xp: 34, coins: 14, h: 92, behavior: 'artillery', range: 720, keep: 420, aggro: 780, atkCd: 3.2, tele: 0.8, proj: 'mortar' },
   armored_captain:{ name: 'Capitaine cuirassé', hp: 160, dmg: 22, speed: 70, xp: 60, coins: 26, h: 106, behavior: 'shield', range: 84, aggro: 420, atkCd: 1.8, tele: 0.55, block: 0.8, knock: 360, elite: true },
+  // Sbire dédié de l'Ingénieur de Guerre (summon uniquement)
+  gear_servitor:  { name: 'Serviteur à engrenages', hp: 50, dmg: 15, speed: 65, xp: 24, coins: 10, h: 78, behavior: 'brute', range: 80, aggro: 420, atkCd: 1.7, tele: 0.55, knock: 280 },
 
   // --- Guerre diesel
   trench_soldier: { name: 'Soldat des tranchées', hp: 46, dmg: 14, speed: 95, xp: 28, coins: 11, h: 82, behavior: 'ranged', range: 520, keep: 300, aggro: 620, atkCd: 1.8, tele: 0.5, proj: 'bullet', bayonet: true },
   flamethrower:   { name: 'Lance-flammes', hp: 70, dmg: 6, speed: 70, xp: 34, coins: 14, h: 88, behavior: 'ranged', range: 240, keep: 170, aggro: 460, atkCd: 2.4, tele: 0.55, proj: 'flame' },
   armored_trooper:{ name: 'Trooper blindé', hp: 110, dmg: 18, speed: 60, xp: 40, coins: 16, h: 92, behavior: 'shield', range: 76, aggro: 400, atkCd: 1.7, tele: 0.5, block: 0.85, knock: 320 },
   roller_scout:   { name: 'Éclaireur à rouleau', hp: 120, dmg: 20, speed: 80, xp: 48, coins: 20, h: 96, behavior: 'charger', range: 520, aggro: 600, atkCd: 2.2, tele: 0.6, chargeSpeed: 500, knock: 360, elite: true },
+  // Sbire dédié du Béhémoth Diesel (summon uniquement) — seul boss sans summon jusqu'ici
+  armored_hound:  { name: 'Chien de guerre blindé', hp: 34, dmg: 14, speed: 150, xp: 22, coins: 9, h: 60, behavior: 'melee', range: 65, aggro: 520, atkCd: 1.3, tele: 0.35, facing: 'l' },
 
   // --- Ère cyber
   corp_trooper:   { name: 'Trooper corporate', hp: 55, dmg: 16, speed: 110, xp: 32, coins: 13, h: 78, behavior: 'ranged', range: 560, keep: 340, aggro: 660, atkCd: 1.4, tele: 0.4, proj: 'plasma', burst: 3 },
@@ -108,6 +118,8 @@ AR.ENEMIES = {
   drone_swarm:    { name: 'Nuée de drones', hp: 45, dmg: 12, speed: 170, xp: 30, coins: 12, h: 84, behavior: 'flyer', range: 60, aggro: 640, atkCd: 1.9, tele: 0.4, dive: true, flyH: 150 },
   shield_drone:   { name: 'Drone bouclier', hp: 90, dmg: 10, speed: 100, xp: 42, coins: 18, h: 86, behavior: 'flyer', range: 420, keep: 260, aggro: 600, atkCd: 2.2, tele: 0.5, proj: 'plasma', flyH: 110, shielded: 40 },
   mech_assassin:  { name: 'Assassin mécanisé', hp: 120, dmg: 22, speed: 220, xp: 65, coins: 28, h: 94, behavior: 'assassin', range: 70, aggro: 700, atkCd: 1.3, tele: 0.26, blinkCd: 2.4, elite: true, parry: true },
+  // Sbire dédié de l'IA Suprême (summon uniquement)
+  core_shard:     { name: 'Éclat du noyau', hp: 26, dmg: 11, speed: 110, xp: 26, coins: 11, h: 56, behavior: 'ranged', range: 480, keep: 300, aggro: 640, atkCd: 1.8, tele: 0.45, proj: 'plasma', float: true },
 };
 
 // Sprite de repli si l'image d'un ennemi est absente (le comportement/les stats
@@ -121,8 +133,9 @@ AR.ENEMY_FALLBACK = {
 AR.BOSSES = {
   mammoth_chief: {
     name: 'CHEF MAMMOUTH', hp: 5500, dmg: 24, h: 210, speed: 90, xp: 220, coins: 120,
-    patterns: ['charge', 'stomp', 'arrowRing'],
-    phase2: 0.5, p2patterns: ['arrowRing', 'stomp', 'charge', 'arrowRing'],
+    // `summon:totem_bearer` ajouté (seul boss avec R5 sans aucun sbire jusqu'ici, cf. TODO.md).
+    patterns: ['charge', 'stomp', 'arrowRing', 'summon:totem_bearer'],
+    phase2: 0.5, p2patterns: ['arrowRing', 'stomp', 'charge', 'summon:totem_bearer', 'arrowRing'],
     // Les deux promontoires de l'arène (cf. arenas.js) doivent rester une échappatoire
     // réelle pendant une charge au sol (§8/§13 du spec niveau 1) : platformChase ferait
     // sauter le boss sur la même plateforme et neutraliserait tout refuge.
@@ -134,8 +147,10 @@ AR.BOSSES = {
     // faisait quand même toucher). À 150, hitbox = 120px < 130px : le centre
     // est désormais réellement hors d'atteinte, avec 10px de marge.
     name: 'COMMANDANT DE CHAR', hp: 7000, dmg: 26, h: 150, speed: 130, xp: 280, coins: 150,
-    patterns: ['sweep', 'javelins', 'sweep', 'summon:hoplite'],
-    phase2: 0.5, p2patterns: ['sweep', 'javelins', 'javelins', 'sweep', 'summon:archer_auxilia'],
+    // summon passé de `hoplite`/`archer_auxilia` (ennemis de terrain génériques) au sbire
+    // dédié `standard_bearer` (porte-étendard visuellement rattaché au char, cf. brief art).
+    patterns: ['sweep', 'javelins', 'sweep', 'summon:standard_bearer'],
+    phase2: 0.5, p2patterns: ['sweep', 'javelins', 'javelins', 'sweep', 'summon:standard_bearer'],
   },
   yokai_lord: {
     // PV relevés (8500->13000) et deux ajouts d'identité (retour joueur : l'IA
@@ -144,8 +159,10 @@ AR.BOSSES = {
     // `summon:spirit_caster` (vrais adversaires) ; `shadowStrike` donne au
     // téléport un vrai coup de sanction au lieu d'un simple repositionnement.
     name: 'SEIGNEUR YŌKAI', hp: 13000, dmg: 24, h: 200, speed: 80, xp: 340, coins: 180, floats: true,
-    patterns: ['blink', 'fireballs', 'summon:spirit_caster', 'shadowStrike'],
-    phase2: 0.5, p2patterns: ['shadowStrike', 'ring', 'fireballs', 'blink', 'summon:spirit_caster', 'shadowStrike'],
+    // summon passé de `spirit_caster` (ennemi de terrain générique) au sbire dédié
+    // `lantern_wisp`, qui reprend l'idée d'origine du spec ("wisps") jamais construite en art.
+    patterns: ['blink', 'fireballs', 'summon:lantern_wisp', 'shadowStrike'],
+    phase2: 0.5, p2patterns: ['shadowStrike', 'ring', 'fireballs', 'blink', 'summon:lantern_wisp', 'shadowStrike'],
   },
   war_engineer: {
     // PV relevés (10000->14000) : la phase 2 n'invoquait plus aucun sbire
@@ -154,18 +171,23 @@ AR.BOSSES = {
     // boss une attaque distinctive qui récompense l'usage des plateformes
     // (cf. `left_lower`/`right_lower` ajoutées à cette arène).
     name: 'INGÉNIEUR DE GUERRE', hp: 14000, dmg: 26, h: 205, speed: 60, xp: 400, coins: 220,
-    patterns: ['volley', 'mortars', 'turretSweep', 'summon:musketeer'],
-    phase2: 0.5, p2patterns: ['turretSweep', 'mortars', 'volley', 'summon:pikeman', 'turretSweep'],
+    // summon passé de `musketeer`/`pikeman` (ennemis de terrain génériques) au sbire dédié
+    // `gear_servitor`, qui reprend `renaissance_gear_servitor` (nommé dans le spec, jamais dessiné).
+    patterns: ['volley', 'mortars', 'turretSweep', 'summon:gear_servitor'],
+    phase2: 0.5, p2patterns: ['turretSweep', 'mortars', 'volley', 'summon:gear_servitor', 'turretSweep'],
   },
   diesel_behemoth: {
     name: 'BÉHÉMOTH DIESEL', hp: 12000, dmg: 30, h: 195, speed: 70, xp: 480, coins: 260, armored: true,
-    patterns: ['charge', 'flames', 'mortars', 'stomp'],
-    phase2: 0.45, p2patterns: ['charge', 'flames', 'charge', 'mortars', 'stomp'],
+    // `summon:armored_hound` ajouté (seul boss avec R1 sans aucun sbire jusqu'ici, cf. TODO.md).
+    patterns: ['charge', 'flames', 'mortars', 'stomp', 'summon:armored_hound'],
+    phase2: 0.45, p2patterns: ['charge', 'flames', 'charge', 'summon:armored_hound', 'mortars', 'stomp'],
   },
   ai_overlord: {
     name: 'IA SUPRÊME', hp: 15000, dmg: 28, h: 230, speed: 110, xp: 600, coins: 400, floats: true, flyH: 150,
-    patterns: ['beam', 'ring', 'summon:drone_swarm', 'beam'],
-    phase2: 0.5, p2patterns: ['beam', 'ring', 'ring', 'blink', 'beam', 'summon:shield_drone'],
+    // summon passé de `drone_swarm`/`shield_drone` (ennemis de terrain génériques) au sbire
+    // dédié `core_shard`, un fragment du noyau/bouclier hexagonal du boss lui-même.
+    patterns: ['beam', 'ring', 'summon:core_shard', 'beam'],
+    phase2: 0.5, p2patterns: ['beam', 'ring', 'ring', 'blink', 'beam', 'summon:core_shard'],
   },
 };
 
