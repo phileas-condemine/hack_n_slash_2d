@@ -191,10 +191,14 @@ const STONE = {
     { tx: 237, ty: 30, id: 'stone_brute', elite: true },
     // SEC_STONE_04 — zone 3 : traqueurs suspendus au plafond, tombent au réveil du trigger
     // SEC04_STALKERS_WAKE une fois le joueur au centre de la salle (encerclement).
-    { tx: 266, ty: 25, id: 'stone_cave_stalker', dormant: true, activate: 'sec04_stalkers' },
-    { tx: 271, ty: 25, id: 'stone_cave_stalker', dormant: true, activate: 'sec04_stalkers' },
-    { tx: 277, ty: 25, id: 'stone_cave_stalker', dormant: true, activate: 'sec04_stalkers' },
-    { tx: 282, ty: 25, id: 'stone_cave_stalker', dormant: true, activate: 'sec04_stalkers' },
+    // ty:27 (pas 25, le niveau même du plafond) : `footY` place le sprite VERS LE HAUT à
+    // partir de ce point — à ty:25 il débordait dans la roche solide du plafond (visible
+    // "dans les murs" depuis que la grotte est bien éclairée). ty:27 le garde entièrement
+    // dans le vide du tunnel, juste sous le plafond.
+    { tx: 266, ty: 27, id: 'stone_cave_stalker', dormant: true, activate: 'sec04_stalkers' },
+    { tx: 271, ty: 27, id: 'stone_cave_stalker', dormant: true, activate: 'sec04_stalkers' },
+    { tx: 277, ty: 27, id: 'stone_cave_stalker', dormant: true, activate: 'sec04_stalkers' },
+    { tx: 282, ty: 27, id: 'stone_cave_stalker', dormant: true, activate: 'sec04_stalkers' },
   ],
 
   // ---- coffres ----
@@ -216,10 +220,13 @@ const STONE = {
     { x: 312, y: 30, returnTo: { x: 236, y: 22 } }, // SEC_STONE_04 : sortie finale, après le mini-boss
   ],
 
-  // ---- poches sombres : voile + trouées de lumière aux torches ('fire' props alentour) ----
+  // ---- poches sombres : ambiance de caverne (cf. drawDarkZones) ----
   darkZones: [
-    { x: 227, y: 20, w: 6, h: 4 },    // capuchon du puits SEC_STONE_04 : on ne voit pas le fond depuis le haut
-    { x: 225, y: 24, w: 93, h: 8 },   // réseau souterrain (zones 1-4), sous le puits
+    // capuchon du puits : reste volontairement plus opaque que le tunnel lui-même — la
+    // profondeur du puits doit rester un mystère vu depuis la surface, même si une fois
+    // dans le réseau souterrain (zone du dessous) la visibilité est maintenant bonne.
+    { x: 227, y: 20, w: 6, h: 4, tint: 0.8 },
+    { x: 225, y: 24, w: 93, h: 8 },   // réseau souterrain (zones 1-4), sous le puits — bien éclairé
   ],
 
   // ---- décor ----

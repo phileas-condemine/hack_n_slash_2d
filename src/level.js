@@ -1059,7 +1059,9 @@ AR.Level = class {
   // n'est pas un filtre qui cache la scène) + halos chauds additifs autour des torches, qui
   // agissent comme de vraies sources de lumière plutôt que des trous découpés dans un voile
   // opaque. La roche/les stalactites (cf. _drawTerrainGrid/_drawStalactite) portent l'essentiel
-  // de l'identité "grotte" ; cette passe ne fait plus que l'éclairage.
+  // de l'identité "grotte" ; cette passe ne fait plus que l'éclairage. `z.tint` permet à une
+  // zone donnée (ex. le capuchon d'un puits, qui doit rester un mystère vu d'en haut) de
+  // s'écarter de la teinte par défaut, plus claire, du reste du réseau souterrain.
   drawDarkZones(ctx, cam) {
     if (!this.darkZones.length) return;
     const cx = cam.cx(), cy = cam.cy(), W = AR.C.VIEW_W, H = AR.C.VIEW_H;
@@ -1071,7 +1073,7 @@ AR.Level = class {
       if (rw <= 0 || rh <= 0) continue;
       ctx.save();
       ctx.beginPath(); ctx.rect(rx, ry, rw, rh); ctx.clip();
-      ctx.fillStyle = 'rgba(10,8,22,0.4)';
+      ctx.fillStyle = 'rgba(10,8,22,' + (z.tint != null ? z.tint : 0.4) + ')';
       ctx.fillRect(rx, ry, rw, rh);
       ctx.globalCompositeOperation = 'lighter';
       for (const p of this.props) {

@@ -145,6 +145,35 @@ pour enrichir l'expérience de jeu, sur le modèle de ce qui marche déjà bien.
   (120s simulées, IA lâchée juste à côté du portail local) : 2 usages du portail (comportement normal
   d'aller-retour pour le butin), progression réelle sur 140+ tuiles ensuite, contre une boucle
   infinie avant le fix.
+- [x] **Suite du point ci-dessus, retour joueur 2026-07-27** : "il y a encore un bug avec la grotte,
+  l'IA a sauté puis est remontée et elle suit par au-dessus le monstre de l'entrée, finalement elle
+  est tombée sur d'autres monstres à la surface mais on voit encore les monstres en dessous, dont
+  certains qui ont l'air d'être dans les murs". Trois bugs distincts, tous préexistants mais
+  invisibles jusqu'ici — masqués par l'ancien voile quasi-opaque (cf. point ci-dessus), donc exposés
+  seulement maintenant que la grotte est bien éclairée :
+  - **Traqueurs suspendus visuellement "dans les murs"** : leur spawn (`src/level_specs.js`, `ty:25`)
+    plaçait `footY` exactement à la ligne du plafond du tunnel ; comme le sprite se dessine vers le
+    HAUT depuis `footY`, il débordait dans la roche solide au-dessus (~30px). Repositionné à `ty:27`
+    (calcul : hauteur du sprite ≈1.64 tuile, il faut `footY ≥ plafond + hauteur` pour rester dans le
+    vide du tunnel) — reste "suspendu près du plafond" sans être embarqué dans la roche.
+  - **Le capuchon du puits laissait voir le fond depuis la surface** : en généralisant l'éclairage de
+    `drawDarkZones` à toutes les poches sombres, le capuchon du puits (dont le rôle est justement de
+    cacher la profondeur vue d'en haut) avait perdu son opacité propre. Ajout d'un champ `tint` par
+    zone (`src/level_specs.js`/`src/level.js`) : le capuchon reste à 0.8 (sombre, mystère préservé),
+    le réseau souterrain lui-même reste à 0.4 (bien éclairé une fois qu'on y est).
+  - **L'IA restait fixée sur un ennemi inatteignable à travers le sol** (`src/demoai.js`) : la
+    sélection de cible ne regardait que la distance à vol d'oiseau, sans tenir compte d'un
+    sol/plafond solide entre les deux. Un ennemi vu depuis la surface mais séparé par de la roche
+    (typiquement : le garde du puits, visible dans le tunnel en contrebas) devenait donc une cible de
+    combat valide ; `blockedShot` la faisait ensuite juste faire les cent pas au-dessus de lui sans
+    jamais pouvoir l'atteindre — lu par le joueur comme "elle suit par au-dessus" le monstre. Fix :
+    un ennemi à plus de 3 tuiles verticalement ET sans ligne de tir dégagée (réutilise
+    `_hasClearShot`) est désormais ignoré comme objectif de combat.
+  Vérifié via Playwright : sprites des traqueurs entièrement hors de la roche (bas du sprite à
+  `ty27.00`, haut à `ty25.36`, plafond du tunnel à `ty25`), capuchon du puits visuellement plus sombre
+  que le tunnel en contrebas, filtre de ciblage confirmé sur le scénario exact du rapport (garde du
+  puits à 7.7 tuiles de distance verticale, aucune ligne de tir dégagée → `wouldBeFiltered: true`),
+  aucune erreur console.
 
 ## 🗺️ Minimap / brouillard de guerre
 

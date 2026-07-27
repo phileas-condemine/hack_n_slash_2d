@@ -702,6 +702,14 @@ AR.DemoAI = {
         if (d < avoidedTd) { avoidedTd = d; avoidedThreat = e; }
         continue;
       }
+      // Un adversaire loin verticalement (ex. une salle souterraine sous une allée de
+      // surface, désormais visible) et sans ligne de tir dégagée n'est séparable que par
+      // du sol/plafond solide — aucun déplacement horizontal ne peut le rapprocher. Sans ce
+      // filtre l'IA le gardait comme cible : `blockedShot` la faisait alors juste faire les
+      // cent pas au-dessus de lui indéfiniment (retour joueur : "elle suit par au-dessus un
+      // monstre inatteignable"). On l'ignore purement et simplement comme objectif de combat.
+      if (Math.abs(e.centerY() - pcy) > AR.C.TILE * 3 &&
+        !this._hasClearShot(game.level, pcx, pcy, e.centerX(), e.centerY())) continue;
       // Si plusieurs adversaires sont disponibles, éliminer d'abord ceux qui
       // ne neutralisent pas l'arme à distance.
       const blockerPenalty = this._isProjectileBlocker(e) ? 130 : 0;
