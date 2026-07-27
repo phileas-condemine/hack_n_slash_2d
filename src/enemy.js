@@ -78,6 +78,10 @@ AR.Enemy = class {
     if (this.emergeT > 0) {
       this.emergeT -= dt;
       const grounded = !(this.def.behavior === 'flyer' || this.def.float);
+      // ennemis "suspendus" (ex. traqueurs accrochés au plafond d'une grotte) : ils ne
+      // sortent pas du sol mais se détachent de la roche AU-DESSUS et tombent — la
+      // gravats doit donc tomber tout droit depuis le plafond, pas jaillir du sol.
+      const ceiling = grounded && this.suspended;
       if (grounded) {
         // jets de terre continus pendant le creusement, de plus en plus fréquents/violents
         // à mesure que la sortie approche, pour bien lire "il creuse" avant "il apparaît".
@@ -86,18 +90,32 @@ AR.Enemy = class {
         this._nextDirtPuff -= dt;
         if (this._nextDirtPuff <= 0) {
           this._nextDirtPuff = 0.16 - prog * 0.08 + Math.random() * 0.05;
-          AR.Particles.burst(this.centerX() + (Math.random() - 0.5) * this.w * 0.4, this.y + this.h - 2,
-            1 + Math.round(prog * 2),
-            { color: ['#7a6a52', '#a89a80', '#57503a'], speed: 90 + prog * 140, size: 3 + prog * 1.5,
-              life: 0.45, up: 60 + prog * 100, spread: 1.6, g: 380 });
+          if (ceiling) {
+            AR.Particles.burst(this.centerX() + (Math.random() - 0.5) * this.w * 0.4, this.y + 2,
+              1 + Math.round(prog * 2),
+              { color: ['#7a6a52', '#a89a80', '#57503a'], angle: Math.PI / 2, spread: 1.0,
+                speed: 70 + prog * 120, size: 3 + prog * 1.5, life: 0.45, up: 0, g: 480 + prog * 200 });
+          } else {
+            AR.Particles.burst(this.centerX() + (Math.random() - 0.5) * this.w * 0.4, this.y + this.h - 2,
+              1 + Math.round(prog * 2),
+              { color: ['#7a6a52', '#a89a80', '#57503a'], speed: 90 + prog * 140, size: 3 + prog * 1.5,
+                life: 0.45, up: 60 + prog * 100, spread: 1.6, g: 380 });
+          }
         }
       }
       if (this.emergeT <= 0) {
         this.emergeT = 0;
-        AR.Particles.burst(this.centerX(), this.y + this.h, grounded ? 24 : 16,
-          { color: ['#7a6a52', '#a89a80', '#57503a'], speed: 260, size: 5, life: 0.7, up: 150 });
-        if (grounded) AR.Particles.burst(this.centerX(), this.y + this.h, 6,
-          { color: 'rgba(90,75,55,0.6)', speed: 60, size: 16, life: 0.55, up: 40, type: 'smoke', g: 0 });
+        if (ceiling) {
+          AR.Particles.burst(this.centerX(), this.y, 24,
+            { color: ['#7a6a52', '#a89a80', '#57503a'], angle: Math.PI / 2, spread: 1.3, speed: 200, size: 5, life: 0.7, up: -30, g: 520 });
+          AR.Particles.burst(this.centerX(), this.y, 6,
+            { color: 'rgba(90,75,55,0.6)', speed: 50, size: 16, life: 0.55, up: 0, type: 'smoke', g: 60 });
+        } else {
+          AR.Particles.burst(this.centerX(), this.y + this.h, grounded ? 24 : 16,
+            { color: ['#7a6a52', '#a89a80', '#57503a'], speed: 260, size: 5, life: 0.7, up: 150 });
+          if (grounded) AR.Particles.burst(this.centerX(), this.y + this.h, 6,
+            { color: 'rgba(90,75,55,0.6)', speed: 60, size: 16, life: 0.55, up: 40, type: 'smoke', g: 0 });
+        }
         AR.Audio.sfx('boom');
       }
       return; // invisible au combat et immobile tant que la sortie de terre n'est pas finie
@@ -689,6 +707,30 @@ AR.Enemy = class {
     const shake = (Math.random() - 0.5) * 4 * prog;
     const mw = this.w * (0.58 + prog * 0.32);
     const mh = 5 + prog * 12;
+    if (this.suspended) {
+      // plafond : symétrique vertical de la taupinière, ancré en haut du sprite (le
+      // point d'accroche) — la roche se fissure et un amas de terre grossit VERS LE
+      // BAS, prêt à se détacher, au lieu de jaillir du sol.
+      const topY = fy - this.h;
+      ctx.save();
+      ctx.globalAlpha = 0.85;
+      ctx.fillStyle = '#4a3a24';
+      ctx.beginPath(); ctx.ellipse(fx + shake, topY - mh * 0.28, mw, mh, 0, 0, Math.PI * 2); ctx.fill();
+      ctx.fillStyle = '#6b5433';
+      ctx.beginPath(); ctx.ellipse(fx + shake, topY - mh * 0.55, mw * 0.72, mh * 0.65, 0, 0, Math.PI * 2); ctx.fill();
+      ctx.globalAlpha = 0.9;
+      ctx.fillStyle = 'rgba(15,10,5,0.85)';
+      ctx.beginPath(); ctx.ellipse(fx + shake, topY - mh * 0.6, mw * 0.32, mh * 0.4, 0, 0, Math.PI * 2); ctx.fill();
+      ctx.globalAlpha = 0.5 + prog * 0.35;
+      ctx.strokeStyle = 'rgba(90,70,45,0.85)'; ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.moveTo(fx - mw * 0.95, topY); ctx.lineTo(fx - mw * 0.32, topY - mh * 0.4);
+      ctx.moveTo(fx + mw * 0.95, topY); ctx.lineTo(fx + mw * 0.38, topY - mh * 0.3);
+      ctx.moveTo(fx - mw * 0.5, topY - 2); ctx.lineTo(fx - mw * 0.15, topY - mh * 0.2);
+      ctx.stroke();
+      ctx.restore();
+      return;
+    }
     ctx.save();
     ctx.globalAlpha = 0.85;
     ctx.fillStyle = '#4a3a24';
@@ -714,6 +756,9 @@ AR.Enemy = class {
   }
 
   draw(ctx, cam, time) {
+    // dormant (embuscade pas encore déclenchée) : encore terré/caché, rien à afficher
+    // tant que le trigger ne l'a pas réveillé et lancé dans son animation d'émergence.
+    if (this.dormant) return;
     const cx = cam.cx(), cy = cam.cy();
     const fx = this.centerX() - cx;
     const fy = this.y + this.h - cy;

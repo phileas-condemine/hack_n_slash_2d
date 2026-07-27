@@ -195,10 +195,10 @@ const STONE = {
     // partir de ce point — à ty:25 il débordait dans la roche solide du plafond (visible
     // "dans les murs" depuis que la grotte est bien éclairée). ty:27 le garde entièrement
     // dans le vide du tunnel, juste sous le plafond.
-    { tx: 266, ty: 27, id: 'stone_cave_stalker', dormant: true, activate: 'sec04_stalkers' },
-    { tx: 271, ty: 27, id: 'stone_cave_stalker', dormant: true, activate: 'sec04_stalkers' },
-    { tx: 277, ty: 27, id: 'stone_cave_stalker', dormant: true, activate: 'sec04_stalkers' },
-    { tx: 282, ty: 27, id: 'stone_cave_stalker', dormant: true, activate: 'sec04_stalkers' },
+    { tx: 266, ty: 27, id: 'stone_cave_stalker', suspended: true, activate: 'sec04_stalkers' },
+    { tx: 271, ty: 27, id: 'stone_cave_stalker', suspended: true, activate: 'sec04_stalkers' },
+    { tx: 277, ty: 27, id: 'stone_cave_stalker', suspended: true, activate: 'sec04_stalkers' },
+    { tx: 282, ty: 27, id: 'stone_cave_stalker', suspended: true, activate: 'sec04_stalkers' },
   ],
 
   // ---- coffres ----

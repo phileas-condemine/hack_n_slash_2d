@@ -147,8 +147,10 @@ AR.Game = class {
     for (const s of lvl.spawns) {
       const e = new AR.Enemy(s.id, s.x, s.y, s.elite, scale);
       e.onPlatform = !!s.onPlatform;
-      // ennemis dormants (chauves-souris suspendues) : réveillés par un trigger de scène
+      // ennemis dormants (chauves-souris/traqueurs suspendus) : réveillés par un trigger de scène
       e.dormant = !!s.dormant;
+      // accrochés au plafond : creusent/se détachent vers le BAS à l'émergence (cf. _drawEmergence)
+      e.suspended = !!s.suspended;
       e.activateGroup = s.activate || null;
       this.enemies.push(e);
     }

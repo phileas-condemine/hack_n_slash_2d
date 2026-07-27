@@ -197,6 +197,39 @@ pour enrichir l'expérience de jeu, sur le modèle de ce qui marche déjà bien.
   `ty30.00` (sol du tunnel juste sous ses pieds). Pièce à la surface depuis le tunnel :
   `surfaceCoinFilteredOut: true` ; pièce dans le même tunnel : `tunnelCoinFilteredOut: false`
   (toujours ramassable normalement). Aucune erreur console.
+- [x] **Suite (3/2 !), retour joueur 2026-07-27** : "c'est vraiment bizarre de voir les monstres
+  cachés dans la grotte, alors qu'en plus ils doivent me faire une embuscade en creusant. Je ne
+  devrais pas les voir à l'avance. Et s'ils veulent sortir du plafond il faut une autre animation
+  qui montre qu'ils creusent depuis le plafond (...) beaucoup de terre qui tombe tout droit, pas
+  comme quand ils creusent du sol." Deux bugs distincts, visibles sur les 4 `stone_cave_stalker`
+  de SEC_STONE_04 (suspendus au plafond, tombent au trigger `SEC04_STALKERS_WAKE`) :
+  - **Ennemis dormants dessinés avant leur réveil** (`src/enemy.js`, `Enemy#draw`) : la boucle de
+    rendu (`game.js` : `for (const e of this.enemies) e.draw(...)`) dessine tous les ennemis sans
+    condition — `update()` skippe bien les ennemis `!active` (donc les dormants ne bougent/
+    n'attaquent pas), mais rien n'empêchait leur sprite normal de s'afficher tel quel avant que le
+    trigger ne les arme (`armEmergence`). Résultat : les 4 traqueurs étaient visibles debout au sol
+    dès qu'on entrait dans le champ de la caméra, bien avant d'avoir atteint le déclencheur — cf.
+    capture d'écran jointe au message. Fix : `draw()` retourne immédiatement si `this.dormant`
+    (donc rien à l'écran tant qu'ils n'ont pas été réveillés/armés).
+  - **Pas de variante "creuse le plafond"** : `armEmergence`/`_drawEmergence` ne connaissaient que
+    la taupinière au sol (monticule + jets de terre qui giclent vers le haut), inadaptée à un
+    ennemi qui se détache du plafond. Ajout d'un champ `suspended` propagé de bout en bout
+    (`level_specs.js` spawn → `level.js` spawn data → `game.js` : `e.suspended = !!s.suspended`,
+    remplace le `dormant:true` des 4 traqueurs) : quand `suspended` est vrai (et l'ennemi non
+    volant), `_drawEmergence` dessine un monticule **symétrique vertical**, ancré en haut du sprite
+    (le point d'accroche au plafond) et grossissant vers le bas au lieu du sol, et `update()` fait
+    gicler les jets de terre (pendant le creusement) et l'éclat final (à la sortie) **vers le bas**
+    avec une gravité renforcée (angle de tir vers le bas, `up` nul/négatif, `g` ~480-620 au lieu de
+    380), au lieu du jet vers le haut utilisé pour une sortie de terre classique.
+  Vérifié via Playwright (simulation déterministe : `g.step` neutralisé temporairement pour geler
+  la physique entre deux appels sans perturber le rendu, plutôt que `g.paused` qui ouvre le menu
+  pause à l'écran) : (1) écran vide à l'emplacement des 4 traqueurs tant que `dormant:true`, malgré
+  leur présence confirmée dans `game.enemies` ; (2) après réveil forcé + `emergeT` à mi-parcours,
+  monticule de terre visible accroché au plafond au-dessus du héros (pas au sol) ; (3) particules de
+  jet de terre et de l'éclat final générées à `y≈1217-1219` (ligne du plafond) avec `vy` positif
+  (vers le bas, ~90-260) et `g` 480-620, confirmant la chute au lieu du jaillissement ; (4) une fois
+  `emergeT` à 0, les 4 traqueurs bien positionnés au sol du tunnel, sous le plafond (pas dans les
+  murs). Aucune erreur console.
 
 ## 🗺️ Minimap / brouillard de guerre
 
@@ -232,7 +265,7 @@ Constat : le système existe déjà partiellement (ex. `SEC_STONE_01` mur friabl
   - **Réseau souterrain** (tx225-318, plafond y25 pour rester sous le trigger/barrières de `E_STONE_ELITE` situé juste au-dessus sur le chemin de surface) creusé dans la même masse solide que S08, croûte de surface (y22-24) et plancher (y30-31) préservés :
     - Zone 1 — garde d'entrée : `stone_brute` **élite** au pied du puits (spawn statique).
     - Zone 2 — `E_SEC04_GAUNTLET` (encounter à portes) : 2 `stone_cave_bats` + 2 `stone_slinger` en retrait.
-    - Zone 3 — embuscade : 4 `stone_cave_stalker` **suspendus au plafond** (`dormant`+`activate`, même mécanisme que les chauves-souris du puits S02), tombent et encerclent au déclenchement du trigger `SEC04_STALKERS_WAKE` une fois le joueur au centre de la salle. `stone_cave_stalker` a reçu `parry:true` (déjà utilisé par des ennemis similaires comme `ninja_assassin`) pour qu'ils parent les flèches.
+    - Zone 3 — embuscade : 4 `stone_cave_stalker` **suspendus au plafond** (`suspended`+`activate`, même mécanisme que les chauves-souris du puits S02) : invisibles jusqu'au réveil, puis animation d'émergence "plafond" dédiée (terre qui tombe vers le bas, cf. entrée du 2026-07-27 dans la section grottes ci-dessus), tombent et encerclent au déclenchement du trigger `SEC04_STALKERS_WAKE` une fois le joueur au centre de la salle. `stone_cave_stalker` a reçu `parry:true` (déjà utilisé par des ennemis similaires comme `ninja_assassin`) pour qu'ils parent les flèches.
     - Zone 4 — antre finale : `E_SEC04_MAMMOTH` (encounter à porte unique, salle sans issue tant qu'il vit) avec `mammoth_rider` **élite** (déjà l'ennemi "élite" normal de l'ère 1, donc déjà à taille humaine — pas le boss géant `mammoth_chief` — et déjà capable de charger *et* sauter via la logique `chase` générique, aucun changement d'IA nécessaire). Coffre à récompense **garantie** (`guaranteed:'swordUp'`, champ géré dans `game.js::openChest`) + second mini-portail local juste après.
   - **Nouveau système `darkZones`** (`src/level_specs.js` → `src/level.js::drawDarkZones` → appelé depuis `game.js::render()`) : voile quasi-opaque sur les zones sombres, troué de flaques de lumière autour des torches (`props` de type `fire`) alentour — donne l'ambiance "on ne voit que les torches au mur" demandée, réutilisable pour d'autres grottes/eras.
   - Deux mini-portails locaux (`src/level.js::localPortals`, `game.js::_useLocalPortal`) : sortie rapide au pied du puits (avant la zone 1, pour pouvoir rebrousser chemin sans combattre) + sortie finale après la zone 4 — tous deux remontent au même point de surface (tx236).
@@ -269,3 +302,4 @@ Constat : le système existe déjà partiellement (ex. `SEC_STONE_01` mur friabl
 - [ ] les sorts ne sont pas expliqués, lors je passe le curseur dessus, je devrais voir une explication. Ca ne fonctionnera pas sur mobile donc il faut toujours, quand on déloque les 2 sorts (puis les 2 autres) ajouter une fenêtre explicative qui décrit les 2 sorts.
 - [ ] la barre de vie est rouge, celle de mana est bleue et les potions sont bleues alors que ce sont des potions de vie ? => mettre les potions en rouge.
 - [ ] quand on récupère une amélioration d'épée ou d'arc, ouvrir une fenêtre explication qui montre l'augmentation de stats (dégâts, vitesse, portée ?) et d'apparence, il faudra peut-être créer quelques designs pour les différents niveaux de l'épée et de l'arc. A mon avis pour tenir jusqu'à l'ère 6 avec 2 armes il faut prévoir 11 épées (10 améliorations) et 11 arcs.
+- [ ] sur PC, dans le menu principal, je ne vois pas mon curseur, est-ce normal ? peux-tu ajouter un curseur spécifique au jeu pour que je vois où est ma souris sans que ça soit le visuel de la souris Windows ?
