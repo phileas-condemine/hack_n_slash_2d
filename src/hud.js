@@ -75,11 +75,15 @@ AR.HUD = {
     // ---------------- sorts : 4 emplacements illustrés (verrouillés ou prêts)
     let sx = bx;
     const slot = 48, sy = AR.C.VIEW_H - 66;
+    let hoverSpell = -1, hoverX = 0;
     for (let i = 0; i < 4; i++) {
       const sp = AR.SPELLS[i];
       const unlocked = pl.spellUnlocked(i);
       const cost = sp.cost * pl.stats.spellCostMult;
       const ready = unlocked && pl.spirit >= cost && pl.spellCds[i] <= 0;
+      if (AR.U.pointInRect(AR.Input.mouse.x, AR.Input.mouse.y, { x: sx, y: sy, w: slot, h: slot })) {
+        hoverSpell = i; hoverX = sx;
+      }
       // fond + icône
       ctx.fillStyle = 'rgba(10,14,18,0.78)';
       ctx.fillRect(sx, sy, slot, slot);
@@ -125,6 +129,10 @@ AR.HUD = {
     ctx.fillStyle = C.textDim;
     ctx.font = '10px "Segoe UI", sans-serif';
     ctx.fillText(pl.spellUnlocked(0) || pl.spellUnlocked(2) ? 'Sorts [1-4]' : 'Sorts : arbre [T], voie de l\'Esprit', bx, AR.C.VIEW_H - 8);
+
+    // info-bulle au survol (souris uniquement — sur tactile, la fenêtre de révélation
+    // affichée au déblocage du sort fait déjà ce travail, cf. AR.UI.drawSpellReveal)
+    if (hoverSpell >= 0) this._spellTooltip(ctx, game, AR.SPELLS[hoverSpell], hoverX, sy, pl);
 
     // ---------------- infos de droite : ère, temps, kills
     ctx.textAlign = 'right';
@@ -309,6 +317,52 @@ AR.HUD = {
     ctx.fillText('Critique ' + Math.round(st.crit * 100) + '%   réduction dégâts ' + Math.round((1 - st.armor) * 100) + '%', x + 10, y + 169);
     ctx.restore();
     return h;
+  },
+
+  _spellTooltip(ctx, game, sp, sx, sy, pl) {
+    const C = AR.C.COLORS;
+    const unlocked = pl.spellUnlocked(AR.SPELLS.indexOf(sp));
+    const w = 220, lineH = 15;
+    const lines = this._wrap(ctx, sp.desc, w - 24, '12px "Segoe UI", sans-serif');
+    const h = 58 + lines.length * lineH + (unlocked ? 16 : 0);
+    let x = sx, y = sy - h - 10;
+    if (x + w > AR.C.VIEW_W - 10) x = AR.C.VIEW_W - 10 - w;
+    ctx.save();
+    ctx.fillStyle = 'rgba(6,9,12,0.92)';
+    ctx.fillRect(x, y, w, h);
+    ctx.strokeStyle = C.magic; ctx.lineWidth = 1.5;
+    ctx.strokeRect(x, y, w, h);
+    ctx.textAlign = 'left';
+    ctx.fillStyle = C.text;
+    ctx.font = 'bold 14px "Segoe UI", sans-serif';
+    ctx.fillText('[' + sp.key + '] ' + sp.name, x + 12, y + 22);
+    ctx.font = '12px "Segoe UI", sans-serif';
+    ctx.fillStyle = C.textDim;
+    let ty = y + 42;
+    for (const l of lines) { ctx.fillText(l, x + 12, ty); ty += lineH; }
+    if (unlocked) {
+      ctx.fillStyle = C.spirit;
+      ctx.font = 'bold 12px "Segoe UI", sans-serif';
+      ctx.fillText('Coût : ' + Math.round(sp.cost * pl.stats.spellCostMult) + ' esprit' + (sp.dmg ? '   Dégâts : ' + sp.dmg : ''), x + 12, ty + 8);
+    } else {
+      ctx.fillStyle = C.textDim;
+      ctx.font = 'italic 12px "Segoe UI", sans-serif';
+      ctx.fillText('Verrouillé — arbre de compétences [T]', x + 12, ty + 8);
+    }
+    ctx.restore();
+  },
+
+  _wrap(ctx, text, maxW, font) {
+    ctx.save(); ctx.font = font;
+    const words = text.split(' ');
+    const lines = []; let line = '';
+    for (const w of words) {
+      if (ctx.measureText(line + w).width > maxW && line) { lines.push(line.trim()); line = w + ' '; }
+      else line += w + ' ';
+    }
+    if (line) lines.push(line.trim());
+    ctx.restore();
+    return lines;
   },
 
   _bar(ctx, x, y, w, h, ratio, color, darkColor) {

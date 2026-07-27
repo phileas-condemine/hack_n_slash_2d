@@ -10,6 +10,7 @@ AR.Game = class {
     this.paused = false;
     this.skillOpen = false;
     this.shopOpen = false;
+    this.spellReveal = null;    // [idx, idx] : fenêtre explicative forcée à l'ouverture de 2 sorts
     this.demo = false;
     this.speed = 1;             // ×1 ×2 ×4 ×8 ×10 ×15 ×20 ×30 ×40 (mode démo)
     this.time = 0;
@@ -114,7 +115,7 @@ AR.Game = class {
     this.loadLevel();
     if (this.startAtBoss) this._startBossFight();
     this.state = 'play';
-    this.paused = false; this.skillOpen = false; this.shopOpen = false;
+    this.paused = false; this.skillOpen = false; this.shopOpen = false; this.spellReveal = null;
     if (demo) AR.HUD.notify('Plan IA équilibré — affinité ' + AR.DemoAI.focusLabel(), AR.C.COLORS.spirit);
   }
 
@@ -251,7 +252,7 @@ AR.Game = class {
 
     this.loadLevel();
     this.state = 'play';
-    this.paused = false; this.skillOpen = false; this.shopOpen = false;
+    this.paused = false; this.skillOpen = false; this.shopOpen = false; this.spellReveal = null;
     AR.HUD.notify('Partie chargée : ' + s.name, AR.C.COLORS.spirit);
     return true;
   }
@@ -330,7 +331,8 @@ AR.Game = class {
     }
     if (this.state === 'play') {
       if (In.pressed('pause')) {
-        if (this.skillOpen) this.skillOpen = false;
+        if (this.spellReveal) this.spellReveal = null;
+        else if (this.skillOpen) this.skillOpen = false;
         else if (this.shopOpen) this.shopOpen = false;
         else this.paused = !this.paused;
       }
@@ -882,8 +884,14 @@ AR.Game = class {
     pl.recalcStats(this);
     AR.Audio.sfx('skill');
     AR.HUD.notify('★ Compétence : ' + node.name + ' (-' + node.cost + ' pt' + (node.cost > 1 ? 's' : '') + ')', AR.C.COLORS.xp);
-    if (nodeId === 'spirit1') AR.HUD.notify('Sorts 1 et 2 débloqués !', AR.C.COLORS.magic);
-    if (nodeId === 'spirit3') AR.HUD.notify('Sorts 3 et 4 débloqués !', AR.C.COLORS.magic);
+    if (nodeId === 'spirit1') {
+      AR.HUD.notify('Sorts 1 et 2 débloqués !', AR.C.COLORS.magic);
+      if (!this.demo) this.spellReveal = [0, 1];
+    }
+    if (nodeId === 'spirit3') {
+      AR.HUD.notify('Sorts 3 et 4 débloqués !', AR.C.COLORS.magic);
+      if (!this.demo) this.spellReveal = [2, 3];
+    }
     return true;
   }
 
@@ -1025,7 +1033,8 @@ AR.Game = class {
     AR.UI.beginFrame();
     if (this.state === 'gameover') { AR.UI.drawEnd(ctx, this, false); return; }
     if (this.state === 'victory') { AR.UI.drawEnd(ctx, this, true); return; }
-    if (this.skillOpen) AR.UI.drawSkills(ctx, this);
+    if (this.spellReveal) AR.UI.drawSpellReveal(ctx, this);
+    else if (this.skillOpen) AR.UI.drawSkills(ctx, this);
     else if (this.shopOpen) AR.UI.drawShop(ctx, this);
     else if (this.paused) AR.UI.drawPause(ctx, this);
   }

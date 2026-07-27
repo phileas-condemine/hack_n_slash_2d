@@ -426,6 +426,40 @@ AR.UI = {
     if (this.button(ctx, W / 2 - 110, AR.C.VIEW_H - 74, 220, 40, 'Fermer  [T / Échap]')) game.skillOpen = false;
   },
 
+  // ================================================ RÉVÉLATION DE SORTS
+  // Fenêtre explicative forcée à l'ouverture de 2 sorts (spirit1 -> 1&2, spirit3 -> 3&4).
+  // Remplace le survol de la souris (indisponible au tactile) comme seule source d'explication.
+  drawSpellReveal(ctx, game) {
+    const W = AR.C.VIEW_W, H = AR.C.VIEW_H;
+    const ids = game.spellReveal;
+    const pw = 560, ph = 300, px = W / 2 - pw / 2, py = H / 2 - ph / 2;
+    this.panel(ctx, px, py, pw, ph, '✨ Nouveaux sorts !');
+    const colW = pw / 2;
+    for (let i = 0; i < ids.length; i++) {
+      const sp = AR.SPELLS[ids[i]];
+      const cx = px + colW * i;
+      ctx.save();
+      ctx.fillStyle = 'rgba(10,14,18,0.7)';
+      ctx.fillRect(cx + 20, py + 70, colW - 40, 170);
+      ctx.strokeStyle = AR.C.COLORS.magic; ctx.lineWidth = 1.5;
+      ctx.strokeRect(cx + 20, py + 70, colW - 40, 170);
+      AR.Assets.drawIcon(ctx, sp.icon, cx + colW / 2 - 24, py + 82, 48, 1);
+      ctx.textAlign = 'center';
+      ctx.fillStyle = AR.C.COLORS.text;
+      ctx.font = 'bold 15px "Segoe UI", sans-serif';
+      ctx.fillText('[' + sp.key + '] ' + sp.name, cx + colW / 2, py + 150);
+      ctx.fillStyle = AR.C.COLORS.textDim;
+      ctx.font = '12px "Segoe UI", sans-serif';
+      this._wrapTextCentered(ctx, sp.desc, cx + colW / 2, py + 170, colW - 60, 15);
+      ctx.fillStyle = AR.C.COLORS.spirit;
+      ctx.font = 'bold 12px "Segoe UI", sans-serif';
+      ctx.fillText('Coût : ' + sp.cost + ' esprit', cx + colW / 2, py + 222);
+      ctx.restore();
+    }
+    if (this.button(ctx, W / 2 - 110, py + ph - 56, 220, 42, 'Compris  [Entrée]') ||
+      AR.Input.pressed('confirm')) game.spellReveal = null;
+  },
+
   // ============================================================ BOUTIQUE
   drawShop(ctx, game) {
     const W = AR.C.VIEW_W;
