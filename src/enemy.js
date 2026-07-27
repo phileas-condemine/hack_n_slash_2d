@@ -1081,7 +1081,12 @@ AR.Boss = class extends AR.Enemy {
         // Chef Mammouth : formation dédiée plutôt que 2 copies du même sbire — 2 porteurs de
         // bouclier en flanc-garde (encaissent/bloquent au front) + 1 joueur de tambour planqué
         // du côté opposé au joueur (buffe les alliés tant qu'il est en vie, cible prioritaire).
-        if (game.enemies.filter((e) => !e.dead && !e.isBoss).length < 3) {
+        // Ne ré-invoque qu'une fois l'ancienne formation totalement éliminée — sinon le
+        // recyclage du pattern (1.4s + récupération) empile les groupes les uns sur les autres
+        // dès qu'un seul survivant fait passer le compte total sous le seuil générique.
+        const warbandAlive = game.enemies.some((e) => !e.dead &&
+          (e.id === 'bone_shield_bearer' || e.id === 'war_drummer'));
+        if (!warbandAlive) {
           const scale = AR.ERA_SCALE[game.eraIdx] * 0.8 * (game.diff ? game.diff.hpMult : 1);
           const backDir = -(AR.U.sign(pl.x - this.centerX()) || this.facing || 1);
           const spots = [

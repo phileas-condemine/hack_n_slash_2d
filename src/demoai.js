@@ -807,6 +807,22 @@ AR.DemoAI = {
 
     // ---------- survie
     if (pl.hp < pl.maxHp * 0.35 && pl.potions > 0) a.potion = true;
+    // Panique : PV critiques et plus de potion — décrocher plutôt que continuer à s'acharner
+    // (retour joueur : l'IA achevait un sbire à 1 PV au lieu de fuir, et mourait dans la
+    // foulée d'un tout petit coup). On coupe la cible pour désactiver le combat ce tour-ci ;
+    // l'esquive/dash normale juste en dessous reste active pour s'écarter des télégraphes.
+    if (pl.hp < pl.maxHp * 0.15 && pl.potions <= 0) {
+      let nearest = null, nearestD = Infinity;
+      for (const e of game.enemies) {
+        if (e.dead || !e.active) continue;
+        const d = AR.U.dist(pcx, pcy, e.centerX(), e.centerY());
+        if (d < nearestD) { nearestD = d; nearest = e; }
+      }
+      if (nearest && nearestD < 500) {
+        goalX = pcx - (AR.U.sign(nearest.centerX() - pcx) || 1) * 300;
+        target = null;
+      }
+    }
 
     // esquive : menace proche ou télégraphe adverse
     const targetTelegraph = target && ['tele', 'charge', 'attack'].includes(target.state) && realTd < 230;
@@ -860,7 +876,12 @@ AR.DemoAI = {
           this.swordPlan -= dt;
           a.sword = this.swordPlan > 0.02;
         } else if (this.decideT <= 0) {
-          if (Math.random() < 0.22) this.swordPlan = pl.stats.swordChargeTime + 0.12;
+          // Un coup chargé traverse la garde (pierceBlock) et repousse le porteur de
+          // bouclier au lieu de subir la réduction de dégâts d'un coup simple contre lui
+          // (retour joueur : les coups simples tapent dans le bouclier pour rien) — on le
+          // privilégie donc nettement plus contre un ennemi bloquant qu'en mêlée normale.
+          const chargeChance = projectileBlocker ? 0.8 : 0.22;
+          if (Math.random() < chargeChance) this.swordPlan = pl.stats.swordChargeTime + 0.12;
           else { a.sword = true; this.decideT = 0.24; }
         }
         // s'écarter des gros bras pendant leur attaque
