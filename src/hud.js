@@ -204,7 +204,7 @@ AR.HUD = {
       ctx.font = 'bold 14px "Segoe UI", sans-serif'; ctx.textAlign = 'center';
       ctx.fillStyle = 'rgba(10,14,18,0.85)';
       const label = p.type === 'chest' ? 'Ouvrir' : p.type === 'portal' ? 'Traverser la faille' :
-        p.type === 'lever' ? 'Actionner' : 'Marchander';
+        p.type === 'lever' ? 'Actionner' : p.type === 'crank' ? 'Actionner la manivelle' : 'Marchander';
       const tw = ctx.measureText('[E] ' + label).width;
       ctx.fillRect(x - tw / 2 - 8, y - 16, tw + 16, 22);
       ctx.fillStyle = C.impact;

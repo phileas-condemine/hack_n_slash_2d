@@ -391,6 +391,7 @@ AR.Game = class {
     if (lvl.authored) {
       this.currentRoom = lvl.currentRoomAt(pl.x + pl.w / 2, pl.y + pl.h / 2);
       lvl.updateDynamics(dt, this);
+      lvl.updateLifts(dt, this);
       this._updateTriggers();
       this._updateEncounters(dt);
       this._suppressSafeRoomProjectiles();
@@ -412,6 +413,7 @@ AR.Game = class {
       else if (p.type === 'portal' && p.returnTo) this._useLocalPortal(p);
       else if (p.type === 'portal') this._enterPortal();
       else if (p.type === 'lever') lvl.activateInteractable(p._int, this);
+      else if (p.type === 'crank') lvl.activateLift(p._int.lift, this);
     }
 
     // ---- mort du joueur
@@ -540,10 +542,16 @@ AR.Game = class {
     const T = AR.C.TILE, lvl = this.level;
     const pcx = pl.x + pl.w / 2, pcy = pl.y + pl.h / 2;
     for (const o of lvl.interactables) {
-      if (o.type !== 'lever') continue;
-      if (o.oneShot && o.state === 'on') continue;
-      const lx = o.x * T, ly = o.y * T;
-      if (AR.U.dist(lx, ly - 10, pcx, pcy) < 70) return { type: 'lever', x: lx, y: ly, _int: o };
+      if (o.type === 'lever') {
+        if (o.oneShot && o.state === 'on') continue;
+        const lx = o.x * T, ly = o.y * T;
+        if (AR.U.dist(lx, ly - 10, pcx, pcy) < 70) return { type: 'lever', x: lx, y: ly, _int: o };
+      } else if (o.type === 'crank') {
+        const lift = lvl.lifts.find((l) => l.id === o.lift);
+        if (lift && lift.state === 'moving') continue; // déjà en mouvement : rien à actionner
+        const lx = o.x * T, ly = o.y * T;
+        if (AR.U.dist(lx, ly - 10, pcx, pcy) < 70) return { type: 'crank', x: lx, y: ly, _int: o };
+      }
     }
     return null;
   }

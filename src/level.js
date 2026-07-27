@@ -31,6 +31,7 @@ AR.Level = class {
     this.gateClosed = false; this.grid = null;
     this.rooms = []; this.roomById = {};
     this.climbables = []; this.breakables = []; this.interactables = [];
+    this.lifts = []; // monte-charges à corde (plateformes verticales, cf. `activateLift`/`updateLifts`)
     this.encounters = []; this.triggers = []; this.hazards = [];
     this.safeAnchors = []; this.navHints = {}; this.dynGates = [];
     this.fallDamageRatio = 0.1;
@@ -271,12 +272,26 @@ AR.Level = class {
       }
     }
 
-    // --- interactables (leviers, portes) ; portes fermées = solides
+    // --- interactables (leviers, portes, manivelles de monte-charge) ; portes fermées = solides
     for (const o of spec.interactables || []) {
       const obj = { id: o.id, type: o.type, x: o.x, y: o.y, rect: o.rect, links: o.links || [],
-        prompt: o.prompt, state: o.state || (o.type === 'door' ? 'closed' : 'off'), oneShot: o.oneShot !== false };
+        lift: o.lift || null, prompt: o.prompt, state: o.state || (o.type === 'door' ? 'closed' : 'off'),
+        oneShot: o.oneShot !== false };
       this.interactables.push(obj);
       if (o.type === 'door' && obj.state === 'closed' && o.rect) this._fillRect(o.rect, F.SOLID | F.DOOR);
+    }
+
+    // --- monte-charges à corde : plateforme verticale entre bottomY et topY, activée par une
+    // manivelle (`interactables` de type 'crank', cf. `Game.activateLift`). Le même objet sert
+    // à la fois d'état du monte-charge ET d'entrée dans `this.platforms` (collision one-way déjà
+    // existante) — en faire bouger `ty` chaque frame (cf. `updateLifts`) suffit à faire "monter"
+    // le joueur avec elle, sans code de collision dédié.
+    for (const l of spec.lifts || []) {
+      const lift = { id: l.id, tx: l.x, w: l.w, kind: 'lift',
+        ty: l.startY !== undefined ? l.startY : l.bottomY, bottomY: l.bottomY, topY: l.topY,
+        speed: l.speed || 2.2, state: 'idle', target: null };
+      this.lifts.push(lift);
+      this.platforms.push(lift);
     }
 
     // --- rooms + ancres de respawn
@@ -304,6 +319,7 @@ AR.Level = class {
     }
     for (const c of this.climbables) this.props.push({ type: 'vine', x: (c.x + c.w / 2) * T, y: c.y * T, vh: c.h, s: 1, r: 0 });
     for (const o of this.interactables) if (o.type === 'lever') this.props.push({ type: 'lever', ref: o, x: o.x * T, y: o.y * T, s: 1, r: 0 });
+    for (const o of this.interactables) if (o.type === 'crank') this.props.push({ type: 'crank', ref: o, x: o.x * T, y: o.y * T, s: 1, r: 0 });
 
     // --- spawns (ennemis libres + suspendus/dormants)
     this.spawns = [];
@@ -498,6 +514,42 @@ AR.Level = class {
     this._deriveHeights();
     if (game) { AR.Audio.sfx('gate'); AR.HUD.notify('Levier actionné — un passage s\'ouvre', AR.C.COLORS.spirit); }
     return true;
+  }
+
+  // ---- monte-charges à corde : manivelle -> déplacement vers l'extrémité opposée
+  activateLift(liftId, game) {
+    const lift = this.lifts.find((l) => l.id === liftId);
+    if (!lift || lift.state === 'moving') return false;
+    const goingUp = lift.ty > (lift.topY + lift.bottomY) / 2;
+    lift.target = goingUp ? lift.topY : lift.bottomY;
+    lift.state = 'moving';
+    if (game) { AR.Audio.sfx('gate'); AR.HUD.notify(goingUp ? 'Le monte-charge grince vers le haut...' : 'Le monte-charge redescend...', AR.C.COLORS.textDim); }
+    return true;
+  }
+
+  // Fait avancer chaque monte-charge en mouvement. Le même objet est aussi une entrée de
+  // `this.platforms` (pour l'atterrissage normal en tombant dessus), mais ça ne suffit pas à
+  // faire "monter" un joueur déjà posé dessus et immobile : la détection d'atterrissage de
+  // `moveRect` est un test de balayage (la plateforme doit être croisée PENDANT ce pas de chute),
+  // pas une requête de position à jour — une plateforme qui s'éloigne sous des pieds immobiles
+  // ne redéclenche jamais cette détection. Décalage explicite du joueur qui la chevauche.
+  updateLifts(dt, game) {
+    const T = AR.C.TILE, pl = game && game.player;
+    for (const lift of this.lifts) {
+      if (lift.state !== 'moving') continue;
+      const oldTy = lift.ty;
+      const dir = lift.target > lift.ty ? 1 : -1;
+      lift.ty += dir * lift.speed * dt;
+      if ((dir > 0 && lift.ty >= lift.target) || (dir < 0 && lift.ty <= lift.target)) {
+        lift.ty = lift.target; lift.state = 'idle'; lift.target = null;
+      }
+      if (pl && pl.onGround) {
+        const feetY = pl.y + pl.h;
+        const onThisLift = pl.x + pl.w > lift.tx * T && pl.x < (lift.tx + lift.w) * T &&
+          Math.abs(feetY - oldTy * T) < 4;
+        if (onThisLift) pl.y += (lift.ty - oldTy) * T;
+      }
+    }
   }
 
   // ---- barrières d'encounter (solides temporaires posées dans la grille)
@@ -1025,6 +1077,19 @@ AR.Level = class {
         ctx.fillStyle = 'rgba(0,0,0,0.28)'; ctx.fillRect(x + 4, y + 10, p.w * T - 8, 4);
         continue;
       }
+      if (p.kind === 'lift') { // monte-charge : plateau de bois, cordes fixes vers la poulie en haut
+        const plankW = p.w * T, topPx = p.topY * T - cy;
+        ctx.strokeStyle = 'rgba(120,95,60,0.85)'; ctx.lineWidth = 2;
+        ctx.beginPath(); ctx.moveTo(x + 4, topPx); ctx.lineTo(x + 4, y + 4); ctx.stroke();
+        ctx.beginPath(); ctx.moveTo(x + plankW - 4, topPx); ctx.lineTo(x + plankW - 4, y + 4); ctx.stroke();
+        ctx.fillStyle = '#7a6a52';
+        ctx.beginPath(); ctx.arc(x + plankW / 2, topPx, 8, 0, Math.PI * 2); ctx.fill();
+        ctx.fillStyle = '#8a6a42'; ctx.fillRect(x, y, plankW, 10);
+        ctx.fillStyle = 'rgba(50,35,20,0.5)';
+        for (let i = 0; i <= p.w; i++) ctx.fillRect(x + i * T - 1, y, 2, 10);
+        ctx.fillStyle = 'rgba(0,0,0,0.28)'; ctx.fillRect(x + 4, y + 10, plankW - 8, 4);
+        continue;
+      }
       ctx.fillStyle = era.groundTop;
       ctx.fillRect(x, y, p.w * T, 12);
       ctx.fillStyle = era.accent;
@@ -1269,6 +1334,22 @@ AR.Level = class {
         ctx.beginPath(); ctx.moveTo(0, -6); ctx.lineTo(on ? 13 : -13, -24); ctx.stroke();
         ctx.fillStyle = on ? '#5cc9a8' : '#e8a545';
         ctx.beginPath(); ctx.arc(on ? 13 : -13, -24, 5, 0, Math.PI * 2); ctx.fill();
+        break;
+      }
+      case 'crank': { // manivelle du monte-charge + panneau d'avertissement
+        ctx.fillStyle = rock; ctx.fillRect(-4, -28, 8, 28);
+        ctx.strokeStyle = '#8a6a42'; ctx.lineWidth = 4; ctx.lineCap = 'round';
+        ctx.beginPath(); ctx.arc(0, -30, 11, 0, Math.PI * 2); ctx.stroke();
+        ctx.beginPath(); ctx.moveTo(0, -30); ctx.lineTo(11, -30); ctx.stroke();
+        ctx.fillStyle = '#c9a86a'; ctx.beginPath(); ctx.arc(11, -30, 3, 0, Math.PI * 2); ctx.fill();
+        // panneau « DANGER » + flèche vers le haut, sur un piquet
+        ctx.fillStyle = '#3a2a1a'; ctx.fillRect(20, -54, 3, 24);
+        ctx.fillStyle = '#e8c33d'; ctx.fillRect(4, -74, 40, 22);
+        ctx.strokeStyle = '#2a2010'; ctx.lineWidth = 2; ctx.strokeRect(4, -74, 40, 22);
+        ctx.fillStyle = '#2a2010'; ctx.font = 'bold 8px "Segoe UI", sans-serif'; ctx.textAlign = 'center';
+        ctx.fillText('DANGER', 24, -63);
+        ctx.beginPath(); ctx.moveTo(24, -59); ctx.lineTo(19, -53); ctx.lineTo(29, -53); ctx.closePath(); ctx.fill();
+        ctx.textAlign = 'left';
         break;
       }
       case 'stall': {
