@@ -94,6 +94,21 @@ pour enrichir l'expérience de jeu, sur le modèle de ce qui marche déjà bien.
     cohérent avec les appels à durée custom dans `game.js`). Vérifié visuellement via Playwright
     (mound visible dès ~15% de progression, jets de terre confirmés par instrumentation, explosion
     finale + apparition normale de l'ennemi sans erreur console).
+- [x] **PV des monstres de terrain ×2.5** — fait le 2026-07-27, retour joueur : "tu peux simplement
+  doubler voire tripler les PV des monstres, sauf les bosses et les monstres avec bouclier qui
+  bloque les flèches, eux je remarque qu'ils ont énormément de PV". `src/data.js` (`AR.ENEMIES`) :
+  PV × 2.5 sur les 28 ennemis de terrain "normaux" des 6 ères (les 5 par ère + l'élite, ex.
+  `stone_spear` 26→65, `mammoth_rider` 150→375, `mech_assassin` 120→300 — script Python one-shot,
+  diff vérifié à la main). **Non touchés, par choix délibéré** : les ennemis `behavior: 'shield'`
+  (bouclier % qui bloque flèches/dégâts : `hoplite`, `temple_guardian`, `armored_captain`,
+  `armored_trooper`) et ceux avec un champ `shielded` (bulle d'absorption : `shield_drone`,
+  `core_shard`) — exactement ceux visés par la demande — ainsi que les **sbires dédiés de boss**
+  (`bone_shield_bearer`, `war_drummer`, `standard_bearer`, `lantern_wisp`, `gear_servitor`,
+  `armored_hound`, `core_shard`) qui n'apparaissent qu'en combat de boss et dont les PV sont déjà
+  calibrés précisément pour l'équilibrage de chaque boss (cf. passes R1/R4/R6 ci-dessus) — à
+  revoir spécifiquement si besoin, mais pas inclus dans ce coup de balai général. Les PV des boss
+  eux-mêmes (`AR.BOSSES`) ne sont pas touchés. Vérifié en jeu (nouvelles valeurs de PV lues
+  correctement à l'instanciation, aucune erreur console).
 
 ## 🗺️ Minimap / brouillard de guerre
 

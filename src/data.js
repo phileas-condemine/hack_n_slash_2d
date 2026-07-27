@@ -64,15 +64,15 @@ AR.ERAS = [
 // facing: orientation du sprite source ('r' par défaut)
 AR.ENEMIES = {
   // --- Âge de pierre
-  stone_spear:    { name: 'Lancier tribal', hp: 26, dmg: 10, speed: 95, xp: 12, coins: 4, h: 78, behavior: 'melee', range: 62, aggro: 420, atkCd: 1.3, tele: 0.45 },
-  stone_slinger:  { name: 'Frondeur', hp: 20, dmg: 8, speed: 80, xp: 14, coins: 5, h: 80, behavior: 'ranged', range: 460, keep: 300, aggro: 520, atkCd: 1.9, tele: 0.55, proj: 'rock' },
-  beast_hunter:   { name: 'Chasseur de bêtes', hp: 30, dmg: 12, speed: 150, xp: 16, coins: 6, h: 82, behavior: 'melee', range: 58, aggro: 480, atkCd: 0.95, tele: 0.3, facing: 'l', parry: true },
-  stone_brute:    { name: 'Brute au gourdin', hp: 62, dmg: 18, speed: 65, xp: 24, coins: 9, h: 92, behavior: 'brute', range: 92, aggro: 400, atkCd: 1.9, tele: 0.6, facing: 'l', knock: 320 },
-  war_shaman:     { name: 'Chaman de guerre', hp: 34, dmg: 9, speed: 55, xp: 26, coins: 10, h: 96, behavior: 'caster', range: 560, keep: 340, aggro: 600, atkCd: 2.6, tele: 0.7, proj: 'wisp' },
-  mammoth_rider:  { name: 'Monteur de mammouth', hp: 150, dmg: 22, speed: 70, xp: 60, coins: 25, h: 128, behavior: 'charger', range: 480, aggro: 560, atkCd: 2.6, tele: 0.75, chargeSpeed: 420, knock: 380, elite: true },
+  stone_spear:    { name: 'Lancier tribal', hp: 65, dmg: 10, speed: 95, xp: 12, coins: 4, h: 78, behavior: 'melee', range: 62, aggro: 420, atkCd: 1.3, tele: 0.45 },
+  stone_slinger:  { name: 'Frondeur', hp: 50, dmg: 8, speed: 80, xp: 14, coins: 5, h: 80, behavior: 'ranged', range: 460, keep: 300, aggro: 520, atkCd: 1.9, tele: 0.55, proj: 'rock' },
+  beast_hunter:   { name: 'Chasseur de bêtes', hp: 75, dmg: 12, speed: 150, xp: 16, coins: 6, h: 82, behavior: 'melee', range: 58, aggro: 480, atkCd: 0.95, tele: 0.3, facing: 'l', parry: true },
+  stone_brute:    { name: 'Brute au gourdin', hp: 155, dmg: 18, speed: 65, xp: 24, coins: 9, h: 92, behavior: 'brute', range: 92, aggro: 400, atkCd: 1.9, tele: 0.6, facing: 'l', knock: 320 },
+  war_shaman:     { name: 'Chaman de guerre', hp: 85, dmg: 9, speed: 55, xp: 26, coins: 10, h: 96, behavior: 'caster', range: 560, keep: 340, aggro: 600, atkCd: 2.6, tele: 0.7, proj: 'wisp' },
+  mammoth_rider:  { name: 'Monteur de mammouth', hp: 375, dmg: 22, speed: 70, xp: 60, coins: 25, h: 128, behavior: 'charger', range: 480, aggro: 560, atkCd: 2.6, tele: 0.75, chargeSpeed: 420, knock: 380, elite: true },
   // Nouveaux monstres de l'extension (âge de pierre) — cf. 01_niveau_age_de_pierre.md §6
-  stone_cave_stalker: { name: 'Traqueur des cavernes', hp: 40, dmg: 12, speed: 72, xp: 34, coins: 14, h: 96, behavior: 'assassin', range: 66, aggro: 500, atkCd: 1.9, tele: 0.45, blinkCd: 2.8, facing: 'l', parry: true },
-  stone_cave_bats:    { name: 'Nuée de chauves-souris', hp: 22, dmg: 8, speed: 150, xp: 16, coins: 6, h: 72, behavior: 'flyer', range: 60, aggro: 520, atkCd: 1.6, tele: 0.35, dive: true, flyH: 150 },
+  stone_cave_stalker: { name: 'Traqueur des cavernes', hp: 100, dmg: 12, speed: 72, xp: 34, coins: 14, h: 96, behavior: 'assassin', range: 66, aggro: 500, atkCd: 1.9, tele: 0.45, blinkCd: 2.8, facing: 'l', parry: true },
+  stone_cave_bats:    { name: 'Nuée de chauves-souris', hp: 55, dmg: 8, speed: 150, xp: 16, coins: 6, h: 72, behavior: 'flyer', range: 60, aggro: 520, atkCd: 1.6, tele: 0.35, dive: true, flyH: 150 },
   // Sbires dédiés du Chef Mammouth (summon uniquement, cf. _specs/07_boss_minions_art_brief.md).
   // Remplacent `totem_bearer` (retour joueur : mourait en une flèche, pas assez intéressant) par
   // une vraie formation : 2 porteurs de bouclier qui encaissent/bloquent au front + 1 joueur de
@@ -85,46 +85,46 @@ AR.ENEMIES = {
 
   // --- Antiquité
   hoplite:        { name: 'Hoplite', hp: 40, dmg: 12, speed: 90, xp: 16, coins: 6, h: 82, behavior: 'shield', range: 64, aggro: 430, atkCd: 1.4, tele: 0.45, block: 0.6 },
-  archer_auxilia: { name: 'Archer auxiliaire', hp: 24, dmg: 10, speed: 85, xp: 16, coins: 6, h: 84, behavior: 'ranged', range: 560, keep: 360, aggro: 620, atkCd: 1.7, tele: 0.5, proj: 'arrow' },
-  desert_raider:  { name: 'Pillard du désert', hp: 34, dmg: 13, speed: 160, xp: 18, coins: 8, h: 84, behavior: 'melee', range: 60, aggro: 500, atkCd: 0.9, tele: 0.28, facing: 'l', parry: true },
-  elephant_guard: { name: 'Garde à éléphant', hp: 170, dmg: 24, speed: 60, xp: 55, coins: 20, h: 132, behavior: 'charger', range: 460, aggro: 540, atkCd: 2.8, tele: 0.8, chargeSpeed: 380, knock: 400 },
+  archer_auxilia: { name: 'Archer auxiliaire', hp: 60, dmg: 10, speed: 85, xp: 16, coins: 6, h: 84, behavior: 'ranged', range: 560, keep: 360, aggro: 620, atkCd: 1.7, tele: 0.5, proj: 'arrow' },
+  desert_raider:  { name: 'Pillard du désert', hp: 85, dmg: 13, speed: 160, xp: 18, coins: 8, h: 84, behavior: 'melee', range: 60, aggro: 500, atkCd: 0.9, tele: 0.28, facing: 'l', parry: true },
+  elephant_guard: { name: 'Garde à éléphant', hp: 425, dmg: 24, speed: 60, xp: 55, coins: 20, h: 132, behavior: 'charger', range: 460, aggro: 540, atkCd: 2.8, tele: 0.8, chargeSpeed: 380, knock: 400 },
   temple_guardian:{ name: 'Gardien du temple', hp: 130, dmg: 20, speed: 45, xp: 50, coins: 22, h: 118, behavior: 'shield', range: 88, aggro: 380, atkCd: 2.1, tele: 0.65, block: 0.85, knock: 340, elite: true },
   // Sbire dédié du Commandant de Char (summon uniquement)
   standard_bearer:{ name: 'Porte-étendard', hp: 36, dmg: 13, speed: 95, xp: 18, coins: 7, h: 84, behavior: 'melee', range: 85, aggro: 460, atkCd: 1.5, tele: 0.45 },
 
   // --- Japon médiéval
-  ronin:          { name: 'Rônin', hp: 44, dmg: 15, speed: 130, xp: 22, coins: 9, h: 80, behavior: 'melee', range: 78, aggro: 480, atkCd: 1.0, tele: 0.32, combo2: true, parry: true },
-  ninja_assassin: { name: 'Assassin ninja', hp: 30, dmg: 14, speed: 190, xp: 26, coins: 11, h: 78, behavior: 'assassin', range: 58, aggro: 560, atkCd: 1.6, tele: 0.3, facing: 'l', blinkCd: 3.2, parry: true },
-  tengu_archer:   { name: 'Archer tengu', hp: 34, dmg: 12, speed: 100, xp: 24, coins: 10, h: 92, behavior: 'ranged', range: 600, keep: 380, aggro: 660, atkCd: 1.5, tele: 0.45, proj: 'arrow', hop: true },
-  spirit_caster:  { name: 'Invocateur d\'esprits', hp: 40, dmg: 11, speed: 60, xp: 30, coins: 13, h: 100, behavior: 'caster', range: 620, keep: 380, aggro: 680, atkCd: 2.4, tele: 0.65, proj: 'wisp', float: true },
-  oni_brute:      { name: 'Brute oni', hp: 130, dmg: 24, speed: 75, xp: 55, coins: 22, h: 108, behavior: 'brute', range: 100, aggro: 420, atkCd: 1.7, tele: 0.55, knock: 380, elite: true, facing: 'l' },
+  ronin:          { name: 'Rônin', hp: 110, dmg: 15, speed: 130, xp: 22, coins: 9, h: 80, behavior: 'melee', range: 78, aggro: 480, atkCd: 1.0, tele: 0.32, combo2: true, parry: true },
+  ninja_assassin: { name: 'Assassin ninja', hp: 75, dmg: 14, speed: 190, xp: 26, coins: 11, h: 78, behavior: 'assassin', range: 58, aggro: 560, atkCd: 1.6, tele: 0.3, facing: 'l', blinkCd: 3.2, parry: true },
+  tengu_archer:   { name: 'Archer tengu', hp: 85, dmg: 12, speed: 100, xp: 24, coins: 10, h: 92, behavior: 'ranged', range: 600, keep: 380, aggro: 660, atkCd: 1.5, tele: 0.45, proj: 'arrow', hop: true },
+  spirit_caster:  { name: 'Invocateur d\'esprits', hp: 100, dmg: 11, speed: 60, xp: 30, coins: 13, h: 100, behavior: 'caster', range: 620, keep: 380, aggro: 680, atkCd: 2.4, tele: 0.65, proj: 'wisp', float: true },
+  oni_brute:      { name: 'Brute oni', hp: 325, dmg: 24, speed: 75, xp: 55, coins: 22, h: 108, behavior: 'brute', range: 100, aggro: 420, atkCd: 1.7, tele: 0.55, knock: 380, elite: true, facing: 'l' },
   // Sbire dédié du Seigneur Yōkai (summon uniquement)
   lantern_wisp:   { name: 'Feu-follet', hp: 28, dmg: 10, speed: 55, xp: 22, coins: 9, h: 70, behavior: 'caster', range: 520, keep: 340, aggro: 600, atkCd: 2.1, tele: 0.55, proj: 'wisp', float: true },
 
   // --- Renaissance
-  pikeman:        { name: 'Piquier', hp: 48, dmg: 14, speed: 85, xp: 24, coins: 10, h: 84, behavior: 'melee', range: 105, aggro: 440, atkCd: 1.5, tele: 0.5 },
-  musketeer:      { name: 'Mousquetaire', hp: 30, dmg: 16, speed: 80, xp: 26, coins: 11, h: 76, behavior: 'ranged', range: 640, keep: 420, aggro: 700, atkCd: 2.3, tele: 0.7, proj: 'bullet' },
-  bombardier:     { name: 'Bombardier', hp: 36, dmg: 18, speed: 75, xp: 28, coins: 12, h: 84, behavior: 'artillery', range: 520, keep: 320, aggro: 600, atkCd: 2.6, tele: 0.6, proj: 'bomb' },
-  mortar_crew:    { name: 'Servants de mortier', hp: 60, dmg: 20, speed: 40, xp: 34, coins: 14, h: 92, behavior: 'artillery', range: 720, keep: 420, aggro: 780, atkCd: 3.2, tele: 0.8, proj: 'mortar' },
+  pikeman:        { name: 'Piquier', hp: 120, dmg: 14, speed: 85, xp: 24, coins: 10, h: 84, behavior: 'melee', range: 105, aggro: 440, atkCd: 1.5, tele: 0.5 },
+  musketeer:      { name: 'Mousquetaire', hp: 75, dmg: 16, speed: 80, xp: 26, coins: 11, h: 76, behavior: 'ranged', range: 640, keep: 420, aggro: 700, atkCd: 2.3, tele: 0.7, proj: 'bullet' },
+  bombardier:     { name: 'Bombardier', hp: 90, dmg: 18, speed: 75, xp: 28, coins: 12, h: 84, behavior: 'artillery', range: 520, keep: 320, aggro: 600, atkCd: 2.6, tele: 0.6, proj: 'bomb' },
+  mortar_crew:    { name: 'Servants de mortier', hp: 150, dmg: 20, speed: 40, xp: 34, coins: 14, h: 92, behavior: 'artillery', range: 720, keep: 420, aggro: 780, atkCd: 3.2, tele: 0.8, proj: 'mortar' },
   armored_captain:{ name: 'Capitaine cuirassé', hp: 160, dmg: 22, speed: 70, xp: 60, coins: 26, h: 106, behavior: 'shield', range: 84, aggro: 420, atkCd: 1.8, tele: 0.55, block: 0.8, knock: 360, elite: true },
   // Sbire dédié de l'Ingénieur de Guerre (summon uniquement)
   gear_servitor:  { name: 'Serviteur à engrenages', hp: 50, dmg: 15, speed: 65, xp: 24, coins: 10, h: 78, behavior: 'brute', range: 80, aggro: 420, atkCd: 1.7, tele: 0.55, knock: 280 },
 
   // --- Guerre diesel
-  trench_soldier: { name: 'Soldat des tranchées', hp: 46, dmg: 14, speed: 95, xp: 28, coins: 11, h: 82, behavior: 'ranged', range: 520, keep: 300, aggro: 620, atkCd: 1.8, tele: 0.5, proj: 'bullet', bayonet: true },
-  flamethrower:   { name: 'Lance-flammes', hp: 70, dmg: 6, speed: 70, xp: 34, coins: 14, h: 88, behavior: 'ranged', range: 240, keep: 170, aggro: 460, atkCd: 2.4, tele: 0.55, proj: 'flame' },
+  trench_soldier: { name: 'Soldat des tranchées', hp: 115, dmg: 14, speed: 95, xp: 28, coins: 11, h: 82, behavior: 'ranged', range: 520, keep: 300, aggro: 620, atkCd: 1.8, tele: 0.5, proj: 'bullet', bayonet: true },
+  flamethrower:   { name: 'Lance-flammes', hp: 175, dmg: 6, speed: 70, xp: 34, coins: 14, h: 88, behavior: 'ranged', range: 240, keep: 170, aggro: 460, atkCd: 2.4, tele: 0.55, proj: 'flame' },
   armored_trooper:{ name: 'Trooper blindé', hp: 110, dmg: 18, speed: 60, xp: 40, coins: 16, h: 92, behavior: 'shield', range: 76, aggro: 400, atkCd: 1.7, tele: 0.5, block: 0.85, knock: 320 },
-  roller_scout:   { name: 'Éclaireur à rouleau', hp: 120, dmg: 20, speed: 80, xp: 48, coins: 20, h: 96, behavior: 'charger', range: 520, aggro: 600, atkCd: 2.2, tele: 0.6, chargeSpeed: 500, knock: 360, elite: true },
+  roller_scout:   { name: 'Éclaireur à rouleau', hp: 300, dmg: 20, speed: 80, xp: 48, coins: 20, h: 96, behavior: 'charger', range: 520, aggro: 600, atkCd: 2.2, tele: 0.6, chargeSpeed: 500, knock: 360, elite: true },
   // Sbire dédié du Béhémoth Diesel (summon uniquement) — seul boss sans summon jusqu'ici
   armored_hound:  { name: 'Chien de guerre blindé', hp: 34, dmg: 14, speed: 150, xp: 22, coins: 9, h: 60, behavior: 'melee', range: 65, aggro: 520, atkCd: 1.3, tele: 0.35, facing: 'l' },
 
   // --- Ère cyber
-  corp_trooper:   { name: 'Trooper corporate', hp: 55, dmg: 16, speed: 110, xp: 32, coins: 13, h: 78, behavior: 'ranged', range: 560, keep: 340, aggro: 660, atkCd: 1.4, tele: 0.4, proj: 'plasma', burst: 3 },
-  laser_trooper:  { name: 'Trooper laser', hp: 60, dmg: 20, speed: 90, xp: 36, coins: 15, h: 84, behavior: 'ranged', range: 720, keep: 440, aggro: 780, atkCd: 2.6, tele: 0.9, proj: 'laser' },
-  hover_gunner:   { name: 'Mitrailleur hover', hp: 65, dmg: 14, speed: 140, xp: 38, coins: 16, h: 74, behavior: 'flyer', range: 480, keep: 300, aggro: 640, atkCd: 1.7, tele: 0.45, proj: 'plasma', flyH: 130 },
-  drone_swarm:    { name: 'Nuée de drones', hp: 45, dmg: 12, speed: 170, xp: 30, coins: 12, h: 84, behavior: 'flyer', range: 60, aggro: 640, atkCd: 1.9, tele: 0.4, dive: true, flyH: 150 },
+  corp_trooper:   { name: 'Trooper corporate', hp: 138, dmg: 16, speed: 110, xp: 32, coins: 13, h: 78, behavior: 'ranged', range: 560, keep: 340, aggro: 660, atkCd: 1.4, tele: 0.4, proj: 'plasma', burst: 3 },
+  laser_trooper:  { name: 'Trooper laser', hp: 150, dmg: 20, speed: 90, xp: 36, coins: 15, h: 84, behavior: 'ranged', range: 720, keep: 440, aggro: 780, atkCd: 2.6, tele: 0.9, proj: 'laser' },
+  hover_gunner:   { name: 'Mitrailleur hover', hp: 162, dmg: 14, speed: 140, xp: 38, coins: 16, h: 74, behavior: 'flyer', range: 480, keep: 300, aggro: 640, atkCd: 1.7, tele: 0.45, proj: 'plasma', flyH: 130 },
+  drone_swarm:    { name: 'Nuée de drones', hp: 112, dmg: 12, speed: 170, xp: 30, coins: 12, h: 84, behavior: 'flyer', range: 60, aggro: 640, atkCd: 1.9, tele: 0.4, dive: true, flyH: 150 },
   shield_drone:   { name: 'Drone bouclier', hp: 90, dmg: 10, speed: 100, xp: 42, coins: 18, h: 86, behavior: 'flyer', range: 420, keep: 260, aggro: 600, atkCd: 2.2, tele: 0.5, proj: 'plasma', flyH: 110, shielded: 40 },
-  mech_assassin:  { name: 'Assassin mécanisé', hp: 120, dmg: 22, speed: 220, xp: 65, coins: 28, h: 94, behavior: 'assassin', range: 70, aggro: 700, atkCd: 1.3, tele: 0.26, blinkCd: 2.4, elite: true, parry: true },
+  mech_assassin:  { name: 'Assassin mécanisé', hp: 300, dmg: 22, speed: 220, xp: 65, coins: 28, h: 94, behavior: 'assassin', range: 70, aggro: 700, atkCd: 1.3, tele: 0.26, blinkCd: 2.4, elite: true, parry: true },
   // Sbire dédié de l'IA Suprême (summon uniquement)
   core_shard:     { name: 'Éclat du noyau', hp: 26, dmg: 11, speed: 110, xp: 26, coins: 11, h: 56, behavior: 'ranged', range: 480, keep: 300, aggro: 640, atkCd: 1.8, tele: 0.45, proj: 'plasma', float: true, shielded: 25 },
 };
