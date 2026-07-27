@@ -85,7 +85,11 @@ const STONE = {
     { x: 64, y: 27, w: 3, id: 'REBORD_2' },
     { x: 109, y: 12, w: 4, id: 'S03_LEDGE_HIGH' }, // corniche du coffre haut (double saut)
     { x: 150, y: 21, w: 8, id: 'S06_LANDING' },    // réception de la route haute vers S06
-    { x: 230, y: 17, w: 4, id: 'S08_PERCH' },      // poste de frondeur
+    // décalé de tx230 (juste au-dessus du puits SEC_STONE_04, tx227-233) à tx218 : engager ce
+    // frondeur ramenait l'IA piloter tout contre le bord du puits, contribuant à la boucle de
+    // rechute décrite pour le spawn `beast_hunter` plus bas — la position couvre toujours l'accès
+    // au puits, juste depuis le côté, sans surplomber l'ouverture elle-même.
+    { x: 218, y: 17, w: 4, id: 'S08_PERCH' },      // poste de frondeur
   ],
 
   // ---- lianes grimpables ----
@@ -184,8 +188,12 @@ const STONE = {
     { tx: 126, ty: 16, id: 'beast_hunter', dormant: true, activate: 'ridge' },
     // S08 chasse
     { tx: 224, ty: 22, id: 'beast_hunter' },
-    { tx: 236, ty: 22, id: 'beast_hunter' },
-    { tx: 230, ty: 17, id: 'stone_slinger', onPlatform: true },
+    // décalé de tx236 (retour exact des portails locaux SEC_STONE_04, cf. `localPortals` plus bas) :
+    // l'IA ressortait du puits en pleine bagarre contre ce garde, à 3 tuiles seulement du bord du
+    // puits — un recul de combat/esquive suffisait à la refaire tomber dedans, d'où une boucle
+    // puits -> portail -> combat -> chute -> puits...
+    { tx: 245, ty: 22, id: 'beast_hunter' },
+    { tx: 218, ty: 17, id: 'stone_slinger', onPlatform: true }, // repositionné avec S08_PERCH ci-dessus
     { tx: 300, ty: 20, id: 'stone_spear' },
     // SEC_STONE_04 — zone 1 : garde d'entrée, brute élite au pied du puits.
     { tx: 237, ty: 30, id: 'stone_brute', elite: true },
@@ -215,9 +223,15 @@ const STONE = {
   merchant: { x: 198, y: 22 },
 
   // ---- mini-portails locaux (remontée depuis une poche secrète, pas une transition d'ère) ----
+  // returnTo décalé de tx236 à tx241 (cf. commentaire sur le spawn `beast_hunter` du puits plus
+  // haut) : le point de sortie tombait à seulement 3 tuiles du bord du puits (tx233), et pile sur
+  // le point d'apparition d'un garde libre — un recul de combat/esquive juste après avoir
+  // ressurgi suffisait à retomber dans le puits, provoquant une boucle puits/portail infinie
+  // (retour joueur 2026-07-27 : "l'IA (...) reaches the end of the cave, teleport up, goes back
+  // in to the end, and loops"). tx241 laisse 8 tuiles de marge avant le bord du puits.
   localPortals: [
-    { x: 229, y: 30, returnTo: { x: 236, y: 22 } }, // SEC_STONE_04 : sortie rapide au pied du puits
-    { x: 312, y: 30, returnTo: { x: 236, y: 22 } }, // SEC_STONE_04 : sortie finale, après le mini-boss
+    { x: 229, y: 30, returnTo: { x: 241, y: 22 } }, // SEC_STONE_04 : sortie rapide au pied du puits
+    { x: 312, y: 30, returnTo: { x: 241, y: 22 } }, // SEC_STONE_04 : sortie finale, après le mini-boss
   ],
 
   // ---- poches sombres : ambiance de caverne (cf. drawDarkZones) ----

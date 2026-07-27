@@ -230,6 +230,32 @@ pour enrichir l'expérience de jeu, sur le modèle de ce qui marche déjà bien.
   (vers le bas, ~90-260) et `g` 480-620, confirmant la chute au lieu du jaillissement ; (4) une fois
   `emergeT` à 0, les 4 traqueurs bien positionnés au sol du tunnel, sous le plafond (pas dans les
   murs). Aucune erreur console.
+- [x] **Boucle infinie puits SEC_STONE_04, retour joueur 2026-07-27** : "the AI is (sometimes)
+  starting an infinity loop in the cave era 1 : reaches the end of the cave, teleport up, goes
+  back in to the end, and loops..." Root cause diagnostiquée par simulation Playwright déterministe
+  (boucle serrée `AR.DemoAI.update`+`AR.Input.update()`+`game.step(AR.C.DT)`, sans passer par
+  `requestAnimationFrame`, en pilotant directement `AR.Input.virtual = true` puisqu'on court-
+  circuite le chemin normal de bascule du mode démo) : ce n'est pas la logique de ciblage de
+  portail (déjà corrigée précédemment) mais un **problème de placement au niveau de la carte**,
+  deux dangers combinés autour du puits (tx227-233) de `level_specs.js` :
+  - Le point de retour des deux portails locaux (`localPortals[*].returnTo: {x:236,y:22}`) tombait
+    **exactement sur la tuile de spawn d'un `beast_hunter`** libre (`{tx:236,ty:22}`), à seulement 3
+    tuiles du bord du puits — ressortir du puits mettait donc l'IA en plein combat immédiat, et un
+    recul d'esquive/knockback à cet endroit exigu suffisait à la refaire tomber dedans.
+  - Le poste de frondeur (`oneWay S08_PERCH` + spawn `stone_slinger onPlatform`, tx230) surplombait
+    directement l'ouverture du puits : engager ce tireur ramenait l'IA marcher pile sur le bord.
+    Mesuré en simulation (avant fix) : l'IA revenait à `tx≈231-234` juste après le portail (bord du
+    puits = tx233), en plein dans la zone à risque.
+  Fix (`src/level_specs.js`) : point de retour des portails déplacé à `{x:241,y:22}` (8 tuiles de
+  marge avant le bord du puits au lieu de 3) ; le `beast_hunter` déplacé de tx236 à tx245 (ne
+  coïncide plus avec la sortie du portail) ; le poste de frondeur + son `stone_slinger` déplacés de
+  tx230 à tx218, à l'ouest du puits au lieu d'au-dessus — il continue de couvrir l'accès au puits,
+  mais sans attirer l'IA sur le bord de l'ouverture pour l'engager. Vérifié via Playwright : 6
+  runs indépendantes simulées (~60s chacune) depuis l'approche du puits jusqu'à la sortie —
+  `portalUses` reste à 1 dans les 6 cas (jamais de second aller-retour), position minimale observée
+  après le portail `tx≈240.65` (jamais plus proche du bord que ça, contre `tx≈231` avant fix, donc
+  déjà dans l'emprise du puits), aucune retombée dans le puits détectée (`y` jamais repassé sous la
+  ligne de surface après le portail). Aucune erreur console.
 
 ## 🗺️ Minimap / brouillard de guerre
 
