@@ -51,12 +51,10 @@ const STONE = {
     // S07 camp des premiers feux (safe)
     { x: 184, y: 22, w: 28, h: 10 },
     // S08 passe des totems : chasse / enclos élite / antichambre
-    // Trou de la grotte secrète (§ci-dessous, tx227-233) : bloc 212-248 scindé en deux avec un
-    // vrai vide entre les deux (pas d'`empties` à soustraire — même technique que le puits S02→S04,
-    // un simple manque de sol) ; la grotte a son propre plancher plus bas, ce n'est pas un gouffre.
-    { x: 212, y: 22, w: 15, h: 10 },      // 212-227
-    { x: 233, y: 22, w: 15, h: 10 },      // 233-248
-    { x: 227, y: 28, w: 6, h: 4 },        // plancher de la grotte secrète (SEC_STONE_04), sous le trou
+    // Bloc plein 212-248 (crypte de la grotte secrète SEC_STONE_04 creusée dedans via `empties`,
+    // ci-dessous : puits vertical tx227-233 + réseau souterrain horizontal tx225-318, plancher
+    // conservé aux 2 dernières tuiles y30-32).
+    { x: 212, y: 22, w: 36, h: 10 },       // 212-248
     { x: 248, y: 22, w: 38, h: 10 },      // enclos (38 tuiles : charge du mammouth OK)
     { x: 286, y: 22, w: 10, h: 10 },
     { x: 296, y: 21, w: 10, h: 11 },
@@ -69,6 +67,13 @@ const STONE = {
   empties: [
     { x: 54, y: 27, w: 6, h: 2 },         // pochette du secret SEC_STONE_01 (sous le hub)
     { x: 176, y: 19, w: 6, h: 4 },        // alcôve SEC_STONE_03 (levier S06) — plain-pied, visible depuis le sol
+    // SEC_STONE_04 : puits vertical (tx227-233, y22-30 — profond, invisible depuis le haut grâce
+    // à darkZones) débouchant sur un réseau souterrain horizontal (tx225-318, y25-30) creusé sous
+    // le chemin de surface de S08 ; la croûte de surface (y22) et le plancher (y30-32) restent solides.
+    // Plafond du réseau à y25 (et non y23) pour rester sous le déclencheur/barrières de E_STONE_ELITE
+    // (y14-24) qui partagent la même bande x248-285 sur le chemin de surface juste au-dessus.
+    { x: 227, y: 22, w: 6, h: 8 },
+    { x: 225, y: 25, w: 93, h: 5 },
   ],
 
   // ---- plateformes traversables (one-way) ----
@@ -118,8 +123,11 @@ const STONE = {
       camera: { minX: 146, maxX: 184, minY: 10, maxY: 32 }, safeRespawn: [{ x: 180, y: 22, priority: 8 }] },
     { id: 'S07_FIRST_FIRE_CAMP', rect: { x: 184, y: 17, w: 28, h: 15 }, tags: ['safe', 'no_enemy', 'merchant'],
       camera: { minX: 184, maxX: 212, minY: 13, maxY: 32 }, safeRespawn: [{ x: 198, y: 22, priority: 10 }] },
-    { id: 'S08_TOTEM_PASS', rect: { x: 212, y: 12, w: 108, h: 20 }, tags: ['tension'],
+    { id: 'S08_TOTEM_PASS', rect: { x: 212, y: 12, w: 108, h: 10 }, tags: ['tension'],
       camera: { minX: 212, maxX: 320, minY: 8, maxY: 32 }, safeRespawn: [{ x: 226, y: 22, priority: 7 }, { x: 300, y: 20, priority: 8 }] },
+    { id: 'SEC_STONE_04_DEPTHS', rect: { x: 225, y: 22, w: 93, h: 12 }, tags: ['secret', 'cave', 'dark'],
+      camera: { minX: 220, maxX: 320, minY: 18, maxY: 32 },
+      safeRespawn: [{ x: 230, y: 30, priority: 9 }, { x: 250, y: 30, priority: 7 }, { x: 300, y: 30, priority: 7 }] },
     { id: 'S09_MAMMOTH_ARENA', rect: { x: 320, y: 8, w: 34, h: 24 }, tags: ['boss'],
       camera: { minX: 320, maxX: 354, minY: 6, maxY: 32 }, safeRespawn: [{ x: 324, y: 23, priority: 10 }] },
   ],
@@ -141,12 +149,26 @@ const STONE = {
       gates: [{ x: 248, y: 14, w: 1, h: 10 }, { x: 285, y: 14, w: 1, h: 10 }],
       waves: [{ ids: ['mammoth_rider', 'stone_spear', 'stone_spear'], elite: ['mammoth_rider'] }],
       reward: { coins: 25 } },
+    // SEC_STONE_04 — zone 2 du réseau souterrain : chauves-souris + frondeurs en retrait, verrouillé.
+    { id: 'E_SEC04_GAUNTLET', roomId: 'SEC_STONE_04_DEPTHS',
+      trigger: { x: 240, y: 25, w: 20, h: 5 },
+      gates: [{ x: 239, y: 25, w: 1, h: 5 }, { x: 261, y: 25, w: 1, h: 5 }],
+      waves: [{ ids: ['stone_cave_bats', 'stone_cave_bats', 'stone_slinger', 'stone_slinger'] }],
+      reward: { coins: 18 } },
+    // SEC_STONE_04 — zone 4 (antre finale) : mini-boss à taille humaine, salle sans issue tant qu'il vit.
+    { id: 'E_SEC04_MAMMOTH', roomId: 'SEC_STONE_04_DEPTHS',
+      trigger: { x: 293, y: 25, w: 21, h: 5 },
+      gates: [{ x: 292, y: 25, w: 1, h: 5 }],
+      waves: [{ ids: ['mammoth_rider'], elite: ['mammoth_rider'] }],
+      reward: { coins: 30 } },
   ],
 
   // ---- déclencheurs de scène ----
   triggers: [
     { id: 'BATS_WAKE', rect: { x: 61, y: 23, w: 6, h: 4 }, action: 'wakeSpawns', group: 'well_bats' },
     { id: 'RIDGE_WAKE', rect: { x: 96, y: 14, w: 40, h: 3 }, action: 'wakeSpawns', group: 'ridge' },
+    // SEC_STONE_04 — zone 3 : les traqueurs tombent du plafond une fois le joueur au centre de la salle.
+    { id: 'SEC04_STALKERS_WAKE', rect: { x: 268, y: 25, w: 16, h: 5 }, action: 'wakeSpawns', group: 'sec04_stalkers' },
   ],
 
   // ---- ennemis libres (hors encounters) + chauves-souris suspendues ----
@@ -165,10 +187,14 @@ const STONE = {
     { tx: 236, ty: 22, id: 'beast_hunter' },
     { tx: 230, ty: 17, id: 'stone_slinger', onPlatform: true },
     { tx: 300, ty: 20, id: 'stone_spear' },
-    // SEC_STONE_04 : grotte secrète sous le trou de S08 (tx227-233) — mêmes créatures que la
-    // grotte S04/S05 (rien d'autre de prévu pour l'ère 1 dans le pack), actives dès l'arrivée.
-    { tx: 228, ty: 28, id: 'stone_cave_stalker' },
-    { tx: 230, ty: 28, id: 'stone_cave_bats' },
+    // SEC_STONE_04 — zone 1 : garde d'entrée, brute élite au pied du puits.
+    { tx: 237, ty: 30, id: 'stone_brute', elite: true },
+    // SEC_STONE_04 — zone 3 : traqueurs suspendus au plafond, tombent au réveil du trigger
+    // SEC04_STALKERS_WAKE une fois le joueur au centre de la salle (encerclement).
+    { tx: 266, ty: 25, id: 'stone_cave_stalker', dormant: true, activate: 'sec04_stalkers' },
+    { tx: 271, ty: 25, id: 'stone_cave_stalker', dormant: true, activate: 'sec04_stalkers' },
+    { tx: 277, ty: 25, id: 'stone_cave_stalker', dormant: true, activate: 'sec04_stalkers' },
+    { tx: 282, ty: 25, id: 'stone_cave_stalker', dormant: true, activate: 'sec04_stalkers' },
   ],
 
   // ---- coffres ----
@@ -179,14 +205,21 @@ const STONE = {
     { x: 206, y: 22 },                    // coffre du camp
     { x: 178, y: 23 },                    // SEC_STONE_03 : cache d'or (alcôve du levier, plain-pied)
     { x: 312, y: 20 },                    // coffre de préparation (antichambre)
-    { x: 229, y: 28, guaranteed: 'swordUp' }, // SEC_STONE_04 : récompense garantie de la grotte secrète
+    { x: 306, y: 30, guaranteed: 'swordUp' }, // SEC_STONE_04 : récompense garantie, derrière le mini-boss
   ],
 
   merchant: { x: 198, y: 22 },
 
   // ---- mini-portails locaux (remontée depuis une poche secrète, pas une transition d'ère) ----
   localPortals: [
-    { x: 232, y: 28, returnTo: { x: 236, y: 22 } }, // SEC_STONE_04 : ramène à la surface, après le trou
+    { x: 229, y: 30, returnTo: { x: 236, y: 22 } }, // SEC_STONE_04 : sortie rapide au pied du puits
+    { x: 312, y: 30, returnTo: { x: 236, y: 22 } }, // SEC_STONE_04 : sortie finale, après le mini-boss
+  ],
+
+  // ---- poches sombres : voile + trouées de lumière aux torches ('fire' props alentour) ----
+  darkZones: [
+    { x: 227, y: 20, w: 6, h: 4 },    // capuchon du puits SEC_STONE_04 : on ne voit pas le fond depuis le haut
+    { x: 225, y: 24, w: 93, h: 8 },   // réseau souterrain (zones 1-4), sous le puits
   ],
 
   // ---- décor ----
@@ -207,6 +240,13 @@ const STONE = {
     { type: 'bones', tx: 240, ty: 22 },
     { type: 'fire', tx: 324, ty: 23, s: 1.2 },
     { type: 'fire', tx: 350, ty: 23, s: 1.2 },
+    // SEC_STONE_04 : torches du réseau souterrain — seules sources de lumière (darkZones)
+    { type: 'fire', tx: 231, ty: 30, s: 0.9 },
+    { type: 'fire', tx: 243, ty: 30, s: 0.9 },
+    { type: 'fire', tx: 254, ty: 30, s: 0.9 },
+    { type: 'fire', tx: 275, ty: 30, s: 0.75 },   // volontairement faible : embuscade des traqueurs
+    { type: 'fire', tx: 297, ty: 30, s: 0.9 },
+    { type: 'fire', tx: 309, ty: 30, s: 1.1 },    // éclaire le coffre final
   ],
 
   // ---- indices pour l'IA de démonstration ----

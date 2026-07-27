@@ -992,6 +992,7 @@ AR.Game = class {
     AR.Projectiles.draw(ctx, cam);
     AR.Particles.draw(ctx, cam);
     lvl.drawAmbient(ctx);
+    lvl.drawDarkZones(ctx, cam);
 
     // teinte du Voile temporel
     if (this.veilT > 0) {

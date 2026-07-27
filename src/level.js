@@ -27,6 +27,7 @@ AR.Level = class {
     // ----- contrats communs, remplis par l'un des deux constructeurs de carte
     this.platforms = []; this.props = []; this.spawns = []; this.chestSpots = [];
     this.localPortals = []; // remontées locales (poches secrètes), distinctes du portail de fin de boss
+    this.darkZones = []; // poches sombres (grottes profondes) : overlay + trouées de lumière aux torches
     this.gateClosed = false; this.grid = null;
     this.rooms = []; this.roomById = {};
     this.climbables = []; this.breakables = []; this.interactables = [];
@@ -321,6 +322,11 @@ AR.Level = class {
     for (const p of spec.localPortals || []) {
       this.localPortals.push({ x: (p.x + 0.5) * T, y: p.y * T,
         returnTo: { x: p.returnTo.x * T, y: p.returnTo.y * T } });
+    }
+
+    // --- poches sombres (grottes profondes) : rects en tuiles -> pixels
+    for (const z of spec.darkZones || []) {
+      this.darkZones.push({ x: z.x * T, y: z.y * T, w: z.w * T, h: z.h * T });
     }
 
     // --- arène de boss (réutilise le pipeline image existant)
@@ -1019,6 +1025,38 @@ AR.Level = class {
       const x = p.x - cx, y = p.y - cy;
       if (x < -140 || x > AR.C.VIEW_W + 140) continue;
       this._drawProp(ctx, p, x, y, time);
+    }
+  }
+
+  // Poches sombres (grottes profondes) : voile quasi-opaque sur la zone, troué de flaques
+  // de lumière aux torches ('fire' props alentour) — donne l'ambiance "on ne voit que les
+  // torches au mur" et cache le fond des puits profonds vus depuis le haut.
+  drawDarkZones(ctx, cam) {
+    if (!this.darkZones.length) return;
+    const cx = cam.cx(), cy = cam.cy(), W = AR.C.VIEW_W, H = AR.C.VIEW_H;
+    for (const z of this.darkZones) {
+      const x = z.x - cx, y = z.y - cy;
+      if (x > W || x + z.w < 0 || y > H || y + z.h < 0) continue;
+      const rx = Math.max(0, x), ry = Math.max(0, y);
+      const rw = Math.min(W, x + z.w) - rx, rh = Math.min(H, y + z.h) - ry;
+      if (rw <= 0 || rh <= 0) continue;
+      ctx.save();
+      ctx.beginPath(); ctx.rect(rx, ry, rw, rh); ctx.clip();
+      ctx.fillStyle = 'rgba(4,4,10,0.86)';
+      ctx.fillRect(rx, ry, rw, rh);
+      ctx.globalCompositeOperation = 'destination-out';
+      for (const p of this.props) {
+        if (p.type !== 'fire') continue;
+        if (p.x < z.x - 60 || p.x > z.x + z.w + 60 || p.y < z.y - 60 || p.y > z.y + z.h + 60) continue;
+        const px = p.x - cx, py = p.y - cy - 16, r = 150 * (p.s || 1);
+        const g = ctx.createRadialGradient(px, py, 0, px, py, r);
+        g.addColorStop(0, 'rgba(0,0,0,0.95)');
+        g.addColorStop(0.55, 'rgba(0,0,0,0.5)');
+        g.addColorStop(1, 'rgba(0,0,0,0)');
+        ctx.fillStyle = g;
+        ctx.beginPath(); ctx.arc(px, py, r, 0, Math.PI * 2); ctx.fill();
+      }
+      ctx.restore();
     }
   }
 

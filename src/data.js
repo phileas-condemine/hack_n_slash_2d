@@ -71,7 +71,7 @@ AR.ENEMIES = {
   war_shaman:     { name: 'Chaman de guerre', hp: 34, dmg: 9, speed: 55, xp: 26, coins: 10, h: 96, behavior: 'caster', range: 560, keep: 340, aggro: 600, atkCd: 2.6, tele: 0.7, proj: 'wisp' },
   mammoth_rider:  { name: 'Monteur de mammouth', hp: 150, dmg: 22, speed: 70, xp: 60, coins: 25, h: 128, behavior: 'charger', range: 480, aggro: 560, atkCd: 2.6, tele: 0.75, chargeSpeed: 420, knock: 380, elite: true },
   // Nouveaux monstres de l'extension (âge de pierre) — cf. 01_niveau_age_de_pierre.md §6
-  stone_cave_stalker: { name: 'Traqueur des cavernes', hp: 40, dmg: 12, speed: 72, xp: 34, coins: 14, h: 96, behavior: 'assassin', range: 66, aggro: 500, atkCd: 1.9, tele: 0.45, blinkCd: 2.8, facing: 'l' },
+  stone_cave_stalker: { name: 'Traqueur des cavernes', hp: 40, dmg: 12, speed: 72, xp: 34, coins: 14, h: 96, behavior: 'assassin', range: 66, aggro: 500, atkCd: 1.9, tele: 0.45, blinkCd: 2.8, facing: 'l', parry: true },
   stone_cave_bats:    { name: 'Nuée de chauves-souris', hp: 22, dmg: 8, speed: 150, xp: 16, coins: 6, h: 72, behavior: 'flyer', range: 60, aggro: 520, atkCd: 1.6, tele: 0.35, dive: true, flyH: 150 },
 
   // --- Antiquité
