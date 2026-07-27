@@ -935,25 +935,52 @@ AR.Level = class {
         const f = this.grid[ty * W + tx];
         if (!(f & F.SOLID)) continue;
         const x = tx * T - cx, y = ty * T - cy;
+        // poche sombre = vraie roche de caverne (teinte froide dédiée), pas juste un filtre
+        // posé par-dessus le décor de surface — cf. drawDarkZones() pour l'éclairage aux torches.
+        const cave = this._inDarkZone(tx * T + T / 2, ty * T + T / 2);
         ctx.fillStyle = pat;
         ctx.save(); ctx.translate(-cx % 96, -cy % 96);
         ctx.fillRect(x + cx % 96, y + cy % 96, T + 1, T + 1);
         ctx.restore();
+        if (cave) { ctx.fillStyle = 'rgba(18,14,34,0.62)'; ctx.fillRect(x, y, T + 1, T + 1); }
         const above = this._flagAt(tx, ty - 1) & F.SOLID;
         const below = this._flagAt(tx, ty + 1) & F.SOLID;
         if (!above) { // surface : bande + liseré
-          ctx.fillStyle = era.groundTop; ctx.fillRect(x, y, T + 1, 9);
-          ctx.fillStyle = era.accent; ctx.globalAlpha = era.id === 'cyber' ? 0.95 : 0.55;
+          ctx.fillStyle = cave ? '#4a3f6a' : era.groundTop; ctx.fillRect(x, y, T + 1, 9);
+          ctx.fillStyle = cave ? '#9d8be0' : era.accent; ctx.globalAlpha = (era.id === 'cyber' && !cave) ? 0.95 : 0.55;
           ctx.fillRect(x, y, T + 1, 3); ctx.globalAlpha = 1;
         }
         if (!(this._flagAt(tx - 1, ty) & F.SOLID)) { ctx.fillStyle = 'rgba(0,0,0,0.22)'; ctx.fillRect(x, y, 5, T + 1); }
         if (!(this._flagAt(tx + 1, ty) & F.SOLID)) { ctx.fillStyle = 'rgba(0,0,0,0.16)'; ctx.fillRect(x + T - 5, y, 5, T + 1); }
-        if (!below) { ctx.fillStyle = 'rgba(0,0,0,0.30)'; ctx.fillRect(x, y + T - 6, T + 1, 6); } // plafond de grotte
+        if (!below) { // plafond de grotte : stalactites en roche de caverne, pas juste une bande noire
+          if (cave) this._drawStalactite(ctx, x, y, T, tx);
+          else { ctx.fillStyle = 'rgba(0,0,0,0.30)'; ctx.fillRect(x, y + T - 6, T + 1, 6); }
+        }
         if (f & F.BREAKABLE) this._drawBreakableTile(ctx, x, y, T, tx, ty);
       }
     }
     this._drawPlatforms(ctx, cam);
     this._drawArenaGate(ctx, cam);
+  }
+
+  _inDarkZone(px, py) {
+    for (const z of this.darkZones) {
+      if (px >= z.x && px <= z.x + z.w && py >= z.y && py <= z.y + z.h) return true;
+    }
+    return false;
+  }
+
+  // Stalactite procédurale : remplace la bande noire plate du plafond par une silhouette de
+  // roche irrégulière qui pend dans la pièce, pour une vraie identité "grotte" (variée par tx
+  // via un pseudo-hasard déterministe, pas d'état à stocker).
+  _drawStalactite(ctx, x, y, T, tx) {
+    const seed = (tx * 7349) % 100;
+    const len = 5 + (seed % 15), w = 9 + (seed % 3) * 4;
+    const cx0 = x + T / 2 + ((seed % 5) - 2) * 3;
+    ctx.fillStyle = 'rgba(9,7,18,0.9)';
+    ctx.beginPath();
+    ctx.moveTo(cx0 - w / 2, y + T); ctx.lineTo(cx0 + w / 2, y + T); ctx.lineTo(cx0, y + T + len);
+    ctx.closePath(); ctx.fill();
   }
 
   // Mur friable : doit se lire comme de la roche fissurée qu'on peut détruire au
@@ -1028,9 +1055,11 @@ AR.Level = class {
     }
   }
 
-  // Poches sombres (grottes profondes) : voile quasi-opaque sur la zone, troué de flaques
-  // de lumière aux torches ('fire' props alentour) — donne l'ambiance "on ne voit que les
-  // torches au mur" et cache le fond des puits profonds vus depuis le haut.
+  // Poches sombres (grottes profondes) : légère teinte froide d'ambiance (on voit tout, ce
+  // n'est pas un filtre qui cache la scène) + halos chauds additifs autour des torches, qui
+  // agissent comme de vraies sources de lumière plutôt que des trous découpés dans un voile
+  // opaque. La roche/les stalactites (cf. _drawTerrainGrid/_drawStalactite) portent l'essentiel
+  // de l'identité "grotte" ; cette passe ne fait plus que l'éclairage.
   drawDarkZones(ctx, cam) {
     if (!this.darkZones.length) return;
     const cx = cam.cx(), cy = cam.cy(), W = AR.C.VIEW_W, H = AR.C.VIEW_H;
@@ -1042,17 +1071,17 @@ AR.Level = class {
       if (rw <= 0 || rh <= 0) continue;
       ctx.save();
       ctx.beginPath(); ctx.rect(rx, ry, rw, rh); ctx.clip();
-      ctx.fillStyle = 'rgba(4,4,10,0.86)';
+      ctx.fillStyle = 'rgba(10,8,22,0.4)';
       ctx.fillRect(rx, ry, rw, rh);
-      ctx.globalCompositeOperation = 'destination-out';
+      ctx.globalCompositeOperation = 'lighter';
       for (const p of this.props) {
         if (p.type !== 'fire') continue;
-        if (p.x < z.x - 60 || p.x > z.x + z.w + 60 || p.y < z.y - 60 || p.y > z.y + z.h + 60) continue;
-        const px = p.x - cx, py = p.y - cy - 16, r = 150 * (p.s || 1);
+        if (p.x < z.x - 220 || p.x > z.x + z.w + 220 || p.y < z.y - 220 || p.y > z.y + z.h + 220) continue;
+        const px = p.x - cx, py = p.y - cy - 18, r = 230 * (p.s || 1);
         const g = ctx.createRadialGradient(px, py, 0, px, py, r);
-        g.addColorStop(0, 'rgba(0,0,0,0.95)');
-        g.addColorStop(0.55, 'rgba(0,0,0,0.5)');
-        g.addColorStop(1, 'rgba(0,0,0,0)');
+        g.addColorStop(0, 'rgba(255,175,90,0.5)');
+        g.addColorStop(0.4, 'rgba(255,120,45,0.24)');
+        g.addColorStop(1, 'rgba(255,80,20,0)');
         ctx.fillStyle = g;
         ctx.beginPath(); ctx.arc(px, py, r, 0, Math.PI * 2); ctx.fill();
       }

@@ -240,11 +240,16 @@ const STONE = {
     { type: 'bones', tx: 240, ty: 22 },
     { type: 'fire', tx: 324, ty: 23, s: 1.2 },
     { type: 'fire', tx: 350, ty: 23, s: 1.2 },
-    // SEC_STONE_04 : torches du réseau souterrain — seules sources de lumière (darkZones)
+    // SEC_STONE_04 : torches du réseau souterrain — la roche de caverne + la teinte d'ambiance
+    // (cf. drawDarkZones/_drawTerrainGrid) assurent maintenant une bonne visibilité partout ;
+    // ces torches ne sont plus la seule source de lumière, juste des halos chauds d'ambiance.
+    { type: 'fire', tx: 229, ty: 26, s: 0.75 },   // puits vertical, à mi-descente
     { type: 'fire', tx: 231, ty: 30, s: 0.9 },
     { type: 'fire', tx: 243, ty: 30, s: 0.9 },
     { type: 'fire', tx: 254, ty: 30, s: 0.9 },
+    { type: 'fire', tx: 264, ty: 30, s: 0.85 },
     { type: 'fire', tx: 275, ty: 30, s: 0.75 },   // volontairement faible : embuscade des traqueurs
+    { type: 'fire', tx: 286, ty: 30, s: 0.85 },
     { type: 'fire', tx: 297, ty: 30, s: 0.9 },
     { type: 'fire', tx: 309, ty: 30, s: 1.1 },    // éclaire le coffre final
   ],

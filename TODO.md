@@ -109,6 +109,42 @@ pour enrichir l'expérience de jeu, sur le modèle de ce qui marche déjà bien.
   revoir spécifiquement si besoin, mais pas inclus dans ce coup de balai général. Les PV des boss
   eux-mêmes (`AR.BOSSES`) ne sont pas touchés. Vérifié en jeu (nouvelles valeurs de PV lues
   correctement à l'instanciation, aucune erreur console).
+- [x] **Refonte de l'ambiance des grottes profondes (SEC_STONE_04, ère 1)** — fait le 2026-07-27,
+  retour joueur (capture d'écran à l'appui) : "on ne voit quasiment rien dans la cave de l'ère 1
+  (...) je ne veux pas que tu ajoutes un filtre opacifiant mais que tu design une ambiance vraiment
+  différente mais avec une bonne luminosité grâce à des torches aux murs". Cause : `drawDarkZones`
+  (`src/level.js`) peignait un voile quasi-opaque (`rgba(4,4,10,0.86)`) **par-dessus toute la scène,
+  y compris le héros et les ennemis** (dernière passe du `render()`), troué de minuscules cercles
+  aux torches (`destination-out`) — d'où le "on ne voit rien" en dehors d'un halo de ~150px. Refonte,
+  pas un simple réglage d'opacité :
+  - `_drawTerrainGrid` distingue maintenant vraiment la roche de caverne (teinte froide dédiée
+    directement sur les tuiles, pas un filtre écran) des plafonds remplacés par de vraies
+    stalactites procédurales (`_drawStalactite`, silhouette variée par tuile via un hasard
+    déterministe) au lieu d'une simple bande noire plate.
+  - `drawDarkZones` ne cache plus rien : teinte d'ambiance froide légère (`rgba(10,8,22,0.4)`,
+    on voit tout partout) + halos chauds **additifs** (`globalCompositeOperation:'lighter'`) autour
+    des torches, qui éclaircissent vraiment la zone comme de vraies sources de lumière au lieu de
+    découper des trous dans le noir.
+  - Torches complétées dans le tunnel souterrain (`src/level_specs.js`, ère pierre) pour combler les
+    deux plus grands intervalles (nouvelles torches tx264/tx286) + une torche à mi-puits (tx229,ty26) ;
+    l'embuscade des traqueurs (tx275, torche volontairement plus faible) reste inchangée.
+  Vérifié visuellement via Playwright (capteur téléporté dans le tunnel : stalactites, sol de roche
+  distinct, halos de torches diffus et lisibles, ennemis visibles à distance des torches), aucune
+  erreur console.
+- [x] **Bug IA démo : boucle infinie au portail local de SEC_STONE_04** — repéré par le joueur en
+  même temps que le point ci-dessus ("l'IA boucle, elle saute dedans, arrive sur le portail, remonte
+  via le portail et boucle à l'infini"). Cause (`src/demoai.js`) : `AR.Pickups.list.find(p => p.type
+  === 'portal')` attrapait n'importe quel portail, y compris les mini-portails locaux des poches
+  secrètes (`returnTo` défini, réutilisables à volonté, présents dès le chargement du niveau — cf.
+  `game.js#_useLocalPortal`) — et ce but écrasait inconditionnellement tout le reste (combat,
+  butin, exploration). L'IA fonçait donc dans la grotte secrète, touchait le portail local, était
+  téléportée à la sortie... où le même portail (toujours dans la liste) redevenait aussitôt sa cible
+  n°1, la renvoyant dedans indéfiniment. Fix : le beeline inconditionnel ne cible plus que le vrai
+  portail de fin d'arène (`!p.returnTo`) ; les portails locaux ne sont plus utilisés qu'au passage,
+  via la logique de proximité déjà existante (`interactive`). Vérifié par simulation accélérée
+  (120s simulées, IA lâchée juste à côté du portail local) : 2 usages du portail (comportement normal
+  d'aller-retour pour le butin), progression réelle sur 140+ tuiles ensuite, contre une boucle
+  infinie avant le fix.
 
 ## 🗺️ Minimap / brouillard de guerre
 

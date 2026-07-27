@@ -756,7 +756,13 @@ AR.DemoAI = {
     // ---------- objectif de déplacement
     let goalX = null;
     const interactive = AR.Pickups.nearestInteractive(pl);
-    const portal = AR.Pickups.list.find((p) => p.type === 'portal');
+    // Seul le vrai portail de fin d'arène (sans `returnTo`) doit être beeliné inconditionnellement :
+    // les mini-portails locaux des poches secrètes (`returnTo` défini, cf. game.js#_useLocalPortal)
+    // restent utilisables à volonté et existent dès le chargement du niveau — les inclure ici
+    // faisait plonger l'IA dans la grotte secrète, la faisait remonter par le portail local, puis
+    // la renvoyait aussitôt dedans (le portail reste dans la liste), en boucle infinie. Un portail
+    // local est maintenant seulement utilisé au passage via `interactive` (proximité), jamais visé.
+    const portal = AR.Pickups.list.find((p) => p.type === 'portal' && !p.returnTo);
     let chest = this._pickReachableChest(game, pl, pcx);
     let loot = null;
     const wantShop = game.merchantPickup && !game.merchantPickup.used &&
