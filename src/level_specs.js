@@ -1737,11 +1737,329 @@ const DIESEL = {
   },
 };
 
+// « La Flèche de l'IA Suprême » — dernière carte authored, forme radicalement différente des 5
+// précédentes : une mégalopole HYBRIDE plutôt qu'une bande large (R1-R4) ou un puits vertical
+// (R5) — progression horizontale au niveau des rues/toits corporate (C0-C2, `y` constant par
+// palier), puis ascension finale (C3, escalier + pads) vers le noyau flottant, tout en haut du
+// monde (même endroit, en coordonnées écran, où l'image d'arène de CHAQUE ère est ancrée —
+// `Level#_startBossFight` téléporte le héros dans l'arène, cf. `Game#_startBossFight` : la
+// position antérieure du héros n'a donc aucune incidence sur le raccord visuel, contrairement à
+// ce qu'on pourrait croire — vérifié en lisant le code avant de dimensionner l'antichambre, pas
+// besoin d'aligner artificiellement les hauteurs).
+// Storytelling : suite directe de R5 — l'IA née de l'innovation de l'Ingénieur de Guerre a
+// fusionné les corporations en une mégalopole flottante entièrement quadrillée par sa propre
+// sécurité. Rue corporate -> toits -> réseau de sécurité -> flèche du noyau -> IA Suprême.
+// 5 mécaniques originales confirmées par le joueur (« génial, je veux tout ! ») :
+//  1. Terminaux réversibles (`type:'terminal'`) -> grille laser / pont holo (`interactables`
+//     `type:'door'`, `propType:'lasergrid'|'holobridge'` — cf. `Level#drawEnergyBarriers`) :
+//     TOUJOURS confinés aux zones secrètes (jamais sur le chemin obligatoire, même leçon que la
+//     cage de mine R5) — chacun plombe une brèche du sol (le sol reste continu et l'IA de démo,
+//     qui n'active jamais délibérément un terminal, ne voit donc jamais de trou).
+//  2. Terminaux de piratage (mêmes `type:'terminal'`, liés par `activate`/`activateGroup` à un
+//     `shield_drone`/`corp_trooper` proche plutôt qu'à une porte, cf. `Enemy#hijack`) : jamais
+//     bloquants, posés en vitrine sur C2_SECURITY.
+//  3. Pads de saut anti-gravité (`launchPads`, contact automatique donc sûrs pour l'IA) : les 2
+//     grandes transitions verticales (C0->C1, C2->C3).
+//  4. Alarme de sécurité (`triggers` `wakeSpawns`, zéro code moteur neuf) : SEC_C2_VAULT.
+// Roster déjà existant (`AR.ERAS[5]`), aucun nouvel art : corp_trooper/laser_trooper (ranged),
+// hover_gunner/drone_swarm/shield_drone (flyer), élite mech_assassin (parry). ~80 monstres,
+// 4 mini-boss élite (mech_assassin), 1 horde qui déferle (10 d'un coup).
+const CYBER = {
+  id: 'cyber',
+  tilesW: 250,
+  worldH: 62,
+  spawnX: 3,
+  startRoom: 'C0_STREET',
+  bossArenaRoom: 'C3_ARENA',
+  // Chemin obligatoire toujours strictement avant cette colonne (C3_ANTECHAMBER s'étend x207-236,
+  // le déclenchement à x228 laisse une marge de marche confortable avant l'arène, même patron que
+  // RENAISSANCE : « antichambre, aucun ennemi, respawn sûr avant la porte »).
+  arenaStartTx: 228,
+  gateTx: 10000, // sentinelle : aucun mur de porte horizontal utile ici (cf. R5)
+  arenaGy: 18,   // hauteur de l'antichambre (comme RENAISSANCE arenaGy:9 = sa propre antichambre)
+  fallDamageRatio: 0.10,
+
+  // ---- terrain solide ----
+  solids: [
+    // C0_STREET (y44) : sol continu, coupé de la brèche gardée x20-22 (GRID_C0 -> SEC_C0_SERVERS,
+    // plombée par défaut donc invisible/infranchissable tant que TERM_C0 ne l'a pas piratée).
+    { x: 0, y: 44, w: 20, h: 8 },
+    { x: 23, y: 44, w: 47, h: 8 },          // x23-69
+
+    { x: 5, y: 54, w: 20, h: 4 },           // SEC_C0_SERVERS (sous la rue) x5-24
+
+    // C1_ROOFTOPS (y32) : sol continu, brèche gardée x90-92 (GRID_C1 -> SEC_C1_WALKWAY). Colonnes
+    // 66-68 (atterrissage de PAD_C0_C1) exclues du solide : un bloc plein de 8 tuiles d'épaisseur
+    // (rows32-39) n'est praticable QUE par le dessus, y compris sa propre face supérieure (row32)
+    // qui bloque tout autant une remontée par en dessous qu'un plafond ordinaire (bug trouvé en
+    // testant : creuser seulement le dessous en `empties` ne suffisait pas, le héros butait quand
+    // même contre le plafond restant à row32). Ce carré est plutôt une plateforme `oneWay` (cf.
+    // plus bas) : traversable en montant, solide seulement en retombant dessus — exactement ce
+    // qu'il faut pour un point d'atterrissage de pad.
+    { x: 60, y: 32, w: 6, h: 8 },           // x60-65
+    { x: 69, y: 32, w: 21, h: 8 },          // x69-89
+    { x: 93, y: 32, w: 37, h: 8 },          // x93-129
+
+    { x: 78, y: 40, w: 25, h: 4 },          // SEC_C1_WALKWAY (sous les toits) x78-102
+
+    // C2_SECURITY (y32, prolonge C1 sans coupure x129->130) : brèche gardée x150-152 (GRID_C2 ->
+    // SEC_C2_VAULT).
+    { x: 130, y: 32, w: 20, h: 8 },         // x130-149
+    { x: 153, y: 32, w: 17, h: 8 },         // x153-169
+
+    { x: 140, y: 40, w: 20, h: 4 },         // SEC_C2_VAULT x140-159
+
+    // C3_SPIRE : petite plateforme d'atterrissage du pad PAD_C2_C3, puis escalier de 6 marches
+    // (1 tuile/marche, toujours franchissable en un saut simple si besoin — même patron que le
+    // rempart de RENAISSANCE, `h` croissant pour garder chaque marche ancrée à une base commune
+    // y40, aucun trou en dessous).
+    { x: 172, y: 24, w: 15, h: 2 },         // atterrissage du pad
+    { x: 189, y: 23, w: 3, h: 17 }, { x: 192, y: 22, w: 3, h: 18 },
+    { x: 195, y: 21, w: 3, h: 19 }, { x: 198, y: 20, w: 3, h: 20 },
+    { x: 201, y: 19, w: 3, h: 21 }, { x: 204, y: 18, w: 3, h: 22 },
+    { x: 207, y: 18, w: 30, h: 22 },        // C3_ANTECHAMBER x207-236 (aucun ennemi jusqu'au gauntlet)
+
+    // filet de sécurité de l'arène : même convention que STONE/ANTIQUITY/MEDIEVAL/RENAISSANCE
+    // (y23, PAS la hauteur de l'antichambre) — le sol réel vient de l'image d'arène une fois
+    // `bossArena.active` (le héros y est téléporté, cf. commentaire d'en-tête).
+    { x: 228, y: 23, w: 34, h: 9 },
+  ],
+
+  empties: [],
+  // Atterrissage de PAD_C0_C1 : cf. commentaire détaillé sur `solids` (C1_ROOFTOPS) juste
+  // au-dessus — une plateforme à sens unique plutôt qu'un solide, seule façon de laisser le pad
+  // traverser librement en montant tout en catchant normalement la retombée.
+  oneWay: [
+    { x: 66, y: 32, w: 3, id: 'PAD_C0_C1_LEDGE' },
+  ],
+  climbables: [],
+
+  // ---- destructibles : aucun (kegs/gaz déjà utilisés R4/R5, R6 mise sur ses 5 mécaniques
+  // propres plutôt que de recycler celle-ci aussi) ----
+  breakables: [],
+
+  // ---- interactables : terminaux -> portes (secrets) ou piratage (vitrine, jamais bloquant) ----
+  interactables: [
+    { id: 'GRID_C0', type: 'door', rect: { x: 20, y: 44, w: 3, h: 8 }, state: 'closed', propType: 'lasergrid' },
+    { id: 'TERM_C0', type: 'terminal', x: 15, y: 44, links: ['GRID_C0'], oneShot: true },
+
+    { id: 'GRID_C1', type: 'door', rect: { x: 90, y: 32, w: 3, h: 8 }, state: 'closed', propType: 'holobridge' },
+    { id: 'TERM_C1', type: 'terminal', x: 85, y: 32, links: ['GRID_C1'], oneShot: true },
+
+    { id: 'GRID_C2', type: 'door', rect: { x: 150, y: 32, w: 3, h: 8 }, state: 'closed', propType: 'lasergrid' },
+    { id: 'TERM_C2', type: 'terminal', x: 145, y: 32, links: ['GRID_C2'], oneShot: true },
+
+    // Piratage (vitrine, C2_SECURITY) : jamais bloquant, l'IA de démo les ignore et se bat
+    // normalement — cf. Enemy#hijack/`Level#activateInteractable` (branche `activateGroup`).
+    { id: 'TERM_HIJACK_1', type: 'terminal', x: 136, y: 32, links: ['HIJACK_1'], oneShot: false },
+    { id: 'TERM_HIJACK_2', type: 'terminal', x: 161, y: 32, links: ['HIJACK_2'], oneShot: false },
+  ],
+
+  lifts: [],
+
+  // ---- pads de saut anti-gravité (contact automatique, cf. `Player#update`/`launchPadAt`) ----
+  launchPads: [
+    // vy dimensionné pour dépasser la hauteur cible avec marge (v0 = sqrt(2*GRAV*dTiles*T), cf.
+    // AR.C.GRAV=1650) : C0->C1 doit franchir 12 tuiles (576px, v0mini≈1379), C2->C3 8 tuiles
+    // (384px, v0mini≈1126) — la marge évite un atterrissage pile à l'apex, trop fragile.
+    // PAD_C0_C1 atterrit dans la « cheminée » creusée sous C1 (cf. `empties` ci-dessous) : peu de
+    // dérive horizontale nécessaire, la cheminée fait tout le travail. PAD_C2_C3 doit au contraire
+    // parcourir ~7-10 tuiles latérales pour rejoindre le palier d'atterrissage x172-186 (rien ne
+    // le « capte » plus tôt) — `driftT` prolongé et `vx` élevé pour garantir la traversée (sinon
+    // le héros survole le palier sans jamais y être, retombe et re-déclenche le pad en boucle,
+    // bug trouvé en testant).
+    { id: 'PAD_C0_C1', x: 66, y: 43, w: 3, h: 1, vx: 90, vy: -1550, driftT: 0.5 },  // C0 (y44) -> C1 (y32)
+    { id: 'PAD_C2_C3', x: 165, y: 31, w: 3, h: 1, vx: 550, vy: -1300, driftT: 0.85 }, // C2 (y32) -> atterrissage C3 (y24)
+  ],
+
+  // ---- rooms (secrets listées avant leur voisine obligatoire, chevauchement Y volontaire —
+  // même règle que R3/R4 : `currentRoomAt` retient le premier rect qui contient le point) ----
+  rooms: [
+    { id: 'SEC_C0_SERVERS', rect: { x: 0, y: 52, w: 30, h: 10 }, tags: ['secret', 'vault', 'dark'],
+      camera: { minX: 0, maxX: 32, minY: 50, maxY: 62 }, safeRespawn: [{ x: 15, y: 54, priority: 9 }] },
+    { id: 'C0_STREET', rect: { x: 0, y: 36, w: 70, h: 16 }, tags: [],
+      camera: { minX: 0, maxX: 72, minY: 34, maxY: 52 }, safeRespawn: [{ x: 3, y: 44, priority: 10 }, { x: 15, y: 44, priority: 8 }] },
+
+    { id: 'SEC_C1_WALKWAY', rect: { x: 70, y: 38, w: 40, h: 8 }, tags: ['secret', 'gallery', 'dark'],
+      camera: { minX: 68, maxX: 112, minY: 36, maxY: 48 }, safeRespawn: [{ x: 85, y: 40, priority: 9 }] },
+    { id: 'C1_ROOFTOPS', rect: { x: 60, y: 24, w: 70, h: 16 }, tags: ['branch'],
+      camera: { minX: 58, maxX: 132, minY: 22, maxY: 40 }, safeRespawn: [{ x: 65, y: 32, priority: 8 }] },
+
+    { id: 'SEC_C2_VAULT', rect: { x: 135, y: 38, w: 30, h: 8 }, tags: ['secret', 'vault', 'dark'],
+      camera: { minX: 133, maxX: 167, minY: 36, maxY: 48 }, safeRespawn: [{ x: 148, y: 40, priority: 9 }] },
+    { id: 'C2_SECURITY', rect: { x: 130, y: 24, w: 45, h: 16 }, tags: ['branch'],
+      camera: { minX: 128, maxX: 177, minY: 22, maxY: 40 }, safeRespawn: [{ x: 135, y: 32, priority: 8 }] },
+
+    { id: 'C3_SPIRE', rect: { x: 165, y: 14, w: 42, h: 26 }, tags: ['ascent'],
+      camera: { minX: 163, maxX: 209, minY: 12, maxY: 40 }, safeRespawn: [{ x: 178, y: 24, priority: 8 }] },
+    { id: 'C3_ANTECHAMBER', rect: { x: 207, y: 14, w: 30, h: 10 }, tags: ['ascent'],
+      camera: { minX: 205, maxX: 239, minY: 6, maxY: 24 }, safeRespawn: [{ x: 215, y: 18, priority: 10 }] },
+    { id: 'C3_ARENA', rect: { x: 207, y: 5, w: 40, h: 12 }, tags: ['boss'],
+      camera: { minX: 205, maxX: 247, minY: 3, maxY: 24 }, safeRespawn: [{ x: 220, y: 18, priority: 10 }] },
+  ],
+
+  // ---- encounters verrouillés (gates:[] partout, même contrainte que R3-R5) ----
+  encounters: [
+    { id: 'E_C0_INTRO', roomId: 'C0_STREET',
+      trigger: { x: 4, y: 36, w: 8, h: 8 }, gates: [],
+      waves: [{ ids: ['corp_trooper', 'corp_trooper', 'corp_trooper'] }],
+      reward: { coins: 10 } },
+    { id: 'E_C0_GAUNTLET', roomId: 'C0_STREET',
+      trigger: { x: 30, y: 36, w: 16, h: 8 }, gates: [],
+      waves: [{ ids: ['corp_trooper', 'corp_trooper', 'laser_trooper'] },
+              { ids: ['laser_trooper', 'corp_trooper', 'corp_trooper'] }],
+      reward: { coins: 18 } },
+    { id: 'E_SEC_C0', roomId: 'SEC_C0_SERVERS',
+      trigger: { x: 8, y: 52, w: 16, h: 8 }, gates: [],
+      waves: [{ ids: ['mech_assassin'], elite: ['mech_assassin'] }],
+      reward: { coins: 26 } },
+
+    { id: 'E_C1_GAUNTLET', roomId: 'C1_ROOFTOPS',
+      trigger: { x: 64, y: 24, w: 22, h: 8 }, gates: [],
+      waves: [{ ids: ['hover_gunner', 'drone_swarm', 'drone_swarm'] },
+              { ids: ['hover_gunner', 'hover_gunner', 'drone_swarm'] }],
+      reward: { coins: 20 } },
+    { id: 'E_SEC_C1_HORDE', roomId: 'SEC_C1_WALKWAY',
+      trigger: { x: 80, y: 38, w: 16, h: 8 }, gates: [],
+      waves: [{ ids: ['corp_trooper', 'corp_trooper', 'hover_gunner', 'hover_gunner', 'drone_swarm',
+                       'drone_swarm', 'drone_swarm', 'corp_trooper', 'hover_gunner', 'drone_swarm'] }],
+      reward: { coins: 36 } },
+    { id: 'E_SEC_C1_CAPTAIN', roomId: 'SEC_C1_WALKWAY',
+      trigger: { x: 98, y: 38, w: 10, h: 8 }, gates: [],
+      waves: [{ ids: ['mech_assassin'], elite: ['mech_assassin'] }],
+      reward: { coins: 30 } },
+
+    { id: 'E_C2_GAUNTLET', roomId: 'C2_SECURITY',
+      trigger: { x: 132, y: 24, w: 16, h: 8 }, gates: [],
+      waves: [{ ids: ['shield_drone', 'laser_trooper', 'corp_trooper'] },
+              { ids: ['shield_drone', 'shield_drone', 'laser_trooper'] }],
+      reward: { coins: 22 } },
+    { id: 'E_SEC_C2', roomId: 'SEC_C2_VAULT',
+      trigger: { x: 152, y: 38, w: 6, h: 8 }, gates: [],
+      waves: [{ ids: ['mech_assassin'], elite: ['mech_assassin'] }],
+      reward: { coins: 32, guaranteed: 'swordUp' } },
+
+    { id: 'E_C3_GAUNTLET', roomId: 'C3_ANTECHAMBER',
+      trigger: { x: 210, y: 10, w: 20, h: 8 }, gates: [],
+      waves: [{ ids: ['corp_trooper', 'laser_trooper', 'shield_drone'] },
+              { ids: ['hover_gunner', 'drone_swarm', 'drone_swarm'] },
+              { ids: ['mech_assassin', 'laser_trooper', 'shield_drone'], elite: ['mech_assassin'] }],
+      reward: { coins: 40 } },
+  ],
+
+  // ---- alarme de sécurité (SEC_C2_VAULT, réutilise `wakeSpawns` — zéro code moteur neuf) ----
+  triggers: [
+    { id: 'ALARM_C2', rect: { x: 140, y: 36, w: 8, h: 8 }, action: 'wakeSpawns', group: 'ALARM_C2' },
+  ],
+
+  // ---- spawns ----
+  spawns: [
+    // Vitrine piratage (C2_SECURITY, jamais bloquante) : tags `activate` réutilisés comme
+    // identifiants de cible plutôt que de groupe de réveil, cf. TERM_HIJACK_1/2 ci-dessus.
+    { tx: 138, ty: 32, id: 'shield_drone', activate: 'HIJACK_1' },
+    { tx: 158, ty: 32, id: 'corp_trooper', activate: 'HIJACK_2' },
+
+    // Alarme SEC_C2_VAULT : 3 gardes dormants, réveillés par ALARM_C2
+    { tx: 143, ty: 40, id: 'laser_trooper', dormant: true, activate: 'ALARM_C2' },
+    { tx: 148, ty: 40, id: 'laser_trooper', dormant: true, activate: 'ALARM_C2' },
+    { tx: 153, ty: 40, id: 'laser_trooper', dormant: true, activate: 'ALARM_C2' },
+
+    // ambiants — C0
+    { tx: 8, ty: 44, id: 'corp_trooper' },
+    { tx: 15, ty: 44, id: 'corp_trooper' },
+    { tx: 35, ty: 44, id: 'laser_trooper' },
+    { tx: 45, ty: 44, id: 'corp_trooper' },
+    { tx: 50, ty: 44, id: 'laser_trooper' },
+    { tx: 55, ty: 44, id: 'laser_trooper' },
+    { tx: 60, ty: 44, id: 'corp_trooper' },
+    { tx: 65, ty: 44, id: 'laser_trooper' },
+    { tx: 12, ty: 54, id: 'mech_assassin' },
+    { tx: 12, ty: 54, id: 'drone_swarm' },
+    // ambiants — C1
+    { tx: 65, ty: 32, id: 'hover_gunner' },
+    { tx: 75, ty: 32, id: 'drone_swarm' },
+    { tx: 100, ty: 32, id: 'drone_swarm' },
+    { tx: 110, ty: 32, id: 'drone_swarm' },
+    { tx: 115, ty: 32, id: 'hover_gunner' },
+    { tx: 120, ty: 32, id: 'hover_gunner' },
+    { tx: 125, ty: 32, id: 'drone_swarm' },
+    { tx: 85, ty: 40, id: 'corp_trooper' },
+    { tx: 85, ty: 40, id: 'hover_gunner' },
+    { tx: 95, ty: 40, id: 'hover_gunner' },
+    { tx: 100, ty: 40, id: 'drone_swarm' },
+    // ambiants — C2
+    { tx: 133, ty: 32, id: 'laser_trooper' },
+    { tx: 135, ty: 32, id: 'shield_drone' },
+    { tx: 148, ty: 32, id: 'shield_drone' },
+    { tx: 160, ty: 32, id: 'corp_trooper' },
+    { tx: 163, ty: 32, id: 'laser_trooper' },
+    { tx: 165, ty: 32, id: 'laser_trooper' },
+    { tx: 168, ty: 32, id: 'shield_drone' },
+    { tx: 145, ty: 40, id: 'corp_trooper' },
+    { tx: 155, ty: 40, id: 'shield_drone' },
+    { tx: 150, ty: 40, id: 'laser_trooper' },
+    { tx: 158, ty: 40, id: 'corp_trooper' },
+  ],
+
+  // ---- coffres ----
+  chests: [
+    { x: 10, y: 44 },
+    { x: 20, y: 54, guaranteed: 'skillPoint' },
+    { x: 100, y: 32 },
+    { x: 95, y: 40, guaranteed: 'skillPoint' },
+    { x: 145, y: 32 },
+    { x: 220, y: 18 },
+  ],
+
+  merchant: { x: 2, y: 44 },
+
+  // ---- portails locaux (sortie immédiate depuis l'aire d'atterrissage de chaque secret + sortie
+  // finale après récompense, même patron que R3/R4/R5 — l'IA de démo n'active jamais un terminal
+  // donc ne devrait jamais y tomber, mais la sortie inconditionnelle reste un filet de sécurité) ----
+  localPortals: [
+    { x: 15, y: 54, returnTo: { x: 25, y: 44 } },
+    { x: 22, y: 54, returnTo: { x: 40, y: 44 } },
+    { x: 90, y: 40, returnTo: { x: 95, y: 32 } },
+    { x: 100, y: 40, returnTo: { x: 110, y: 32 } },
+    { x: 150, y: 40, returnTo: { x: 155, y: 32 } },
+    { x: 156, y: 40, returnTo: { x: 165, y: 32 } },
+  ],
+
+  // ---- poches sombres (salles secrètes) ----
+  darkZones: [
+    { x: 0, y: 52, w: 30, h: 10, tint: 0.4 },
+    { x: 70, y: 38, w: 40, h: 8, tint: 0.45 },
+    { x: 135, y: 38, w: 30, h: 8, tint: 0.5 },
+  ],
+
+  // ---- décor ----
+  props: [
+    { type: 'screen', tx: 8, ty: 44 },
+    { type: 'pylon', tx: 40, ty: 44 },
+    { type: 'holo', tx: 55, ty: 44 },
+    { type: 'vent', tx: 18, ty: 54 },
+    { type: 'pylon', tx: 70, ty: 32 },
+    { type: 'screen', tx: 110, ty: 32 },
+    { type: 'holo', tx: 82, ty: 40 },
+    { type: 'vent', tx: 133, ty: 32 },
+    { type: 'pylon', tx: 165, ty: 32 },
+    { type: 'screen', tx: 143, ty: 40 },
+    { type: 'holo', tx: 215, ty: 18 },
+    { type: 'pylon', tx: 230, ty: 18 },
+  ],
+
+  // ---- indices pour l'IA de démonstration (documentation seule, cf. R3-R5 : demoai.js ne lit
+  // aucun de ces champs) ----
+  navHints: {
+    defaultRoute: 'main',
+  },
+};
+
 AR.LEVEL_SPECS = {
   stone: STONE,
   antiquity: ANTIQUITY,
   medieval: MEDIEVAL,
   renaissance: RENAISSANCE,
   diesel: DIESEL,
-  cyber: null,
+  cyber: CYBER,
 };

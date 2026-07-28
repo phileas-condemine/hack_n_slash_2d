@@ -63,6 +63,22 @@ AR.Enemy = class {
     this.baseDmg = this.dmg;
     this.buffT = 0;
     this.buffResist = 0;
+    // piratage (R6, cf. `hijack()`/état 'hijacked') : mode tourelle temporaire, tire sur les
+    // autres ennemis au lieu du joueur — hijackedT = 0 tant qu'aucun terminal ne l'a activé.
+    this.hijackedT = 0;
+    this.hijackFireT = 0;
+  }
+
+  // Terminal de piratage (R6, `Level#activateInteractable`) : bascule ce drone en mode tourelle
+  // alliée pour `duration` secondes. Limité en pratique aux ennemis avec `def.proj` (cf.
+  // `_fireHijacked`) — un ennemi sans tir à distance passerait juste `duration` secondes immobile
+  // et inoffensif, ce qui reste sans danger mais n'a aucun intérêt (la spec R6 ne cible que des
+  // tireurs via `activateGroup`).
+  hijack(duration) {
+    if (this.dead) return;
+    this.state = 'hijacked';
+    this.hijackedT = duration;
+    this.hijackFireT = 0.4;
   }
 
   centerX() { return this.x + this.w / 2; }
@@ -163,6 +179,10 @@ AR.Enemy = class {
     if (this.buffT > 0) {
       this.buffT -= dt;
       if (this.buffT <= 0) { this.buffT = 0; this.dmg = this.baseDmg; this.buffResist = 0; }
+    }
+    if (this.hijackedT > 0) {
+      this.hijackedT -= dt;
+      if (this.hijackedT <= 0 && this.state === 'hijacked') { this.state = 'idle'; this.t = 0; }
     }
 
     const pl = game.player;
@@ -417,6 +437,20 @@ AR.Enemy = class {
       case 'stunned': {
         this.vx = 0;
         if (this.t > 0.9) { this.state = 'chase'; this.t = 0; this.atkTimer = def.atkCd * diff.atkCdMult; }
+        break;
+      }
+      // Piratage (R6, cf. `hijack()`) : mode tourelle alliée — immobile (même flottement que
+      // l'état 'tele' pour les flyers), tire périodiquement sur l'ennemi hostile le plus proche
+      // au lieu du joueur. `hijackedT` est décrémenté plus haut, qui remet `state:'idle'` à
+      // expiration (redevient hostile normalement).
+      case 'hijacked': {
+        this.vx = 0;
+        if (flying) this.vy = Math.sin(this.t * 12) * 22;
+        this.hijackFireT -= dt;
+        if (this.hijackFireT <= 0 && def.proj) {
+          this.hijackFireT = (def.atkCd || 1.5) * diff.atkCdMult;
+          this._fireHijacked(game);
+        }
         break;
       }
     }
@@ -683,6 +717,36 @@ AR.Enemy = class {
     }
   }
 
+  // Piratage (R6, cf. `hijack()`/état 'hijacked') : tire un projectile `friendly:true` sur
+  // l'ennemi hostile le plus proche — un `friendly:true` est déjà, sans rien changer, ignoré
+  // comme dangereux pour le joueur et capable de blesser les ennemis (mêmes règles que les
+  // flèches du héros, cf. `projectiles.js`). Duplique volontairement 2 cas de `_fire()`
+  // (`'plasma'`/`'laser'`, les seuls projectiles du roster piratable de R6) plutôt que de
+  // généraliser `_fire()`, qui cible `game.player` en dur dans chaque branche.
+  _fireHijacked(game) {
+    const def = this.def;
+    let target = null, best = Infinity;
+    for (const e of game.enemies) {
+      if (e === this || e.dead || !e.active || e.state === 'hijacked') continue;
+      const dd = AR.U.dist(this.centerX(), this.centerY(), e.centerX(), e.centerY());
+      if (dd < best) { best = dd; target = e; }
+    }
+    if (!target || best > (def.range || 600) * 1.2) return;
+    this.attackPoseT = Math.max(this.attackPoseT, 0.24);
+    this.facing = AR.U.sign(target.centerX() - this.centerX()) || this.facing;
+    const sx = this.centerX() + this.facing * this.w * 0.4, sy = this.y + this.h * 0.35;
+    const ang = AR.U.angle(sx, sy, target.centerX(), target.centerY());
+    const shoot = (o) => { o.owner = this; return AR.Projectiles.spawn(o); };
+    AR.Audio.sfx(def.proj === 'laser' ? 'laser' : 'enemyShoot');
+    if (def.proj === 'laser') {
+      shoot({ x: sx, y: sy, kind: 'laser', friendly: true, dmg: this.dmg, r: 6,
+        vx: Math.cos(ang) * 1500, vy: Math.sin(ang) * 1500, life: 0.9 });
+    } else {
+      shoot({ x: sx, y: sy, kind: 'plasma', friendly: true, dmg: this.dmg, r: 7,
+        vx: Math.cos(ang) * 620, vy: Math.sin(ang) * 620, life: 1.8, color: '#42e8f5' });
+    }
+  }
+
   // dégâts entrants (renvoie les dégâts réellement infligés)
   takeDamage(dmg, opts, game) {
     const def = this.def;
@@ -857,6 +921,14 @@ AR.Enemy = class {
       ctx.save();
       ctx.globalAlpha = 0.5 + Math.sin(time * 5) * 0.2;
       ctx.strokeStyle = AR.C.COLORS.gold; ctx.lineWidth = 2;
+      ctx.beginPath(); ctx.ellipse(fx, fy, this.w * 0.7, 8, 0, 0, Math.PI * 2); ctx.stroke();
+      ctx.restore();
+    }
+    // halo cyan de piratage (R6) : signale qu'un drone a changé de camp (cf. `hijack()`)
+    if (this.hijackedT > 0) {
+      ctx.save();
+      ctx.globalAlpha = 0.55 + Math.sin(time * 8) * 0.25;
+      ctx.strokeStyle = '#42e8f5'; ctx.lineWidth = 2;
       ctx.beginPath(); ctx.ellipse(fx, fy, this.w * 0.7, 8, 0, 0, Math.PI * 2); ctx.stroke();
       ctx.restore();
     }

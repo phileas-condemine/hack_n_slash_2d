@@ -32,6 +32,7 @@ AR.Level = class {
     this.rooms = []; this.roomById = {};
     this.climbables = []; this.breakables = []; this.interactables = [];
     this.lifts = []; // monte-charges à corde (plateformes verticales, cf. `activateLift`/`updateLifts`)
+    this.launchPads = []; // pads de saut anti-gravité (R6, cf. `launchPadAt`)
     this.encounters = []; this.triggers = []; this.hazards = [];
     this.safeAnchors = []; this.navHints = {}; this.dynGates = [];
     this.fallDamageRatio = 0.1;
@@ -288,7 +289,11 @@ AR.Level = class {
       const obj = { id: o.id, type: o.type, x: o.x, y: o.y, rect: o.rect, links: o.links || [],
         lift: o.lift || null, prompt: o.prompt, state: o.state || (o.type === 'door' ? 'closed' : 'off'),
         oneShot: o.oneShot !== false, dir: o.dir || 1, cd: 0,
-        targetY: o.targetY !== undefined ? o.targetY : null };
+        targetY: o.targetY !== undefined ? o.targetY : null,
+        // `propType` (R6) : reskin d'une porte en pont holographique/grille laser (cf.
+        // `_drawEnergyBarriers`) — même patron que `breakables[].propType` pour les kegs/poches
+        // de grisou (R4/R5) : ne change que le rendu, la logique de porte reste identique.
+        propType: o.propType || null };
       this.interactables.push(obj);
       if (o.type === 'door' && obj.state === 'closed' && o.rect) this._fillRect(o.rect, F.SOLID | F.DOOR);
     }
@@ -307,6 +312,13 @@ AR.Level = class {
         speed: l.speed || 2.2, state: 'idle', target: null };
       this.lifts.push(lift);
       this.platforms.push(lift);
+    }
+
+    // --- pads de saut anti-gravité (R6) : contact automatique (aucune action délibérée), donc
+    // sûrs sur le chemin obligatoire pour l'IA de démo — cf. `Player#update`/`launchPadAt`.
+    for (const p of spec.launchPads || []) {
+      this.launchPads.push({ id: p.id, x: p.x, y: p.y, w: p.w, h: p.h, vx: p.vx || 0, vy: p.vy });
+      this.props.push({ type: 'launchpad', x: (p.x + p.w / 2) * T, y: (p.y + p.h) * T, s: 1, r: 0 });
     }
 
     // --- rooms + ancres de respawn
@@ -336,6 +348,7 @@ AR.Level = class {
     for (const c of this.climbables) this.props.push({ type: 'vine', x: (c.x + c.w / 2) * T, y: c.y * T, vh: c.h, s: 1, r: 0 });
     for (const o of this.interactables) if (o.type === 'lever') this.props.push({ type: 'lever', ref: o, x: o.x * T, y: o.y * T, s: 1, r: 0 });
     for (const o of this.interactables) if (o.type === 'crank') this.props.push({ type: 'crank', ref: o, x: o.x * T, y: o.y * T, s: 1, r: 0 });
+    for (const o of this.interactables) if (o.type === 'terminal') this.props.push({ type: 'terminal', ref: o, x: o.x * T, y: o.y * T, s: 1, r: 0 });
 
     // --- spawns (ennemis libres + suspendus/dormants)
     this.spawns = [];
@@ -454,6 +467,15 @@ AR.Level = class {
     return true;
   }
 
+  // ---- pads de saut anti-gravité (R6) : contact automatique, cf. `Player#update`
+  launchPadAt(rect) {
+    const T = AR.C.TILE;
+    for (const p of this.launchPads) {
+      if (AR.U.rectsOverlap(rect, { x: p.x * T, y: p.y * T, w: p.w * T, h: p.h * T })) return p;
+    }
+    return null;
+  }
+
   // ---- rooms
   currentRoomAt(x, y) {
     const T = AR.C.TILE, txp = x / T, typ = y / T;
@@ -563,20 +585,30 @@ AR.Level = class {
     }
   }
 
-  // ---- interactables (leviers → portes/raccourcis)
+  // ---- interactables (leviers/terminaux → portes/raccourcis, ou piratage d'un drone R6)
   activateInteractable(o, game) {
     if (!o || (o.oneShot && o.state === 'on')) return false;
     o.state = o.state === 'on' ? 'off' : 'on';
+    let hijacked = false;
     for (const linkId of o.links) {
       const door = this.interactables.find((d) => d.id === linkId);
       if (door && door.type === 'door' && door.rect) {
         door.state = door.state === 'open' ? 'closed' : 'open';
         if (door.state === 'open') this._clearRect(door.rect, AR.TILE_FLAGS.SOLID | AR.TILE_FLAGS.DOOR);
         else this._fillRect(door.rect, AR.TILE_FLAGS.SOLID | AR.TILE_FLAGS.DOOR);
+        continue;
+      }
+      // Terminal de piratage (R6) : le lien ne pointe pas vers une porte mais vers le tag
+      // `activate`/`activateGroup` d'un spawn (même champ que `wakeSpawns`, cf.
+      // `Game#newRun`/`_updateTriggers`) — bascule ce drone en mode tourelle alliée.
+      if (game) {
+        const target = game.enemies.find((e) => e.activateGroup === linkId && !e.dead);
+        if (target && target.hijack) { target.hijack(7); hijacked = true; }
       }
     }
     this._deriveHeights();
-    if (game) { AR.Audio.sfx('gate'); AR.HUD.notify('Levier actionné — un passage s\'ouvre', AR.C.COLORS.spirit); }
+    if (game && hijacked) { AR.Audio.sfx('skill'); AR.HUD.notify('Drone piraté — il se retourne contre ses alliés !', AR.C.COLORS.spirit); }
+    else if (game) { AR.Audio.sfx('gate'); AR.HUD.notify('Levier actionné — un passage s\'ouvre', AR.C.COLORS.spirit); }
     return true;
   }
 
@@ -1238,6 +1270,47 @@ AR.Level = class {
     }
   }
 
+  // Portes reskinnées en pont holographique / grille laser (R6, `interactables[].propType`,
+  // cf. `activateInteractable`). Rendu à part de `_drawProp` (pas un décor ponctuel translaté à
+  // un point : `door.rect` peut couvrir plusieurs tuiles de large/haut) — un simple rectangle
+  // plein en espace monde, dont la couleur/l'aspect suit `door.state` (la collision réelle,
+  // solide seulement à `'closed'`, est déjà gérée par `activateInteractable`, ceci n'est QUE du
+  // rendu). `'holobridge'` : par défaut *open* = trou (danger, on tombe au travers, clignote pour
+  // avertir) ; activé -> *closed* = plateforme pleine et sûre. `'lasergrid'` : inverse, *closed*
+  // par défaut = mur de faisceaux (bloqué), *open* une fois piraté = passage libre.
+  drawEnergyBarriers(ctx, cam, time) {
+    const cx = cam.cx(), cy = cam.cy(), T = AR.C.TILE;
+    for (const o of this.interactables) {
+      if (o.type !== 'door' || !o.propType || !o.rect) continue;
+      const x = o.rect.x * T - cx, y = o.rect.y * T - cy, w = o.rect.w * T, h = o.rect.h * T;
+      if (x + w < -60 || x > AR.C.VIEW_W + 60) continue;
+      const solid = o.state === 'closed';
+      ctx.save();
+      if (o.propType === 'holobridge') {
+        const safe = solid; // solide = sûr à traverser
+        const fl = 0.5 + Math.sin(time * 9) * 0.3;
+        ctx.globalAlpha = safe ? 0.85 : 0.28 + fl * 0.18;
+        ctx.fillStyle = '#42e8f5';
+        ctx.fillRect(x, y, w, Math.max(4, h));
+        ctx.globalAlpha = safe ? 0.9 : 0.4;
+        ctx.strokeStyle = '#e35cff'; ctx.lineWidth = 2;
+        ctx.setLineDash(safe ? [] : [8, 6]);
+        ctx.strokeRect(x, y, w, Math.max(4, h));
+      } else if (o.propType === 'lasergrid') {
+        const blocked = solid;
+        ctx.globalAlpha = blocked ? 0.85 : 0.2;
+        ctx.strokeStyle = '#ff3d6e'; ctx.lineWidth = 3;
+        const step = 14;
+        for (let lx = x + 4; lx < x + w; lx += step) {
+          ctx.beginPath(); ctx.moveTo(lx, y); ctx.lineTo(lx, y + h); ctx.stroke();
+        }
+        ctx.globalAlpha = blocked ? 0.5 : 0.12;
+        ctx.fillStyle = '#ff3d6e'; ctx.fillRect(x, y, w, h);
+      }
+      ctx.restore();
+    }
+  }
+
   // Poches sombres (grottes profondes) : légère teinte froide d'ambiance sur le DÉCOR + halos
   // chauds additifs autour des torches. Appelée par `Game.render()` juste après le terrain/les
   // props et AVANT les pickups/ennemis/héros — jamais après, sinon le voile se plaque sur les
@@ -1511,6 +1584,31 @@ AR.Level = class {
         ctx.beginPath(); ctx.moveTo(32, -61); ctx.lineTo(44, -61); ctx.stroke();
         ctx.beginPath(); ctx.moveTo(44, -61); ctx.lineTo(38, -67); ctx.moveTo(44, -61); ctx.lineTo(38, -55); ctx.stroke();
         ctx.textAlign = 'left';
+        break;
+      }
+      case 'terminal': { // console de piratage (R6) : ouvre un pont holo/grille laser, ou
+        // détourne un drone (`Level#activateInteractable`) — voyant rouge/vert selon `ref.state`.
+        const on = p.ref && p.ref.state === 'on';
+        ctx.fillStyle = '#251740'; ctx.fillRect(-14, -46, 28, 46);
+        ctx.fillStyle = '#1c0f33'; ctx.fillRect(-10, -42, 20, 24);
+        ctx.fillStyle = on ? '#42e8f5' : '#e35cff';
+        ctx.globalAlpha = 0.55 + Math.sin(time * 6) * 0.25;
+        ctx.fillRect(-8, -40, 16, 20);
+        ctx.globalAlpha = 1;
+        ctx.fillStyle = on ? '#5cffa0' : '#ff3d6e';
+        ctx.beginPath(); ctx.arc(0, -12, 3, 0, Math.PI * 2); ctx.fill();
+        break;
+      }
+      case 'launchpad': { // pad de saut anti-gravité (R6) : contact automatique, cf.
+        // `Level#launchPadAt`/`Player#update` — anneau lumineux pulsé, pur décor.
+        const pulse = 0.5 + Math.sin(time * 5 + p.r * 6) * 0.4;
+        ctx.strokeStyle = '#42e8f5'; ctx.lineWidth = 3;
+        ctx.globalAlpha = 0.5 + pulse * 0.4;
+        ctx.beginPath(); ctx.ellipse(0, -4, 24, 7, 0, 0, Math.PI * 2); ctx.stroke();
+        ctx.strokeStyle = '#e35cff'; ctx.lineWidth = 2;
+        ctx.globalAlpha = 0.3 + pulse * 0.3;
+        ctx.beginPath(); ctx.ellipse(0, -4, 15, 4.5, 0, 0, Math.PI * 2); ctx.stroke();
+        ctx.globalAlpha = 1;
         break;
       }
       case 'stall': {

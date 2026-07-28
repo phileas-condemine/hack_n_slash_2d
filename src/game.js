@@ -428,7 +428,7 @@ AR.Game = class {
       else if (p.type === 'merchant') { this.shopOpen = true; AR.Audio.sfx('ui'); }
       else if (p.type === 'portal' && p.returnTo) this._useLocalPortal(p);
       else if (p.type === 'portal') this._enterPortal();
-      else if (p.type === 'lever') lvl.activateInteractable(p._int, this);
+      else if (p.type === 'lever' || p.type === 'terminal') lvl.activateInteractable(p._int, this);
       else if (p.type === 'crank') lvl.activateLift(p._int.lift, this, p._int.targetY);
       else if (p.type === 'cannon') this._fireCannon(p._int);
     }
@@ -629,6 +629,10 @@ AR.Game = class {
         if (o.cd > 0) continue; // en recharge : pas d'invite tant qu'il n'est pas prêt
         const lx = o.x * T, ly = o.y * T;
         if (AR.U.dist(lx, ly - 10, pcx, pcy) < 70) return { type: 'cannon', x: lx, y: ly, _int: o };
+      } else if (o.type === 'terminal') { // console de piratage/pont holo/grille laser (R6)
+        if (o.oneShot && o.state === 'on') continue;
+        const lx = o.x * T, ly = o.y * T;
+        if (AR.U.dist(lx, ly - 10, pcx, pcy) < 70) return { type: 'terminal', x: lx, y: ly, _int: o };
       }
     }
     return null;
@@ -1147,6 +1151,7 @@ AR.Game = class {
       lvl.drawBackground(ctx, cam);
       lvl.drawTerrain(ctx, cam);
       lvl.drawProps(ctx, cam, this.time);
+      lvl.drawEnergyBarriers(ctx, cam, this.time);
       // Le voile des poches sombres doit assombrir le DÉCOR, pas les personnages : appliqué ici,
       // avant les pickups/ennemis/héros, jamais après (retour joueur 2026-07-27 : "les personnages
       // sont noircis, c'est moche" — c'était un filtre plaqué par-dessus tout le monde, alors que

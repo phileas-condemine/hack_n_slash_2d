@@ -110,7 +110,11 @@ AR.Projectiles = {
           }
         }
         for (const e of game.enemies) {
-          if (e.dead || !e.active || e.emergeT > 0 || (p.hitSet && p.hitSet.has(e))) continue;
+          // `e === p.owner` : jusqu'ici seul le héros tirait du `friendly:true` (jamais dans
+          // `game.enemies`, donc jamais concerné) — le piratage de drone (R6) fait maintenant
+          // tirer un ennemi lui-même présent dans cette liste, qui se toucherait sinon dès la
+          // frame de spawn (le projectile naît à son propre centre).
+          if (e.dead || !e.active || e.emergeT > 0 || e === p.owner || (p.hitSet && p.hitSet.has(e))) continue;
           if (this._hits(p, e)) {
             // blocage au bouclier : la flèche est cassée et n'atteint pas les alliés derrière
             if (this._blockable(p) && e.blocksArrow && e.blocksArrow(p)) {

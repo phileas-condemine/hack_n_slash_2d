@@ -15,6 +15,8 @@ AR.Player = class {
     this.airDashed = false;
     this.climbing = false; this.climbCooldown = 0; this.climbLockout = 0; this._prevSpace = false;
     this.riding = null; // chariot sur rail (R5) : {speed, endX} — cf. update(), trigger 'startRail'
+    this.launchCd = 0; // pad de saut anti-gravité (R6) : anti-rebond, cf. update()/launchPadAt
+    this.launchDriftT = 0; this.launchDriftVx = 0; // même mécanique, dérive horizontale forcée
     this.dropThrough = 0;
     this.dashHeld = 0;
     this.trail = [];
@@ -102,6 +104,7 @@ AR.Player = class {
     this.comboT -= dt;
     this.attackAnimT -= dt;
     this.dashCd -= dt;
+    this.launchCd = Math.max(0, this.launchCd - dt);
     this.dropThrough -= dt;
     this.walkT += dt;
     for (let i = 0; i < 4; i++) this.spellCds[i] -= dt;
@@ -138,6 +141,16 @@ AR.Player = class {
     }
     // en visée, on se tourne vers le curseur
     if (chargingBow) this.facing = AR.U.sign(aim.x - (this.x + this.w / 2)) || this.facing;
+
+    // ---------------- pad de saut anti-gravité (R6) : vx forcée brièvement, même logique que
+    // `riding` ci-dessous — sans ça, un héros immobile (ou une IA de démo qui ne « vise » pas
+    // spécifiquement la bande suivante) perd sa dérive horizontale en un instant (frottement de
+    // la ligne 138 ci-dessus) et retombe sur le même pad au lieu d'atteindre la bande suivante.
+    if (this.launchDriftT > 0) {
+      this.launchDriftT -= dt;
+      this.vx = this.launchDriftVx;
+      if (this.launchDriftVx) this.facing = AR.U.sign(this.launchDriftVx);
+    }
 
     // ---------------- chariot sur rail (R5) : vx forcée (défilement imposé), le contrôle
     // horizontal manuel est ignoré jusqu'à `endX` — cf. trigger 'startRail'
@@ -284,6 +297,22 @@ AR.Player = class {
       }
     } else if (wasGround) this.coyote = P.COYOTE;
     if (res.hitCeil) this.vy = Math.max(this.vy, 0);
+
+    // ---------------- pad de saut anti-gravité (R6) : contact automatique (aucune touche), donc
+    // sûr sur le chemin obligatoire pour l'IA de démo — cf. `Level#launchPadAt`. `launchCd`
+    // évite un rebond en boucle tant que le héros reste sur le pad.
+    if (this.launchCd <= 0) {
+      const pad = game.level.launchPadAt(this.getRect());
+      if (pad) {
+        this.vy = pad.vy;
+        if (pad.vx) { this.vx = pad.vx; this.launchDriftVx = pad.vx; this.launchDriftT = pad.driftT || 0.45; }
+        this.launchCd = 0.5;
+        this.onGround = false;
+        AR.Audio.sfx('jump');
+        AR.Particles.burst(this.x + this.w / 2, this.y + this.h, 10,
+          { color: '#42e8f5', speed: 160, size: 3, life: 0.4, up: 80 });
+      }
+    }
 
     // chute dans le vide (hauteur RÉELLE du niveau courant, pas la constante globale — R5 a un
     // worldH bien plus grand que 32 ; pour les autres ères, worldH vaut déjà AR.C.WORLD_H)
