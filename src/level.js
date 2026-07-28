@@ -1498,6 +1498,21 @@ AR.Level = class {
         ctx.textAlign = 'left';
         break;
       }
+      case 'signpost': { // panneau directionnel (pur décor, aucune collision) : indique la
+        // direction à suivre pour un passage qui n'a pas de sol visible de l'autre côté (ex. R5,
+        // chute volontaire vers l'antichambre du boss) — même esprit que le panneau « DANGER » du
+        // cas 'crank' ci-dessus, mais une flèche latérale plutôt que verticale.
+        ctx.fillStyle = rock; ctx.fillRect(-4, -50, 8, 50);
+        ctx.fillStyle = '#c9a86a'; ctx.fillRect(-6, -74, 58, 26);
+        ctx.strokeStyle = '#2a2010'; ctx.lineWidth = 2; ctx.strokeRect(-6, -74, 58, 26);
+        ctx.fillStyle = '#2a2010'; ctx.font = 'bold 11px "Segoe UI", sans-serif'; ctx.textAlign = 'center';
+        ctx.fillText('ARÈNE', 14, -57);
+        ctx.strokeStyle = '#2a2010'; ctx.lineWidth = 3; ctx.lineCap = 'round';
+        ctx.beginPath(); ctx.moveTo(32, -61); ctx.lineTo(44, -61); ctx.stroke();
+        ctx.beginPath(); ctx.moveTo(44, -61); ctx.lineTo(38, -67); ctx.moveTo(44, -61); ctx.lineTo(38, -55); ctx.stroke();
+        ctx.textAlign = 'left';
+        break;
+      }
       case 'stall': {
         // échoppe du marchand
         ctx.fillStyle = '#6a5238';

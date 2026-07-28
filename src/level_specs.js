@@ -1464,8 +1464,8 @@ const DIESEL = {
   // (et donc `bossX`) à des dizaines de milliers de pixels hors de la carte (bug trouvé en
   // testant : la démo IA « atteignait » le boss mais `player.x` explosait à ~10000 tuiles).
   // Fixé à une vraie position (58 -> viewX=x60, aligné sur l'antichambre/filet de sécurité
-  // ci-dessous) ; le gauntlet D3 (x0-55, cf. `solids`) reste toujours strictement AVANT cette
-  // colonne, donc `pl.x > arenaStartTx*T` ne peut se déclencher qu'une fois le gauntlet terminé
+  // ci-dessous) ; le gauntlet D3 (x0-58, colonnes 0-57, cf. `solids`) reste toujours strictement
+  // AVANT cette colonne, donc `pl.x > arenaStartTx*T` ne peut se déclencher qu'une fois le gauntlet terminé
   // et la chute vers l'antichambre déjà entamée — jamais prématurément.
   arenaStartTx: 58,
   gateTx: 10000,
@@ -1498,18 +1498,23 @@ const DIESEL = {
     { x: 0, y: 92, w: 38, h: 6 },   // D2 galeries inférieures
     { x: 0, y: 102, w: 30, h: 6 },  // D2_SEC_GALLERY (corde CLIMB_D2_ROPE)
 
-    // D3 PROFONDEURS (y132) : palier obligatoire (x0-55, strictement avant arenaStartTx=58, cf.
-    // plus haut) séparé de la galerie secrète (x75-98) par une brèche de 20 tuiles — largement
-    // au-delà de la portée de saut de la démo IA (`DemoAI#_gapPlan` ne cherche que 9 tuiles),
-    // donc jamais franchie par erreur ; l'atteindre exige un vrai saut délibéré. Continuer tout
-    // droit (ou juste tomber du bord) mène à la chute volontaire vers l'antichambre, en dessous.
-    { x: 0, y: 132, w: 55, h: 8 },
+    // D3 PROFONDEURS (y132) : palier obligatoire (x0-58, colonnes 0-57, strictement avant
+    // arenaStartTx=58, cf. plus haut) séparé de la galerie secrète (x75-98) par une brèche de 17
+    // tuiles — largement au-delà de la portée de saut de la démo IA (`DemoAI#_gapPlan` ne cherche
+    // que 9 tuiles), donc jamais franchie par erreur ; l'atteindre exige un vrai saut délibéré.
+    // Continuer tout droit (ou juste tomber du bord) mène à la chute volontaire vers l'antichambre,
+    // juste en dessous — un panneau (`props`, type 'signpost') indique la direction au bord du
+    // gouffre, et la colonne 58 est flush avec le bord de l'antichambre (aucune brèche
+    // horizontale à couvrir en tombant, seulement la chute verticale) : retour joueur 2026-07-28,
+    // « pas très clair qu'en sautant dans le vide en bas à droite on arrive dans l'arène du boss ».
+    { x: 0, y: 132, w: 58, h: 8 },
     { x: 75, y: 132, w: 23, h: 8 },
     // Antichambre (y145, chute volontaire depuis D3 — même patron que le puits de STONE) + filet
     // de sécurité de l'arène (y155, même convention que STONE/ANTIQUITY/MEDIEVAL/RENAISSANCE :
-    // reste sous le sol illustré de l'arène, AR.BOSS_ARENAS.diesel_behemoth).
-    { x: 60, y: 145, w: 40, h: 10 },
-    { x: 60, y: 155, w: 40, h: 13 },
+    // reste sous le sol illustré de l'arène, AR.BOSS_ARENAS.diesel_behemoth). Bord gauche calé sur
+    // x58, pile la colonne où s'arrête le sol D3 ci-dessus, pour que la chute soit verticale.
+    { x: 58, y: 145, w: 42, h: 10 },
+    { x: 58, y: 155, w: 42, h: 13 },
   ],
 
   empties: [],
@@ -1716,6 +1721,7 @@ const DIESEL = {
     { type: 'wreck', tx: 20, ty: 132 },
     { type: 'crater', tx: 50, ty: 132 },
     { type: 'wire', tx: 90, ty: 132 },
+    { type: 'signpost', tx: 55, ty: 132 },       // bord du gouffre D3 -> antichambre/boss (retour joueur 2026-07-28)
     { type: 'fire', tx: 75, ty: 145, s: 1.1 },   // antichambre
   ],
 
