@@ -11,7 +11,17 @@ Not a general tool (unlike build_sprite_meta.py) - specific to this one batch of
 sheets. Run once, then delete/ignore.
 """
 import os
-from PIL import Image
+from PIL import Image, ImageDraw
+
+# Per-pose manual touch-ups applied after cropping, for the rare case row/column-based
+# detection can't separate two things that share the same rows AND columns aren't
+# distinctive enough either: manticore's "POUNCE - ATTACK" label sits directly above its
+# own wingtip with ~0px gap, so no crop line can exclude the text without also cutting the
+# wing. {pose_name: [(x0, y0, x1, y1), ...]} rectangles painted chroma-green post-crop
+# (build_sprite_meta.py's chroma-key removes them like any other background pixel).
+POST_PATCHES = {
+    'manticore_atk2_attack': [(300, 0, 700, 26)],
+}
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 SRC = os.path.join(ROOT, 'assets', 'raw', 'gladiator_arena_monsters')
@@ -170,11 +180,60 @@ def trim_divider_lines(img):
     return img
 
 
+def is_border_pixel(r, g, b):
+    # the frame some sheets (gorgone_*, molosse_sheet1) have around the whole canvas: a
+    # near-white but slightly-off (sometimes greenish-tinted) opaque strip a few px thick,
+    # distinct from both the pure chroma-green backdrop and real artwork. Left in place, it
+    # survives build_sprite_meta.py's chroma-key (which only strips green) as a visible
+    # straight white line on every pose cut from that sheet.
+    return r > 165 and g > 165 and b > 165 and not is_green(r, g, b)
+
+
+def strip_canvas_border(img):
+    """Inset the whole raw sheet to drop a solid border frame, if present, before any
+    pose slicing - so it can never leak into a per-pose crop regardless of where that
+    pose's content happens to sit relative to the sheet edges."""
+    w, h = img.size
+    px = img.load()
+
+    def col_is_border(x):
+        cnt = 0
+        for y in range(0, h, 5):
+            if is_border_pixel(*px[x, y][:3]):
+                cnt += 1
+        return cnt > (h / 5) * 0.9
+
+    def row_is_border(y):
+        cnt = 0
+        for x in range(0, w, 5):
+            if is_border_pixel(*px[x, y][:3]):
+                cnt += 1
+        return cnt > (w / 5) * 0.9
+
+    left = 0
+    while left < w // 4 and col_is_border(left):
+        left += 1
+    right = w
+    while right > w - w // 4 and col_is_border(right - 1):
+        right -= 1
+    top = 0
+    while top < h // 4 and row_is_border(top):
+        top += 1
+    bottom = h
+    while bottom > h - h // 4 and row_is_border(bottom - 1):
+        bottom -= 1
+    if (left, top, right, bottom) != (0, 0, w, h):
+        print(f'  (stripped canvas border: left={left} top={top} right={w-right} bottom={h-bottom})')
+        return img.crop((left, top, right, bottom))
+    return img
+
+
 def main():
     os.makedirs(DST, exist_ok=True)
     for fname, poses in SHEETS:
         path = os.path.join(SRC, fname)
         img = Image.open(path).convert('RGB')
+        img = strip_canvas_border(img)
         w, h = img.size
         rows = content_rows(img, w, h)
         clusters = cluster_rows(rows, len(poses))
@@ -189,9 +248,19 @@ def main():
             while y >= 0 and (art_top - y) <= MARGIN and row_is_pure_green(img, y, w):
                 crop_top = y
                 y -= 1
-            crop_bottom = min(h, bottom + MARGIN)
+            content_end = bottom + 1  # `bottom` is the last True (content) row, inclusive
+            crop_bottom = content_end
+            y = content_end
+            while y < h and (y - content_end) < MARGIN and row_is_pure_green(img, y, w):
+                crop_bottom = y + 1
+                y += 1
             cropped = img.crop((0, crop_top, w, crop_bottom))
             cropped = trim_divider_lines(cropped)
+            if pose_name in POST_PATCHES:
+                cropped = cropped.copy()
+                draw = ImageDraw.Draw(cropped)
+                for rect in POST_PATCHES[pose_name]:
+                    draw.rectangle(rect, fill=(0, 200, 0))
             out_path = os.path.join(DST, pose_name + '.png')
             cropped.save(out_path)
             print(f'{fname} -> {pose_name} rows[{crop_top}:{crop_bottom}] size={cropped.size}')
