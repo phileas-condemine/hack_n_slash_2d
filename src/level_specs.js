@@ -685,86 +685,103 @@ const ANTIQUITY = {
 };
 
 // ======================================================= NIVEAU 3 : JAPON MÉDIÉVAL
-// « Le Sanctuaire entre Deux Mondes » — cf. _specs/03_niveau_japon_medieval.md, adapté au
-// patron STONE/ANTIQUITY (voir TODO.md, 2026-07-28) plutôt qu'à la spec aspirationnelle
-// d'origine : un seul chemin obligatoire (saut/double-saut/dash uniquement, jamais de grimpe/
-// levier/téléporteur sur la route du boss — la démo IA ne grimpe jamais aux lianes, n'actionne
-// jamais délibérément un levier/manivelle et ne vise jamais un `localPortals`, cf. exploration
-// de demoai.js avant ce spec), la « route spirituelle » du brief devenant une poche secrète
-// optionnelle (portails à sens unique, même mécanisme que les `localPortals` existants).
-// Contrairement à ANTIQUITY, l'arène du boss (`yokai_lord`, src/arenas.js) a déjà son art
-// dédié — aucune nouvelle arène à construire ici, juste le niveau qui y mène.
-// Structure : M01 forêt sacrée -> M02 rivière (+ SEC cascade) -> M03 carrefour des torii
-//   (+ SEC sanctuaire spirituel, poches reliées par portails) -> M04 pont suspendu (+ SEC
-//   perchoir haut) -> M06 cour du sanctuaire (safe) -> M07 terrasse de l'oni (élite) ->
-//   M08 escaliers sacrés -> arène du Seigneur Yōkai.
+// « Le Sanctuaire entre Deux Mondes » — v2 (densité), cf. TODO.md 2026-07-28. La v1 (18
+// monstres, 4 encounters) était jugée trop proche d'un couloir et bien en retrait de la
+// densité procédurale historique (~70-80 monstres/ère) — même retour joueur que pour
+// ANTIQUITY v1->v2. Reconstruite sur le même principe qu'ANTIQUITY v2 mais avec une approche
+// « en couches » plutôt que purement linéaire : la grotte souterraine, le sanctuaire spirituel
+// (poches reliées par portails) et la canopée de bambou (lianes) partagent l'empreinte X de
+// rooms de surface déjà existantes (même technique que A03B_SLAVE_PIT/ANTIQUITY, superposée à
+// A03 sur le même x100-220) plutôt que d'allonger le niveau d'autant. Seule une vraie nouvelle
+// salle (M05) est insérée dans la longueur du chemin obligatoire.
+// Un seul chemin obligatoire (saut/double-saut/dash uniquement, jamais de grimpe/levier/
+// téléporteur sur la route du boss — la démo IA ne grimpe jamais aux lianes, n'actionne jamais
+// délibérément un levier/manivelle et ne vise jamais un `localPortals`, cf. exploration de
+// demoai.js avant le premier plan de cette carte) : M01 forêt sacrée -> M02 rivière (+ SEC
+// grotte souterraine à 5 zones) -> M03 carrefour des torii (+ SEC sanctuaire spirituel à 4
+// poches, dont une horde à 10 ennemis simultanés) -> M04 pont suspendu (+ SEC canopée de bambou
+// à 3 lianes) -> M05 gauntlet du sanctuaire (nouveau) -> M06 cour du sanctuaire (safe) -> M07
+// terrasse de l'oni (élite, 3 vagues) -> M08 escaliers sacrés (+ embuscade sur le palier) ->
+// arène du Seigneur Yōkai (art déjà existant, `AR.BOSS_ARENAS.yokai_lord`, inchangée).
+// 15 zones de rencontre distinctes (~75 monstres) + spawns libres ambiants (~10) = ~85 au total.
 const MEDIEVAL = {
   id: 'medieval',
   // arenaStartTx + 34 : même marge que STONE/ANTIQUITY, pour que la largeur pleine vue (VIEW_W
   // = 1280px = ~27 tuiles) de l'arène du boss reste entièrement dans la grille. En dessous de ça,
   // `solidAt` traite tout ce qui dépasse `tilesW` comme un mur plein, ce qui corrompt la
   // collision des plateformes d'arène situées le plus à droite (ex. right_lower/right_upper).
-  tilesW: 381,
+  tilesW: 419,
   worldH: 32,
   spawnX: 3,
   startRoom: 'M01_SACRED_FOREST',
   bossArenaRoom: 'M09_YOKAI_ARENA',
-  arenaStartTx: 347,
-  gateTx: 348,
+  arenaStartTx: 385,
+  gateTx: 386,
   arenaGy: 9,
   fallDamageRatio: 0.10,
 
   // ---- terrain solide ----
   solids: [
-    { x: 0, y: 22, w: 42, h: 10 },          // M01 forêt sacrée : plateau d'arrivée
+    { x: 0, y: 22, w: 44, h: 10 },          // M01 forêt sacrée : plateau d'arrivée
 
-    // M02 rivière : 4 pierres de gué séparées par des sauts simples (3 tuiles), l'une des
-    // trous (x58-61) cache le fond du secret SEC_MEDIEVAL_01 (cf. `empties`/`breakables`).
+    // M02 rivière : 4 pierres de gué séparées par des sauts simples (3 tuiles). Le trou du
+    // milieu (x58-61) cache l'entrée de SEC_MEDIEVAL_GROTTO (cf. `empties` plus bas) ; les deux
+    // trous voisins (x50-53/x66-69) restent de vraies chutes jusqu'au bas du monde.
     { x: 45, y: 22, w: 5, h: 10 },
     { x: 53, y: 22, w: 5, h: 10 },
     { x: 61, y: 22, w: 5, h: 10 },
     { x: 69, y: 22, w: 5, h: 10 },
-    // SEC_MEDIEVAL_01 : contrairement aux pierres de gué (colonnes pleines isolées), les
-    // trous entre elles n'ont NATURELLEMENT aucun sol (vide jusqu'au bas du monde) - cette
-    // dalle ajoute un vrai plancher (y28) sous la seule poche x56-68 pour que `empties`
-    // ci-dessous ait quelque chose à creuser en une pochette fermée plutôt qu'un puits sans
-    // fond. Volontairement étroite (ne déborde pas sur les trous voisins x50-53/x66-69,
-    // toujours de vraies chutes) : seul le trou du milieu (x58-61) est le secret.
-    { x: 56, y: 28, w: 12, h: 4 },
+    // Plancher de la grotte sous l'entrée : contrairement aux pierres de gué (colonnes pleines
+    // isolées), les trous entre elles n'ont NATURELLEMENT aucun sol — cette dalle ajoute un vrai
+    // plancher (y31, une chute de 9 tuiles depuis le trou x58-61, façon caverne) et se prolonge
+    // jusqu'à x86 pour rejoindre en continu le plancher préservé de la grande cavité creusée
+    // plus loin (cf. `empties`), sans avoir besoin d'un raccord séparé.
+    { x: 56, y: 31, w: 30, h: 1 },
     { x: 77, y: 21, w: 53, h: 11 },         // rive lointaine -> M03 carrefour des torii (x77-130)
 
     { x: 130, y: 21, w: 14, h: 2 },         // amorce sous le pont (cf. oneWay BRIDGE_MAIN par-dessus)
+    // Bouchon souterrain sous le pont (x130-144) : la surface n'a qu'une fine amorce (y21-23,
+    // au-dessus), en dessous c'est naturellement vide jusqu'ici — comblé en roche pleine pour que
+    // la grande cavité de SEC_MEDIEVAL_GROTTO (cf. `empties`) puisse la traverser sans un trou.
+    { x: 130, y: 23, w: 14, h: 9 },
     { x: 144, y: 21, w: 52, h: 11 },        // M04 bosquet de bambou (embuscade) x144-196
 
-    // remontée vers la cour du sanctuaire (x196-202, y21->19)
+    // remontée vers M05 (x196-202, y21->19)
     { x: 196, y: 20, w: 3, h: 12 }, { x: 199, y: 19, w: 3, h: 13 },
 
-    { x: 202, y: 19, w: 40, h: 13 },        // M06 cour du sanctuaire (safe) x202-242
+    { x: 202, y: 19, w: 28, h: 13 },        // M05 gauntlet du sanctuaire (nouveau) x202-230
+    { x: 230, y: 19, w: 40, h: 13 },        // M06 cour du sanctuaire (safe) x230-270
 
-    { x: 240, y: 18, w: 2, h: 1 },          // petite marche vers la terrasse
-    { x: 242, y: 18, w: 50, h: 14 },        // M07 terrasse de l'oni x242-292
+    { x: 268, y: 18, w: 2, h: 1 },          // petite marche vers la terrasse
+    { x: 270, y: 18, w: 50, h: 14 },        // M07 terrasse de l'oni x270-320
 
-    // M08 escaliers sacrés : montée de 9 tuiles (y18->9), paliers de 3 tuiles
-    { x: 292, y: 17, w: 3, h: 15 }, { x: 295, y: 16, w: 3, h: 16 }, { x: 298, y: 15, w: 3, h: 17 },
-    { x: 301, y: 14, w: 3, h: 18 }, { x: 304, y: 13, w: 3, h: 19 }, { x: 307, y: 12, w: 3, h: 20 },
-    { x: 310, y: 11, w: 3, h: 21 }, { x: 313, y: 10, w: 3, h: 22 }, { x: 316, y: 9, w: 3, h: 23 },
+    // M08 escaliers sacrés : 4 marches (y17->14), un palier plat (embuscade), puis 5 marches
+    // de plus (y13->9).
+    { x: 320, y: 17, w: 3, h: 15 }, { x: 323, y: 16, w: 3, h: 16 },
+    { x: 326, y: 15, w: 3, h: 17 }, { x: 329, y: 14, w: 3, h: 18 },
+    { x: 332, y: 14, w: 10, h: 18 },        // palier plat : E_MEDIEVAL_STAIRS_AMBUSH
+    { x: 342, y: 13, w: 3, h: 19 }, { x: 345, y: 12, w: 3, h: 20 },
+    { x: 348, y: 11, w: 3, h: 21 }, { x: 351, y: 10, w: 3, h: 22 },
+    { x: 354, y: 9, w: 3, h: 23 },
 
-    { x: 319, y: 9, w: 28, h: 23 },         // antichambre (aucun ennemi, respawn sûr avant la porte)
+    { x: 357, y: 9, w: 28, h: 23 },         // antichambre (aucun ennemi, respawn sûr avant la porte)
     // M09 sol d'arène : filet de sécurité seulement (le sol réel vient de l'image d'arène,
     // AR.BOSS_ARENAS.yokai_lord, ground_main ~tuile 10.5) — doit rester SOUS ce sol visuel,
     // sinon `solidAt` (grille, testé avant les plateformes d'arène dans `moveRect`) intercepte
     // la chute trop tôt et le héros marche en l'air bien au-dessus du sol dessiné. Même
     // convention que STONE (y:23) et ANTIQUITY (y:22), pas la hauteur de l'antichambre (y:9).
-    { x: 347, y: 23, w: 34, h: 9 },
-
+    { x: 385, y: 23, w: 34, h: 9 },
   ],
 
-  // ---- creusements (poche secrète de la cascade, sous la rivière) ----
+  // ---- creusements ----
   empties: [
-    // SEC_MEDIEVAL_01 : chute volontaire dans le trou x58-61 -> petite poche derrière la
-    // cascade (plancher y28), puis nook du trésor séparée par un mur friable (cf. `breakables`).
-    { x: 56, y: 24, w: 7, h: 4 },
-    { x: 64, y: 24, w: 4, h: 4 },
+    // SEC_MEDIEVAL_GROTTO : une seule grande cavité creusée sous M03/le bouchon sous le pont/
+    // M04 (x86-186, masse pleine avant creusement), croûte de surface (y21-24) et plancher
+    // (y31) préservés — même technique que le Quartier des Esclaves/A03B_SLAVE_PIT
+    // (ANTIQUITY). Les 4 zones de combat souterraines (garde d'entrée, gauntlet, embuscade au
+    // plafond, passage inondé, coffre-fort) se succèdent le long de cette même cavité plutôt
+    // que dans des salles séparées par des murs, comme les zones 1-4 de SEC_STONE_04.
+    { x: 86, y: 24, w: 100, h: 7 },
   ],
 
   // ---- plateformes traversables (one-way) ----
@@ -772,126 +789,212 @@ const MEDIEVAL = {
     { x: 130, y: 21, w: 14, id: 'BRIDGE_MAIN' },              // pont suspendu principal (14 tuiles)
     { x: 150, y: 16, w: 4, id: 'TENGU_PERCH_1' },             // couverture d'archers tengu
     { x: 180, y: 15, w: 4, id: 'TENGU_PERCH_2' },
-    { x: 165, y: 10, w: 6, id: 'BRIDGE_HIGH_PERCH' },         // SEC_MEDIEVAL_03 : perchoir haut (coffre)
-    { x: 262, y: 14, w: 8, id: 'ONI_BALCONY' },               // balcon de la terrasse de l'oni
-    // SEC_MEDIEVAL_02 : accès caché au sanctuaire spirituel (marches vers la corniche cachée,
-    // humain uniquement — la démo IA ne grimpe/ne vise jamais un `localPortals`, cf. en-tête).
+    { x: 290, y: 14, w: 8, id: 'ONI_BALCONY' },               // balcon de la terrasse de l'oni
+    { x: 206, y: 15, w: 6, id: 'SHRINE_LEDGE_1' },            // M05 : verticalité du gauntlet
+    { x: 220, y: 13, w: 6, id: 'SHRINE_LEDGE_2' },
+
+    // SEC_MEDIEVAL_SPIRIT : accès caché (marches vers la corniche, humain uniquement — la démo
+    // IA ne grimpe/ne vise jamais un `localPortals`, cf. en-tête) puis 4 poches reliées par une
+    // chaîne de portails à sens unique : relais -> combat -> horde (10 ennemis d'un coup) ->
+    // mini-boss + coffre garanti.
     { x: 100, y: 18, w: 3, id: 'SPIRIT_STEP_1' },
     { x: 104, y: 15, w: 3, id: 'SPIRIT_STEP_2' },
     { x: 108, y: 12, w: 4, id: 'SPIRIT_ENTRY_LEDGE' },
     { x: 94, y: 8, w: 10, id: 'SPIRIT_POCKET_A' },            // poche 1 : simple relais
-    { x: 118, y: 6, w: 14, id: 'SPIRIT_POCKET_B' },           // poche 2 : combat + coffre garanti
+    { x: 118, y: 6, w: 16, id: 'SPIRIT_POCKET_B' },           // poche 2 : combat
+    { x: 140, y: 4, w: 22, id: 'SPIRIT_POCKET_C' },           // poche 3 : horde qui déferle
+    { x: 168, y: 2, w: 14, id: 'SPIRIT_POCKET_D' },           // poche 4 : mini-boss + coffre garanti
+
+    // SEC_MEDIEVAL_GROTTO : passage inondé (zone 10), plateformes étroites sous tir.
+    { x: 146, y: 28, w: 6, id: 'GROTTO_FLOODED_1' },
+    { x: 156, y: 27, w: 6, id: 'GROTTO_FLOODED_2' },
+
+    // SEC_MEDIEVAL_CANOPY : plateforme continue au sommet des 3 lianes (cf. `climbables`).
+    { x: 145, y: 10, w: 42, id: 'CANOPY_WALK' },
   ],
 
-  // ---- racine grimpable (SEC_MEDIEVAL_03, humain uniquement) ----
+  // ---- lianes grimpables (SEC_MEDIEVAL_CANOPY, humain uniquement) ----
   climbables: [
-    { id: 'CLIMB_MEDIEVAL_01', x: 165, y: 10, w: 3, h: 11, exitY: 12 },
+    { id: 'CLIMB_MEDIEVAL_01', x: 148, y: 10, w: 2, h: 11, exitY: 12 },
+    { id: 'CLIMB_MEDIEVAL_02', x: 165, y: 10, w: 2, h: 11, exitY: 12 },
+    { id: 'CLIMB_MEDIEVAL_03', x: 182, y: 10, w: 2, h: 11, exitY: 12 },
   ],
 
-  // ---- destructibles ----
-  breakables: [
-    // SEC_MEDIEVAL_01 : mur friable entre la poche d'atterrissage et le nook du trésor (même
-    // patron que SEC_STONE_01 — le mur reste dans la roche non creusée entre les deux `empties`).
-    { id: 'SEC_MEDIEVAL_01', type: 'wall', rect: { x: 63, y: 24, w: 1, h: 4 }, hp: 45 },
-  ],
-
+  breakables: [],
   interactables: [],
 
   // ---- rooms (unités de pacing/caméra/respawn) ----
   rooms: [
+    // Les rooms secrètes qui partagent l'empreinte X d'une room de surface doivent précéder
+    // cette dernière dans le tableau : currentRoomAt() retient le premier rect qui contient le
+    // point (même règle déjà appliquée à SEC_STONE_05_BRIDGE_FALL/STONE et à la v1 de cette
+    // carte). Les rects de grotte/sanctuaire restent bornés à leur bande y propre (grotte
+    // y23-32, sanctuaire y0-14) pour ne jamais capter un point sur le chemin de surface normal.
+    { id: 'SEC_MEDIEVAL_GROTTO', rect: { x: 50, y: 23, w: 140, h: 9 }, tags: ['secret', 'cave', 'dark'],
+      camera: { minX: 50, maxX: 190, minY: 16, maxY: 32 }, safeRespawn: [{ x: 60, y: 31, priority: 9 }] },
     { id: 'M01_SACRED_FOREST', rect: { x: 0, y: 16, w: 44, h: 16 }, tags: ['start'],
       camera: { minX: 0, maxX: 46, minY: 12, maxY: 32 }, safeRespawn: [{ x: 3, y: 22, priority: 10 }] },
-    // Doit précéder M02_RIVER_PATH : les deux rects se chevauchent (la poche secrète est sous
-    // la rivière), et currentRoomAt() retient le premier match (cf. le même besoin pour
-    // SEC_STONE_05_BRIDGE_FALL dans STONE, plus haut dans ce fichier).
-    { id: 'SEC_MEDIEVAL_01_CASCADE', rect: { x: 55, y: 22, w: 14, h: 10 }, tags: ['secret', 'cave', 'dark'],
-      camera: { minX: 50, maxX: 70, minY: 18, maxY: 32 }, safeRespawn: [{ x: 59, y: 28, priority: 9 }] },
     { id: 'M02_RIVER_PATH', rect: { x: 42, y: 14, w: 38, h: 18 }, tags: ['branch'],
       camera: { minX: 40, maxX: 80, minY: 10, maxY: 32 }, safeRespawn: [{ x: 45, y: 22, priority: 6 }] },
+    { id: 'SEC_MEDIEVAL_SPIRIT', rect: { x: 86, y: 0, w: 100, h: 14 }, tags: ['secret', 'spirit'],
+      camera: { minX: 86, maxX: 186, minY: 0, maxY: 16 }, safeRespawn: [{ x: 98, y: 8, priority: 9 }] },
     { id: 'M03_TORII_CROSSROADS', rect: { x: 77, y: 12, w: 53, h: 20 }, tags: ['hub'],
       camera: { minX: 75, maxX: 132, minY: 8, maxY: 32 }, safeRespawn: [{ x: 85, y: 21, priority: 8 }] },
-    { id: 'SEC_MEDIEVAL_02_SPIRIT_A', rect: { x: 92, y: 6, w: 16, h: 6 }, tags: ['secret', 'spirit'],
-      camera: { minX: 88, maxX: 112, minY: 2, maxY: 16 }, safeRespawn: [{ x: 98, y: 8, priority: 9 }] },
-    { id: 'SEC_MEDIEVAL_02_SPIRIT_B', rect: { x: 116, y: 4, w: 18, h: 6 }, tags: ['secret', 'spirit'],
-      camera: { minX: 112, maxX: 138, minY: 2, maxY: 14 }, safeRespawn: [{ x: 122, y: 6, priority: 9 }] },
+    { id: 'SEC_MEDIEVAL_CANOPY', rect: { x: 140, y: 8, w: 52, h: 13 }, tags: ['secret', 'canopy'],
+      camera: { minX: 140, maxX: 192, minY: 4, maxY: 21 }, safeRespawn: [{ x: 148, y: 12, priority: 9 }] },
     { id: 'M04_PHYSICAL_BRIDGES', rect: { x: 130, y: 8, w: 66, h: 24 }, tags: ['bridge'],
       camera: { minX: 128, maxX: 200, minY: 4, maxY: 32 }, safeRespawn: [{ x: 146, y: 21, priority: 7 }] },
-    { id: 'M06_SHRINE_COURT', rect: { x: 202, y: 15, w: 40, h: 17 }, tags: ['safe', 'no_enemy', 'merchant'],
-      camera: { minX: 200, maxX: 242, minY: 11, maxY: 32 }, safeRespawn: [{ x: 214, y: 19, priority: 10 }] },
-    { id: 'M07_ONI_TERRACE', rect: { x: 242, y: 10, w: 50, h: 22 }, tags: ['tension'],
-      camera: { minX: 240, maxX: 292, minY: 6, maxY: 32 }, safeRespawn: [{ x: 250, y: 18, priority: 7 }] },
-    { id: 'M08_SHRINE_STAIRS', rect: { x: 292, y: 6, w: 55, h: 26 }, tags: ['ascent'],
-      camera: { minX: 290, maxX: 347, minY: 2, maxY: 32 }, safeRespawn: [{ x: 322, y: 9, priority: 8 }] },
-    { id: 'M09_YOKAI_ARENA', rect: { x: 347, y: 6, w: 34, h: 26 }, tags: ['boss'],
-      camera: { minX: 347, maxX: 381, minY: 2, maxY: 32 }, safeRespawn: [{ x: 351, y: 9, priority: 10 }] },
+    { id: 'M05_SHRINE_GAUNTLET', rect: { x: 202, y: 8, w: 28, h: 24 }, tags: ['tension'],
+      camera: { minX: 200, maxX: 230, minY: 4, maxY: 32 }, safeRespawn: [{ x: 206, y: 19, priority: 7 }] },
+    { id: 'M06_SHRINE_COURT', rect: { x: 230, y: 15, w: 40, h: 17 }, tags: ['safe', 'no_enemy', 'merchant'],
+      camera: { minX: 228, maxX: 270, minY: 11, maxY: 32 }, safeRespawn: [{ x: 242, y: 19, priority: 10 }] },
+    { id: 'M07_ONI_TERRACE', rect: { x: 270, y: 10, w: 50, h: 22 }, tags: ['tension'],
+      camera: { minX: 268, maxX: 320, minY: 6, maxY: 32 }, safeRespawn: [{ x: 278, y: 18, priority: 7 }] },
+    { id: 'M08_SHRINE_STAIRS', rect: { x: 320, y: 6, w: 65, h: 26 }, tags: ['ascent'],
+      camera: { minX: 318, maxX: 385, minY: 2, maxY: 32 }, safeRespawn: [{ x: 360, y: 9, priority: 8 }] },
+    { id: 'M09_YOKAI_ARENA', rect: { x: 385, y: 6, w: 34, h: 26 }, tags: ['boss'],
+      camera: { minX: 385, maxX: 419, minY: 2, maxY: 32 }, safeRespawn: [{ x: 389, y: 9, priority: 10 }] },
   ],
 
-  // ---- encounters verrouillés ----
+  // ---- encounters verrouillés (gates:[] partout — retour joueur du 2026-07-27 : pas de
+  // barrière physique, ça enferme l'IA de démo sans raison ; cf. TODO.md) ----
   encounters: [
+    // --- chemin obligatoire ---
+    { id: 'E_MEDIEVAL_FOREST', roomId: 'M01_SACRED_FOREST',
+      trigger: { x: 12, y: 18, w: 20, h: 6 }, gates: [],
+      waves: [{ ids: ['ronin', 'ronin', 'tengu_archer'] }],
+      reward: { coins: 10 } },
     { id: 'E_MEDIEVAL_CROSSROADS', roomId: 'M03_TORII_CROSSROADS',
-      trigger: { x: 95, y: 14, w: 20, h: 7 },
-      gates: [],
-      waves: [{ ids: ['ronin', 'spirit_caster'] }, { ids: ['ninja_assassin'] }],
-      reward: { coins: 15 } },
+      trigger: { x: 95, y: 14, w: 20, h: 7 }, gates: [],
+      waves: [{ ids: ['ronin', 'spirit_caster', 'ninja_assassin'] }, { ids: ['medieval_bamboo_stalker', 'tengu_archer', 'ronin'] }],
+      reward: { coins: 16 } },
     { id: 'E_MEDIEVAL_BRIDGE', roomId: 'M04_PHYSICAL_BRIDGES',
-      trigger: { x: 150, y: 14, w: 30, h: 8 },
-      gates: [],
-      waves: [{ ids: ['medieval_bamboo_stalker', 'tengu_archer'] }, { ids: ['tengu_archer'] }],
+      trigger: { x: 150, y: 14, w: 30, h: 8 }, gates: [],
+      waves: [{ ids: ['medieval_bamboo_stalker', 'medieval_bamboo_stalker', 'tengu_archer'] }, { ids: ['tengu_archer', 'ninja_assassin', 'medieval_bamboo_stalker'] }],
+      reward: { coins: 18 } },
+    { id: 'E_MEDIEVAL_SHRINE_GAUNTLET', roomId: 'M05_SHRINE_GAUNTLET',
+      trigger: { x: 206, y: 10, w: 20, h: 10 }, gates: [],
+      waves: [{ ids: ['ronin', 'ronin', 'tengu_archer'] }, { ids: ['ninja_assassin', 'medieval_bamboo_stalker', 'ronin'] }],
       reward: { coins: 18 } },
     { id: 'E_MEDIEVAL_ELITE', roomId: 'M07_ONI_TERRACE',
-      trigger: { x: 248, y: 10, w: 30, h: 8 },
-      gates: [],
-      waves: [{ ids: ['oni_brute', 'tengu_archer'], elite: ['oni_brute'] }, { ids: ['lantern_wisp', 'lantern_wisp'] }],
-      reward: { coins: 28 } },
-    // SEC_MEDIEVAL_02 — poche 2 du sanctuaire spirituel : combat léger avant le coffre garanti.
-    { id: 'E_SEC_SPIRIT_SANCTUARY', roomId: 'SEC_MEDIEVAL_02_SPIRIT_B',
-      trigger: { x: 118, y: 3, w: 14, h: 5 },
-      gates: [],
-      waves: [{ ids: ['spirit_caster', 'lantern_wisp'] }],
+      trigger: { x: 276, y: 10, w: 30, h: 8 }, gates: [],
+      waves: [{ ids: ['ronin', 'ronin', 'tengu_archer'] },
+              { ids: ['ninja_assassin', 'ninja_assassin', 'medieval_bamboo_stalker'] },
+              { ids: ['oni_brute', 'lantern_wisp', 'lantern_wisp'], elite: ['oni_brute'] }],
+      reward: { coins: 30 } },
+    { id: 'E_MEDIEVAL_STAIRS_AMBUSH', roomId: 'M08_SHRINE_STAIRS',
+      trigger: { x: 333, y: 8, w: 8, h: 6 }, gates: [],
+      waves: [{ ids: ['ninja_assassin', 'ninja_assassin', 'tengu_archer', 'tengu_archer'] }],
+      reward: { coins: 14 } },
+
+    // --- SEC_MEDIEVAL_GROTTO : garde d'entrée (mini-boss) -> gauntlet -> (embuscade au
+    // plafond, cf. `spawns`/`triggers`) -> passage inondé -> coffre-fort ---
+    { id: 'E_SEC_GROTTO_GUARDIAN', roomId: 'SEC_MEDIEVAL_GROTTO',
+      trigger: { x: 58, y: 26, w: 14, h: 6 }, gates: [],
+      waves: [{ ids: ['ninja_assassin'], elite: ['ninja_assassin'] }],
+      reward: { coins: 20 } },
+    { id: 'E_SEC_GROTTO_GAUNTLET', roomId: 'SEC_MEDIEVAL_GROTTO',
+      trigger: { x: 92, y: 24, w: 16, h: 7 }, gates: [],
+      waves: [{ ids: ['medieval_bamboo_stalker', 'medieval_bamboo_stalker', 'spirit_caster', 'ronin', 'tengu_archer'] }],
+      reward: { coins: 18 } },
+    { id: 'E_SEC_GROTTO_FLOODED', roomId: 'SEC_MEDIEVAL_GROTTO',
+      trigger: { x: 144, y: 24, w: 18, h: 7 }, gates: [],
+      waves: [{ ids: ['spirit_caster', 'lantern_wisp', 'medieval_bamboo_stalker', 'medieval_bamboo_stalker'] }],
+      reward: { coins: 16 } },
+    { id: 'E_SEC_GROTTO_VAULT', roomId: 'SEC_MEDIEVAL_GROTTO',
+      trigger: { x: 168, y: 24, w: 16, h: 7 }, gates: [],
+      waves: [{ ids: ['ninja_assassin', 'ninja_assassin', 'medieval_bamboo_stalker', 'medieval_bamboo_stalker', 'ronin'] }],
+      reward: { coins: 22 } },
+
+    // --- SEC_MEDIEVAL_SPIRIT : combat -> horde (10 ennemis simultanés, mêlée pareuse de
+    // flèches + casters volants qui submergent) -> mini-boss + coffre garanti ---
+    { id: 'E_SEC_SPIRIT_B', roomId: 'SEC_MEDIEVAL_SPIRIT',
+      trigger: { x: 118, y: 3, w: 16, h: 5 }, gates: [],
+      waves: [{ ids: ['spirit_caster', 'spirit_caster', 'lantern_wisp', 'lantern_wisp', 'lantern_wisp'] }],
+      reward: { coins: 18 } },
+    { id: 'E_SEC_SPIRIT_SWARM', roomId: 'SEC_MEDIEVAL_SPIRIT',
+      trigger: { x: 140, y: 1, w: 22, h: 5 }, gates: [],
+      waves: [{ ids: ['lantern_wisp', 'lantern_wisp', 'lantern_wisp', 'lantern_wisp', 'lantern_wisp',
+                       'spirit_caster', 'spirit_caster', 'spirit_caster', 'ninja_assassin', 'ninja_assassin'] }],
+      reward: { coins: 30 } },
+    { id: 'E_SEC_SPIRIT_ELDER', roomId: 'SEC_MEDIEVAL_SPIRIT',
+      trigger: { x: 168, y: 0, w: 14, h: 4 }, gates: [],
+      waves: [{ ids: ['spirit_caster'], elite: ['spirit_caster'] }],
+      reward: { coins: 20 } },
+
+    // --- SEC_MEDIEVAL_CANOPY : embuscade avant le coffre perché ---
+    { id: 'E_SEC_CANOPY', roomId: 'SEC_MEDIEVAL_CANOPY',
+      trigger: { x: 150, y: 5, w: 35, h: 6 }, gates: [],
+      waves: [{ ids: ['medieval_bamboo_stalker', 'medieval_bamboo_stalker', 'medieval_bamboo_stalker', 'tengu_archer', 'tengu_archer'] }],
       reward: { coins: 20 } },
   ],
 
-  triggers: [],
+  // ---- déclencheurs de scène ----
+  triggers: [
+    // SEC_MEDIEVAL_GROTTO, zone 9 : embuscade au plafond (feux-follets accrochés à la roche,
+    // même mécanisme que BATS_WAKE/SEC04_STALKERS_WAKE dans STONE) entre le gauntlet et le
+    // passage inondé.
+    { id: 'GROTTO_CEILING_WAKE', rect: { x: 116, y: 24, w: 20, h: 5 }, action: 'wakeSpawns', group: 'grotto_ceiling' },
+  ],
 
   // ---- ennemis libres (hors encounters) ----
   spawns: [
-    { tx: 10, ty: 22, id: 'ronin' },
-    { tx: 24, ty: 22, id: 'ninja_assassin' },
-    { tx: 82, ty: 21, id: 'tengu_archer' },                         // rive lointaine de la rivière
-    { tx: 150, ty: 16, id: 'tengu_archer', onPlatform: true },      // TENGU_PERCH_1
-    { tx: 180, ty: 15, id: 'tengu_archer', onPlatform: true },      // TENGU_PERCH_2
-    { tx: 266, ty: 14, id: 'tengu_archer', onPlatform: true },      // ONI_BALCONY
+    // SEC_MEDIEVAL_GROTTO, zone 9 : 4 feux-follets suspendus au plafond, réveillés par
+    // GROTTO_CEILING_WAKE ci-dessus (cf. `suspended`/`activate`, même patron que STONE).
+    { tx: 121, ty: 24, id: 'lantern_wisp', suspended: true, activate: 'grotto_ceiling' },
+    { tx: 125, ty: 24, id: 'lantern_wisp', suspended: true, activate: 'grotto_ceiling' },
+    { tx: 129, ty: 24, id: 'lantern_wisp', suspended: true, activate: 'grotto_ceiling' },
+    { tx: 133, ty: 24, id: 'lantern_wisp', suspended: true, activate: 'grotto_ceiling' },
+
+    // ambiants (hors zones de rencontre verrouillées)
+    { tx: 36, ty: 22, id: 'ronin' },                                 // lisière de la forêt
+    { tx: 82, ty: 21, id: 'tengu_archer' },                          // rive lointaine de la rivière
+    { tx: 100, ty: 31, id: 'medieval_bamboo_stalker' },              // couloir de la grotte
+    { tx: 150, ty: 16, id: 'tengu_archer', onPlatform: true },       // TENGU_PERCH_1
+    { tx: 180, ty: 15, id: 'tengu_archer', onPlatform: true },       // TENGU_PERCH_2
+    { tx: 150, ty: 21, id: 'medieval_bamboo_stalker' },              // pied de la canopée
+    { tx: 208, ty: 19, id: 'ronin' },                                // lisière du gauntlet M05
+    { tx: 290, ty: 14, id: 'tengu_archer', onPlatform: true },       // ONI_BALCONY
+    { tx: 310, ty: 18, id: 'tengu_archer' },                         // lisière de la terrasse
+    { tx: 316, ty: 18, id: 'ninja_assassin' },                       // pied des marches sacrées
   ],
 
   // ---- coffres ----
   chests: [
-    { x: 30, y: 22 },                              // forêt
-    { x: 66, y: 28, guaranteed: 'skillPoint' },     // SEC_MEDIEVAL_01 : nook derrière le mur friable
-    { x: 126, y: 6, guaranteed: 'skillPoint' },     // SEC_MEDIEVAL_02 : sanctuaire spirituel
-    { x: 168, y: 10, high: true },                  // SEC_MEDIEVAL_03 : perchoir haut du pont
-    { x: 230, y: 19 },                              // cour du sanctuaire
-    { x: 338, y: 9 },                               // antichambre
+    { x: 30, y: 22 },                                    // forêt
+    { x: 64, y: 31, guaranteed: 'skillPoint' },          // SEC_MEDIEVAL_GROTTO : garde d'entrée
+    { x: 178, y: 31, guaranteed: 'swordUp' },            // SEC_MEDIEVAL_GROTTO : coffre-fort final
+    { x: 124, y: 6, high: true },                        // SEC_MEDIEVAL_SPIRIT : poche 2
+    { x: 172, y: 2, high: true, guaranteed: 'skillPoint' }, // SEC_MEDIEVAL_SPIRIT : mini-boss final
+    { x: 180, y: 10, high: true },                       // SEC_MEDIEVAL_CANOPY : coffre perché
+    { x: 250, y: 19 },                                   // cour du sanctuaire
+    { x: 370, y: 9 },                                    // antichambre
   ],
 
-  merchant: { x: 214, y: 19 },
+  merchant: { x: 242, y: 19 },
 
-  // ---- portails courts (poche secrète du sanctuaire spirituel — jamais sur le chemin du boss) ----
+  // ---- portails courts (jamais sur le chemin obligatoire du boss) ----
   localPortals: [
-    // SEC_MEDIEVAL_01 : sortie immédiate depuis la poche d'atterrissage elle-même (pas besoin
-    // de casser le mur du nook) — même patron que SEC_STONE_05 (STONE) : quiconque tombe dans
-    // le trou x58-61, volontairement ou non, doit pouvoir en ressortir sans dépendre d'une
-    // action optionnelle (trouvé en testant : sans ça, l'IA de démo qui y tombe par accident
-    // reste bloquée indéfiniment, aucun comportement de bris de mur ni d'escalade de puits).
-    { x: 59, y: 28, returnTo: { x: 90, y: 21 } },
-    { x: 110, y: 12, returnTo: { x: 98, y: 8 } },    // corniche cachée -> poche 1
-    { x: 100, y: 8, returnTo: { x: 120, y: 6 } },    // poche 1 -> poche 2
-    { x: 128, y: 6, returnTo: { x: 112, y: 21 } },   // poche 2 -> retour au carrefour
+    // SEC_MEDIEVAL_GROTTO : sortie immédiate depuis l'aire d'atterrissage elle-même — quiconque
+    // tombe dans le trou x58-61, volontairement ou non, doit pouvoir en ressortir sans dépendre
+    // d'une action optionnelle (leçon de la v1 : sans ça, l'IA de démo qui y tombe par accident
+    // reste bloquée indéfiniment). Et sortie finale depuis le coffre-fort, plus loin sur le
+    // chemin (récompense : on ressort près de M06 plutôt que de revenir en arrière).
+    { x: 60, y: 31, returnTo: { x: 90, y: 21 } },
+    { x: 180, y: 31, returnTo: { x: 236, y: 19 } },
+
+    // SEC_MEDIEVAL_SPIRIT : chaîne de 5 portails à sens unique le long des 4 poches.
+    { x: 110, y: 12, returnTo: { x: 98, y: 8 } },     // corniche cachée -> poche 1 (relais)
+    { x: 100, y: 8, returnTo: { x: 124, y: 6 } },     // poche 1 -> poche 2 (combat)
+    { x: 132, y: 6, returnTo: { x: 150, y: 4 } },     // poche 2 -> poche 3 (horde)
+    { x: 158, y: 4, returnTo: { x: 174, y: 2 } },     // poche 3 -> poche 4 (mini-boss)
+    { x: 180, y: 2, returnTo: { x: 112, y: 21 } },    // poche 4 -> retour au carrefour
   ],
 
   // ---- poches sombres ----
   darkZones: [
-    { x: 54, y: 24, w: 16, h: 8, tint: 0.75 },   // SEC_MEDIEVAL_01 : derrière la cascade
-    { x: 90, y: 2, w: 46, h: 14, tint: 0.5 },    // SEC_MEDIEVAL_02 : sanctuaire spirituel (brume)
+    { x: 50, y: 23, w: 140, h: 9, tint: 0.7 },   // SEC_MEDIEVAL_GROTTO
+    { x: 86, y: 0, w: 100, h: 16, tint: 0.5 },   // SEC_MEDIEVAL_SPIRIT (brume)
   ],
 
   // ---- décor ----
@@ -899,21 +1002,28 @@ const MEDIEVAL = {
     { type: 'torii', tx: 20, ty: 22 },
     { type: 'lantern', tx: 48, ty: 22 },
     { type: 'lantern', tx: 72, ty: 22 },
-    { type: 'lantern', tx: 59, ty: 28 },      // SEC_MEDIEVAL_01
+    { type: 'lantern', tx: 60, ty: 31 },      // SEC_MEDIEVAL_GROTTO : entrée
+    { type: 'lantern', tx: 100, ty: 31 },     // SEC_MEDIEVAL_GROTTO : gauntlet
+    { type: 'lantern', tx: 150, ty: 28 },     // SEC_MEDIEVAL_GROTTO : passage inondé
+    { type: 'lantern', tx: 178, ty: 31 },     // SEC_MEDIEVAL_GROTTO : coffre-fort
     { type: 'torii', tx: 95, ty: 21 },
-    { type: 'lantern', tx: 98, ty: 8 },       // SEC_MEDIEVAL_02 poche 1
-    { type: 'lantern', tx: 122, ty: 6 },      // SEC_MEDIEVAL_02 poche 2
+    { type: 'lantern', tx: 98, ty: 8 },       // SEC_MEDIEVAL_SPIRIT poche 1
+    { type: 'lantern', tx: 122, ty: 6 },      // SEC_MEDIEVAL_SPIRIT poche 2
+    { type: 'lantern', tx: 148, ty: 4 },      // SEC_MEDIEVAL_SPIRIT poche 3
+    { type: 'lantern', tx: 172, ty: 2 },      // SEC_MEDIEVAL_SPIRIT poche 4
     { type: 'lantern', tx: 145, ty: 21 },
+    { type: 'lantern', tx: 160, ty: 10 },     // SEC_MEDIEVAL_CANOPY
     { type: 'lantern', tx: 190, ty: 21 },
-    { type: 'sakura', tx: 210, ty: 19 },
-    { type: 'shrine', tx: 222, ty: 19 },
-    { type: 'sakura', tx: 235, ty: 19 },
-    { type: 'lantern', tx: 255, ty: 18 },
-    { type: 'lantern', tx: 285, ty: 18 },
-    { type: 'lantern', tx: 300, ty: 17 },
-    { type: 'lantern', tx: 315, ty: 10 },
-    { type: 'shrine', tx: 335, ty: 9 },
-    { type: 'torii', tx: 345, ty: 9 },
+    { type: 'shrine', tx: 210, ty: 19 },      // M05
+    { type: 'sakura', tx: 238, ty: 19 },
+    { type: 'shrine', tx: 250, ty: 19 },
+    { type: 'sakura', tx: 263, ty: 19 },
+    { type: 'lantern', tx: 283, ty: 18 },
+    { type: 'lantern', tx: 313, ty: 18 },
+    { type: 'lantern', tx: 328, ty: 17 },
+    { type: 'lantern', tx: 345, ty: 12 },
+    { type: 'shrine', tx: 365, ty: 9 },
+    { type: 'torii', tx: 375, ty: 9 },
   ],
 
   // ---- indices pour l'IA de démonstration (documentation seule, cf. en-tête : demoai.js ne
@@ -921,7 +1031,9 @@ const MEDIEVAL = {
   navHints: {
     defaultRoute: 'main',
     climbs: [
-      { id: 'CLIMB_MEDIEVAL_01', x: 167, bottomY: 21, topY: 10, exitX: 172 },
+      { id: 'CLIMB_MEDIEVAL_01', x: 149, bottomY: 21, topY: 10, exitX: 152 },
+      { id: 'CLIMB_MEDIEVAL_02', x: 166, bottomY: 21, topY: 10, exitX: 169 },
+      { id: 'CLIMB_MEDIEVAL_03', x: 183, bottomY: 21, topY: 10, exitX: 186 },
     ],
   },
 };

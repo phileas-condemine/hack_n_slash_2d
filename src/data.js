@@ -150,7 +150,7 @@ AR.ENEMIES = {
   ninja_assassin: { name: 'Assassin ninja', hp: 75, dmg: 14, speed: 190, xp: 26, coins: 11, h: 78, behavior: 'assassin', range: 58, aggro: 560, atkCd: 1.6, tele: 0.3, facing: 'l', blinkCd: 3.2, parry: true },
   // Nouveau monstre de terrain (carte authored R3, cf. level_specs.js MEDIEVAL) : embuscade
   // depuis un couvert de bambou, jamais utilisé ailleurs. Art dédié généré via ChatGPT/Playwright.
-  medieval_bamboo_stalker: { name: 'Traqueur des bambous', hp: 95, dmg: 13, speed: 145, xp: 24, coins: 10, h: 82, behavior: 'assassin', range: 62, aggro: 500, atkCd: 1.7, tele: 0.35, blinkCd: 2.6 },
+  medieval_bamboo_stalker: { name: 'Traqueur des bambous', hp: 95, dmg: 13, speed: 145, xp: 24, coins: 10, h: 82, behavior: 'assassin', range: 62, aggro: 500, atkCd: 1.7, tele: 0.35, blinkCd: 2.6, parry: true },
   tengu_archer:   { name: 'Archer tengu', hp: 85, dmg: 12, speed: 100, xp: 24, coins: 10, h: 92, behavior: 'ranged', range: 600, keep: 380, aggro: 660, atkCd: 1.5, tele: 0.45, proj: 'arrow', hop: true },
   spirit_caster:  { name: 'Invocateur d\'esprits', hp: 100, dmg: 11, speed: 60, xp: 30, coins: 13, h: 100, behavior: 'caster', range: 620, keep: 380, aggro: 680, atkCd: 2.4, tele: 0.65, proj: 'wisp', float: true },
   oni_brute:      { name: 'Brute oni', hp: 325, dmg: 24, speed: 75, xp: 55, coins: 22, h: 108, behavior: 'brute', range: 100, aggro: 420, atkCd: 1.7, tele: 0.55, knock: 380, elite: true, facing: 'l' },
