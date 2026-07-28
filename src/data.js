@@ -148,10 +148,14 @@ AR.ENEMIES = {
   // --- Japon médiéval
   ronin:          { name: 'Rônin', hp: 110, dmg: 15, speed: 130, xp: 22, coins: 9, h: 80, behavior: 'melee', range: 78, aggro: 480, atkCd: 1.0, tele: 0.32, combo2: true, parry: true },
   ninja_assassin: { name: 'Assassin ninja', hp: 75, dmg: 14, speed: 190, xp: 26, coins: 11, h: 78, behavior: 'assassin', range: 58, aggro: 560, atkCd: 1.6, tele: 0.3, facing: 'l', blinkCd: 3.2, parry: true },
+  // Nouveau monstre de terrain (carte authored R3, cf. level_specs.js MEDIEVAL) : embuscade
+  // depuis un couvert de bambou, jamais utilisé ailleurs. Art dédié généré via ChatGPT/Playwright.
+  medieval_bamboo_stalker: { name: 'Traqueur des bambous', hp: 95, dmg: 13, speed: 145, xp: 24, coins: 10, h: 82, behavior: 'assassin', range: 62, aggro: 500, atkCd: 1.7, tele: 0.35, blinkCd: 2.6 },
   tengu_archer:   { name: 'Archer tengu', hp: 85, dmg: 12, speed: 100, xp: 24, coins: 10, h: 92, behavior: 'ranged', range: 600, keep: 380, aggro: 660, atkCd: 1.5, tele: 0.45, proj: 'arrow', hop: true },
   spirit_caster:  { name: 'Invocateur d\'esprits', hp: 100, dmg: 11, speed: 60, xp: 30, coins: 13, h: 100, behavior: 'caster', range: 620, keep: 380, aggro: 680, atkCd: 2.4, tele: 0.65, proj: 'wisp', float: true },
   oni_brute:      { name: 'Brute oni', hp: 325, dmg: 24, speed: 75, xp: 55, coins: 22, h: 108, behavior: 'brute', range: 100, aggro: 420, atkCd: 1.7, tele: 0.55, knock: 380, elite: true, facing: 'l' },
-  // Sbire dédié du Seigneur Yōkai (summon uniquement)
+  // Feu-follet : à l'origine sbire dédié du Seigneur Yōkai (summon), réutilisé tel quel comme
+  // ennemi de terrain dans la carte authored R3 (déjà l'art voulu pour ce rôle, cf. TODO.md).
   lantern_wisp:   { name: 'Feu-follet', hp: 28, dmg: 10, speed: 55, xp: 22, coins: 9, h: 70, behavior: 'caster', range: 520, keep: 340, aggro: 600, atkCd: 2.1, tele: 0.55, proj: 'wisp', float: true },
 
   // --- Renaissance

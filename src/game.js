@@ -1026,6 +1026,10 @@ AR.Game = class {
   onBossDeath() {
     this.level.gateClosed = false;
     this.stats.bosses++;
+    // Sbires invoqués (ex. summon:lantern_wisp) encore en vie à la mort du boss : sans ça,
+    // un survivant peut coincer l'IA de démo en boucle de repli contre le bord de l'arène,
+    // sans jamais l'engager ni rejoindre le portail (trouvé en testant R3/Seigneur Yōkai).
+    for (const e of this.enemies) if (!e.isBoss && !e.dead) e.die(this, true);
     const footY = this.level.bossArena && this.level.bossArena.active
       ? this.level.bossArena.ground.y : this.level.arenaGy * AR.C.TILE;
     AR.Pickups.spawn({ type: 'portal', x: this.level.portalX, y: footY });

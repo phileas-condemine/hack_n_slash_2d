@@ -802,7 +802,13 @@ AR.DemoAI = {
         // sur la position courante, l'écart au but ne redescend jamais sous
         // le seuil "arrivé" tant qu'il reste à descendre, donc plus de
         // rebond ; l'approche fine reprend sur `portal.x` dès l'atterrissage.
-        if (!this.portalDropDir) this.portalDropDir = portal.x >= pcx ? 1 : -1;
+        // Re-choisie aussi à chaque contact au sol (pas seulement la 1ère fois) : sinon un
+        // atterrissage sur une plateforme du MAUVAIS côté du portail (arène à plateaux étagés,
+        // ex. le Seigneur Yōkai) fige une direction qui pousse contre un mur/bord d'arène en
+        // boucle infinie au lieu de se réévaluer (trouvé en testant R3 : plus aucun ennemi en
+        // vie, portail visible, IA plaquée contre la bordure gauche de l'arène sans jamais
+        // rejoindre le portail à droite).
+        if (!this.portalDropDir || pl.onGround) this.portalDropDir = portal.x >= pcx ? 1 : -1;
         goalX = pcx + this.portalDropDir * AR.C.TILE * 4;
       } else {
         this.portalDropDir = 0;
