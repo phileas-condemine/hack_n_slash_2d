@@ -1806,7 +1806,15 @@ const CYBER = {
     // `oneWay` sur TOUT le tronçon élimine le problème quelle que soit la dérive.
     { x: 93, y: 32, w: 37, h: 8 },          // x93-129
 
-    { x: 78, y: 40, w: 25, h: 4 },          // SEC_C1_WALKWAY (sous les toits) x78-102
+    // SEC_C1_WALKWAY (sous les toits) : élargi à x70-109 — trop étroit à l'origine (x78-102),
+    // 2 des 10 ennemis de la horde (`E_SEC_C1_HORDE`, tirée à ±13 tuiles de son centre x88) et
+    // le capitaine (`E_SEC_C1_CAPTAIN`, x103) tombaient hors du sol : `Game#_spawnWave` cherche
+    // le sol via `groundYAtEntity`, qui renvoie une sentinelle très profonde (aucun sol trouvé
+    // dans la colonne) plutôt que d'échouer — ces ennemis se retrouvaient littéralement hors
+    // carte, invisibles et inaccessibles (retour joueur 2026-07-28 : « les soldats sont emurés,
+    // le coffre aussi »). Trouvé en rejouant chaque encounter et en vérifiant la position réelle
+    // des ennemis apparus, pas seulement les coordonnées du sol lui-même.
+    { x: 70, y: 40, w: 40, h: 4 },          // x70-109
 
     // C2_SECURITY (y32, prolonge C1 sans coupure x129->130) : brèche gardée x150-152 (GRID_C2 ->
     // SEC_C2_VAULT).
