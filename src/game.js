@@ -1134,10 +1134,10 @@ AR.Game = class {
     const ctx = this.ctx;
     ctx.clearRect(0, 0, AR.C.VIEW_W, AR.C.VIEW_H);
 
-    if (this.state === 'title') { AR.UI.beginFrame(); AR.UI.drawTitle(ctx, this); return; }
-    if (this.state === 'help') { AR.UI.beginFrame(); AR.UI.drawHelp(ctx, this); return; }
-    if (this.state === 'rift') { AR.UI.beginFrame(); AR.UI.drawRift(ctx, this); return; }
-    if (this.state === 'saves') { AR.UI.beginFrame(); AR.UI.drawSaves(ctx, this); return; }
+    if (this.state === 'title') { AR.UI.beginFrame(); AR.UI.drawTitle(ctx, this); AR.UI.drawCursor(ctx); return; }
+    if (this.state === 'help') { AR.UI.beginFrame(); AR.UI.drawHelp(ctx, this); AR.UI.drawCursor(ctx); return; }
+    if (this.state === 'rift') { AR.UI.beginFrame(); AR.UI.drawRift(ctx, this); AR.UI.drawCursor(ctx); return; }
+    if (this.state === 'saves') { AR.UI.beginFrame(); AR.UI.drawSaves(ctx, this); AR.UI.drawCursor(ctx); return; }
 
     // monde
     const cam = this.camera, lvl = this.level;
@@ -1188,11 +1188,12 @@ AR.Game = class {
 
     // overlays
     AR.UI.beginFrame();
-    if (this.state === 'gameover') { AR.UI.drawEnd(ctx, this, false); return; }
-    if (this.state === 'victory') { AR.UI.drawEnd(ctx, this, true); return; }
+    if (this.state === 'gameover') { AR.UI.drawEnd(ctx, this, false); AR.UI.drawCursor(ctx); return; }
+    if (this.state === 'victory') { AR.UI.drawEnd(ctx, this, true); AR.UI.drawCursor(ctx); return; }
     if (this.spellReveal) AR.UI.drawSpellReveal(ctx, this);
     else if (this.skillOpen) AR.UI.drawSkills(ctx, this);
     else if (this.shopOpen) AR.UI.drawShop(ctx, this);
     else if (this.paused) AR.UI.drawPause(ctx, this);
+    if (this.spellReveal || this.skillOpen || this.shopOpen || this.paused) AR.UI.drawCursor(ctx);
   }
 };

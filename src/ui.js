@@ -35,6 +35,29 @@ AR.UI = {
     return !opts.disabled && this._click(r);
   },
 
+  // Le canvas a `cursor:none` en CSS (le perso sert d'indicateur de visée en jeu, cf. player.js),
+  // mais dans les menus rien ne remplaçait le curseur système : on ne voyait la souris qu'en
+  // devinant via le survol des boutons (retour joueur 2026-07-28). Un petit réticule dessiné
+  // par-dessus les overlays comble ce trou ; inutile en tactile (pas de pointeur persistant).
+  drawCursor(ctx) {
+    if (AR.Touch && AR.Touch.enabled) return;
+    const m = AR.Input.mouse;
+    ctx.save();
+    ctx.strokeStyle = '#fff';
+    ctx.lineWidth = 1.5;
+    ctx.beginPath();
+    ctx.moveTo(m.x - 7, m.y); ctx.lineTo(m.x - 2, m.y);
+    ctx.moveTo(m.x + 2, m.y); ctx.lineTo(m.x + 7, m.y);
+    ctx.moveTo(m.x, m.y - 7); ctx.lineTo(m.x, m.y - 2);
+    ctx.moveTo(m.x, m.y + 2); ctx.lineTo(m.x, m.y + 7);
+    ctx.stroke();
+    ctx.fillStyle = AR.C.COLORS.spirit;
+    ctx.beginPath();
+    ctx.arc(m.x, m.y, 1.6, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.restore();
+  },
+
   panel(ctx, x, y, w, h, title) {
     ctx.save();
     ctx.fillStyle = 'rgba(6,9,12,0.62)';
