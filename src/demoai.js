@@ -81,7 +81,7 @@ AR.DemoAI = {
   // niveau du pied masquerait la marche suivante), mais assez bas pour ignorer
   // un étage totalement distinct de la carte (plateau/grotte à 10+ tuiles).
   _supportYAt(level, x, fromY) {
-    const pitLimit = AR.C.WORLD_H * AR.C.TILE;
+    const pitLimit = (level.worldH || AR.C.WORLD_H) * AR.C.TILE;
     const scanFrom = fromY !== undefined ? fromY - AR.C.TILE * 6 : 0;
     const groundY = (level.grid && level.groundYAtEntity) ?
       level.groundYAtEntity(x, scanFrom) : level.groundYpx(x);
@@ -98,7 +98,7 @@ AR.DemoAI = {
 
   _scanPath(level, pl, dir) {
     const T = AR.C.TILE;
-    const pitLimit = AR.C.WORLD_H * T;
+    const pitLimit = (level.worldH || AR.C.WORLD_H) * T;
     const footY = pl.y + pl.h;
     const leadX = pl.x + pl.w / 2 + dir * (pl.w / 2 + 6);
     const horizon = AR.U.clamp(90 + Math.abs(pl.vx) * 0.28, 90, 220);
@@ -125,7 +125,7 @@ AR.DemoAI = {
   _gapPlan(level, pl, dir) {
     if (!dir) return null;
     const T = AR.C.TILE;
-    const pitLimit = AR.C.WORLD_H * T;
+    const pitLimit = (level.worldH || AR.C.WORLD_H) * T;
     const footY = pl.y + pl.h;
     const leadX = pl.x + pl.w / 2 + dir * (pl.w / 2 + 6);
     let startDist = Infinity;
@@ -151,7 +151,7 @@ AR.DemoAI = {
     const crossed = this.traversal.dir > 0 ?
       pcx >= this.traversal.landingX - T * 0.7 :
       pcx <= this.traversal.landingX + T * 0.7;
-    const safeGround = this._supportYAt(game.level, pcx, pl.y + pl.h) <= AR.C.WORLD_H * T;
+    const safeGround = this._supportYAt(game.level, pcx, pl.y + pl.h) <= (game.level.worldH || AR.C.WORLD_H) * T;
     if ((pl.onGround && crossed && safeGround && this.traversal.t > 0.15) || this.traversal.t > 3.2) {
       this.traversal = null;
     }
@@ -1049,7 +1049,7 @@ AR.DemoAI = {
 
       // Second appui près de l'apex : rattrape les fosses larges et permet
       // d'atteindre les marches ou coffres placés deux tuiles plus haut.
-      const overGap = this._supportYAt(lvl, pcx, pl.y + pl.h) > AR.C.WORLD_H * AR.C.TILE;
+      const overGap = this._supportYAt(lvl, pcx, pl.y + pl.h) > (lvl.worldH || AR.C.WORLD_H) * AR.C.TILE;
       const airObstacle = path.gapDist < 58 ||
         (path.riseDist < 70 && path.maxRise > AR.C.TILE * 0.55) || chestAbove;
       if (!pl.onGround && !pl.dashing && pl.jumpsUsed === 1 && pl.vy > -80 &&

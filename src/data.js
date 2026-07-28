@@ -180,6 +180,11 @@ AR.ENEMIES = {
   roller_scout:   { name: 'Éclaireur à rouleau', hp: 300, dmg: 20, speed: 80, xp: 48, coins: 20, h: 96, behavior: 'charger', range: 520, aggro: 600, atkCd: 2.2, tele: 0.6, chargeSpeed: 500, knock: 360, elite: true },
   // Sbire dédié du Béhémoth Diesel (summon uniquement) — seul boss sans summon jusqu'ici
   armored_hound:  { name: 'Chien de guerre blindé', hp: 34, dmg: 14, speed: 150, xp: 22, coins: 9, h: 60, behavior: 'melee', range: 65, aggro: 520, atkCd: 1.3, tele: 0.35, facing: 'l' },
+  // Monstre dédié des zones secrètes de la carte authored R5 (galeries en cul-de-sac, salle de
+  // grisou) — premier archétype `parry` de l'ère, même précédent que chaque ère précédente
+  // (stone_cave_stalker/crypt_wraith/medieval_bamboo_stalker/powder_saboteur). Pas de nouvel art :
+  // sprite emprunté via AR.ENEMY_FALLBACK.
+  diesel_tunnel_stalker: { name: 'Traqueur des galeries', hp: 120, dmg: 16, speed: 155, xp: 30, coins: 12, h: 84, behavior: 'assassin', range: 62, aggro: 540, atkCd: 1.7, tele: 0.32, blinkCd: 2.6, facing: 'l', parry: true },
 
   // --- Ère cyber
   corp_trooper:   { name: 'Trooper corporate', hp: 138, dmg: 16, speed: 110, xp: 32, coins: 13, h: 78, behavior: 'ranged', range: 560, keep: 340, aggro: 660, atkCd: 1.4, tele: 0.4, proj: 'plasma', burst: 3 },
@@ -203,6 +208,7 @@ AR.ENEMY_FALLBACK = {
   pit_vermin: 'desert_raider',
   manacled_brute: 'hoplite',
   powder_saboteur: 'musketeer',
+  diesel_tunnel_stalker: 'armored_trooper',
 };
 
 // ------------------------------------------------------------------ LES BOSS

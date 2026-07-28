@@ -14,6 +14,7 @@ AR.Player = class {
     this.dashing = false; this.dashT = 0; this.dashCd = 0; this.dashCharges = 1;
     this.airDashed = false;
     this.climbing = false; this.climbCooldown = 0; this.climbLockout = 0; this._prevSpace = false;
+    this.riding = null; // chariot sur rail (R5) : {speed, endX} — cf. update(), trigger 'startRail'
     this.dropThrough = 0;
     this.dashHeld = 0;
     this.trail = [];
@@ -138,8 +139,19 @@ AR.Player = class {
     // en visée, on se tourne vers le curseur
     if (chargingBow) this.facing = AR.U.sign(aim.x - (this.x + this.w / 2)) || this.facing;
 
+    // ---------------- chariot sur rail (R5) : vx forcée (défilement imposé), le contrôle
+    // horizontal manuel est ignoré jusqu'à `endX` — cf. trigger 'startRail'
+    // (`Game#_updateTriggers`). Saut/gravité restent actifs (esquive des obstacles/ennemis
+    // rencontrés en chemin), seul le déplacement horizontal est repris ci-dessous.
+    if (this.riding) {
+      this.vx = this.riding.speed;
+      this.facing = this.riding.speed >= 0 ? 1 : -1;
+      const arrived = this.riding.speed >= 0 ? this.x >= this.riding.endX : this.x <= this.riding.endX;
+      if (arrived) this.riding = null;
+    }
+
     // ---------------- dash (appui) / sprint (maintien)
-    if (In.pressed('dash') && this.dashCharges > 0 && !this.dashing && (this.onGround || !this.airDashed)) {
+    if (!this.riding && In.pressed('dash') && this.dashCharges > 0 && !this.dashing && (this.onGround || !this.airDashed)) {
       this.dashing = true;
       this.dashT = P.DASH_TIME;
       this.dashDir = dir !== 0 ? dir : this.facing;
@@ -273,9 +285,10 @@ AR.Player = class {
     } else if (wasGround) this.coyote = P.COYOTE;
     if (res.hitCeil) this.vy = Math.max(this.vy, 0);
 
-    // chute dans le vide
-    if (this.y > AR.C.WORLD_H * AR.C.TILE + 60) {
-      const safe = game.level.findSafeRespawn(this.lastSafe.x, this.w, this.h);
+    // chute dans le vide (hauteur RÉELLE du niveau courant, pas la constante globale — R5 a un
+    // worldH bien plus grand que 32 ; pour les autres ères, worldH vaut déjà AR.C.WORLD_H)
+    if (this.y > (game.level.worldH || AR.C.WORLD_H) * AR.C.TILE + 60) {
+      const safe = game.level.findSafeRespawn(this.lastSafe.x, this.w, this.h, this.lastSafe.y);
       this.x = safe.x; this.y = safe.y;
       // Les dégâts environnementaux n'ont pas de provenance : passer undefined
       // évite le recul artificiel vers la droite qui renvoyait dans le trou.

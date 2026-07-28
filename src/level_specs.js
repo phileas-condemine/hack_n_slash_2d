@@ -1421,11 +1421,321 @@ const RENAISSANCE = {
   },
 };
 
+// ============================================================ NIVEAU 5 : GUERRE DIESEL
+// « Le Puits de la Cité-Mine » — première carte authored de l'ère 5, de forme radicalement
+// différente des précédentes : au lieu d'une bande large et courte (tilesW 350-560 × worldH 32),
+// un rectangle vertical (tilesW 100 × worldH 168, même « budget » total de tuiles que les cartes
+// précédentes, juste redistribué en hauteur). On descend surtout, via une chute volontaire à la
+// fin de chaque palier (même patron que le puits de STONE — jamais de manivelle/corde sur le
+// chemin obligatoire, cf. plus bas). Chemin obligatoire (saut/dash/chariot/chute uniquement) :
+// D0 surface (camp + chariot sur rail #1) -> D1 galeries supérieures -> D2 galeries inférieures
+// (+ chariot sur rail #2) -> D3 profondeurs (gauntlet élite) -> chute jusqu'à l'antichambre ->
+// arène du Béhémoth Diesel (art déjà existant, inchangée).
+// IMPORTANT (retour d'un test IA de démo pendant la conception, cf. TODO.md) : la 1ère version
+// faisait descendre via une cage de mine à manivelle — mais la démo IA n'actionne JAMAIS de
+// levier/manivelle délibérément (contrainte déjà documentée sur R2-R4), et la cage restait
+// parquée en haut par défaut, formant un pont bien réel (pas un obstacle à sauter) que l'IA
+// traversait sans le vouloir tout droit dans la galerie secrète, où elle restait bloquée sans
+// pouvoir progresser (le coffre nécessite la corde, qu'elle ne grimpe pas non plus). Refondu :
+// chaque palier est un simple à-pic (aucun sol au-delà d'un point, comme le puits de STONE) qui
+// ramène systématiquement le chemin obligatoire au palier suivant ; la cage de mine à paliers
+// multiples devient une attraction 100% optionnelle, entièrement contenue DANS la galerie
+// secrète de D1 (jamais nécessaire pour progresser), atteinte par une corde (jamais empruntée
+// par l'IA, même contrainte que les lianes de R3/les cordes des autres galeries).
+// Chaque palier a sa galerie secrète en cul-de-sac, atteinte par une corde (`climbables`) :
+// garde d'entrée, traqueurs des galeries (nouveau `parry`), cage de mine à 3 arrêts (relais ->
+// horde qui déferle, 10 ennemis d'un coup -> capitaine), salle de grisou signature (barils de
+// poudre R4 reskinnés, cf. `propType:'gaspocket'`).
+// Déclenchement du boss par profondeur (`arenaStartTy`), pas par distance horizontale — cf.
+// `Game#frame`. `arenaStartTx`/`gateTx` mis à une sentinelle hors de portée (aucun mur de porte
+// horizontal n'a de sens sur une carte verticale).
+// 12 encounters verrouillés + 2 chariots sur rail (spawns libres le long du couloir) + spawns
+// ambiants ≈ 80 monstres au total, 5 mini-boss élites.
+const DIESEL = {
+  id: 'diesel',
+  tilesW: 100,
+  worldH: 168,
+  spawnX: 3,
+  startRoom: 'D0_SURFACE',
+  bossArenaRoom: 'D3_ARENA',
+  // `arenaStartTx` ne pilote PAS que le déclenchement du combat (`Game#frame`) : `Level#_buildBossArena`
+  // l'utilise aussi pour placer l'image d'arène elle-même dans l'espace du monde (`viewX =
+  // (arenaStartTx+2)*TILE`) — une sentinelle du genre 9999 y était encore lue, plaçant l'arène
+  // (et donc `bossX`) à des dizaines de milliers de pixels hors de la carte (bug trouvé en
+  // testant : la démo IA « atteignait » le boss mais `player.x` explosait à ~10000 tuiles).
+  // Fixé à une vraie position (58 -> viewX=x60, aligné sur l'antichambre/filet de sécurité
+  // ci-dessous) ; le gauntlet D3 (x0-55, cf. `solids`) reste toujours strictement AVANT cette
+  // colonne, donc `pl.x > arenaStartTx*T` ne peut se déclencher qu'une fois le gauntlet terminé
+  // et la chute vers l'antichambre déjà entamée — jamais prématurément.
+  arenaStartTx: 58,
+  gateTx: 10000,
+  // Déclenche aussi le combat de boss une fois la profondeur de l'antichambre atteinte (y145,
+  // pieds au sol ≈ y143.7 pour un héros de ~62px de haut) — marge confortable sous le gauntlet
+  // D3 (y132), redondant avec `arenaStartTx` ci-dessus mais nécessaire si le joueur tombe côté
+  // x<58 de l'antichambre.
+  arenaStartTy: 138,
+  arenaGy: 132,
+  fallDamageRatio: 0.10,
+
+  // ---- terrain solide : dalles fines qui flottent dans le puits (pas de "bedrock" infini comme
+  // les cartes horizontales) ; le chemin obligatoire (x0-38 environ) se termine toujours en
+  // à-pic (rien au-delà), la chute est la seule façon de continuer, exactement comme le puits de
+  // STONE — l'IA de démo, qui ne trouve alors aucun atterrissage proche pour sauter par-dessus
+  // (`DemoAI#_gapPlan`), avance et tombe naturellement au palier suivant. Les galeries secrètes
+  // (x0-38 aussi, mais bien plus bas que le chemin obligatoire, cf. `climbables`) restent hors
+  // de portée de cette chute : jamais dans sa trajectoire. ----
+  solids: [
+    { x: 0, y: 20, w: 38, h: 6 },   // D0 surface
+    { x: 0, y: 30, w: 30, h: 6 },   // D0_SEC_GALLERY (corde CLIMB_D0_ROPE)
+
+    { x: 0, y: 56, w: 38, h: 6 },   // D1 galeries supérieures
+    // D1_SEC_CAGE : 3 paliers de la cage de mine optionnelle (relais/horde/capitaine),
+    // superposés dans une colonne dédiée (x0-11) — jamais dans la colonne de chute (x33-38).
+    { x: 12, y: 64, w: 18, h: 6 },
+    { x: 12, y: 72, w: 18, h: 6 },
+    { x: 12, y: 80, w: 18, h: 6 },
+
+    { x: 0, y: 92, w: 38, h: 6 },   // D2 galeries inférieures
+    { x: 0, y: 102, w: 30, h: 6 },  // D2_SEC_GALLERY (corde CLIMB_D2_ROPE)
+
+    // D3 PROFONDEURS (y132) : palier obligatoire (x0-55, strictement avant arenaStartTx=58, cf.
+    // plus haut) séparé de la galerie secrète (x75-98) par une brèche de 20 tuiles — largement
+    // au-delà de la portée de saut de la démo IA (`DemoAI#_gapPlan` ne cherche que 9 tuiles),
+    // donc jamais franchie par erreur ; l'atteindre exige un vrai saut délibéré. Continuer tout
+    // droit (ou juste tomber du bord) mène à la chute volontaire vers l'antichambre, en dessous.
+    { x: 0, y: 132, w: 55, h: 8 },
+    { x: 75, y: 132, w: 23, h: 8 },
+    // Antichambre (y145, chute volontaire depuis D3 — même patron que le puits de STONE) + filet
+    // de sécurité de l'arène (y155, même convention que STONE/ANTIQUITY/MEDIEVAL/RENAISSANCE :
+    // reste sous le sol illustré de l'arène, AR.BOSS_ARENAS.diesel_behemoth).
+    { x: 60, y: 145, w: 40, h: 10 },
+    { x: 60, y: 155, w: 40, h: 13 },
+  ],
+
+  empties: [],
+
+  oneWay: [],
+
+  // ---- cordes grimpables (accès aux 2 galeries simples + à la cage de mine optionnelle de D1 ;
+  // jamais sur le chemin obligatoire — la démo IA ne grimpe jamais délibérément, même contrainte
+  // que les lianes de R3) ----
+  climbables: [
+    { id: 'CLIMB_D0_ROPE', x: 12, y: 18, w: 2, h: 16, exitY: 22 },
+    { id: 'CLIMB_D1_ROPE', x: 12, y: 54, w: 2, h: 18, exitY: 58 },
+    { id: 'CLIMB_D2_ROPE', x: 12, y: 90, w: 2, h: 16, exitY: 94 },
+  ],
+
+  // ---- destructibles : poche de grisou signature (D2_SEC_GALLERY) + obstacle du chariot #2 —
+  // barils de poudre R4 reskinnés (`propType:'gaspocket'`), même mécanique intacte ----
+  breakables: [
+    // chainR relevé à 180 (comme R4) : espacement de 3 tuiles/144px > le rayon par défaut 140.
+    { id: 'GAS_ROOM_1', type: 'keg', propType: 'gaspocket', rect: { x: 10, y: 101, w: 1, h: 1 }, hp: 14, radius: 130, chainR: 180 },
+    { id: 'GAS_ROOM_2', type: 'keg', propType: 'gaspocket', rect: { x: 13, y: 101, w: 1, h: 1 }, hp: 14, radius: 130, chainR: 180 },
+    { id: 'GAS_ROOM_3', type: 'keg', propType: 'gaspocket', rect: { x: 16, y: 101, w: 1, h: 1 }, hp: 14, radius: 130, chainR: 180 },
+    { id: 'GAS_RAIL2', type: 'keg', propType: 'gaspocket', rect: { x: 24, y: 91, w: 1, h: 1 }, hp: 14, radius: 120, chainR: 140 },
+  ],
+
+  // ---- manivelles de la cage de mine (100% optionnelle, cf. en-tête — jamais atteinte sans
+  // grimper CLIMB_D1_ROPE d'abord) : relais -> horde -> capitaine, une manivelle par palier,
+  // chacune envoie au palier suivant (`targetY`, cf. Level#activateLift). ----
+  interactables: [
+    { id: 'CRANK_D1_TO_SWARM', type: 'crank', x: 15, y: 64, lift: 'D1_CAGE', targetY: 72, prompt: 'Actionner la manivelle' },
+    { id: 'CRANK_D1_TO_CAPTAIN', type: 'crank', x: 15, y: 72, lift: 'D1_CAGE', targetY: 80, prompt: 'Actionner la manivelle' },
+    { id: 'CRANK_D1_RETURN', type: 'crank', x: 15, y: 80, lift: 'D1_CAGE', targetY: 64, prompt: 'Actionner la manivelle' },
+  ],
+
+  // ---- cage de mine à paliers multiples (cf. Level#activateLift, targetY) ----
+  lifts: [
+    { id: 'D1_CAGE', x: 12, w: 6, bottomY: 80, topY: 64, startY: 64, speed: 2.5 },
+  ],
+
+  // ---- rooms : partition propre par bande de profondeur (y), aucun chevauchement ----
+  rooms: [
+    { id: 'D0_SURFACE', rect: { x: 0, y: 0, w: 38, h: 26 }, tags: ['start'],
+      camera: { minX: 0, maxX: 40, minY: 0, maxY: 28 }, safeRespawn: [{ x: 3, y: 20, priority: 10 }, { x: 10, y: 20, priority: 8 }] },
+    { id: 'D0_SEC_GALLERY', rect: { x: 0, y: 26, w: 38, h: 12 }, tags: ['secret', 'gallery', 'dark'],
+      camera: { minX: 0, maxX: 40, minY: 24, maxY: 40 }, safeRespawn: [{ x: 15, y: 30, priority: 9 }] },
+    { id: 'D1_GALLERIES', rect: { x: 0, y: 38, w: 38, h: 22 }, tags: ['branch'],
+      camera: { minX: 0, maxX: 40, minY: 36, maxY: 62 }, safeRespawn: [{ x: 10, y: 56, priority: 8 }] },
+    { id: 'D1_SEC_CAGE', rect: { x: 0, y: 60, w: 38, h: 26 }, tags: ['secret', 'gallery', 'dark'],
+      camera: { minX: 0, maxX: 40, minY: 58, maxY: 90 }, safeRespawn: [{ x: 18, y: 64, priority: 9 }] },
+    { id: 'D2_GALLERIES', rect: { x: 0, y: 86, w: 38, h: 12 }, tags: ['branch'],
+      camera: { minX: 0, maxX: 40, minY: 84, maxY: 100 }, safeRespawn: [{ x: 10, y: 92, priority: 8 }] },
+    { id: 'D2_SEC_GALLERY', rect: { x: 0, y: 98, w: 38, h: 18 }, tags: ['secret', 'gallery', 'dark'],
+      camera: { minX: 0, maxX: 40, minY: 96, maxY: 118 }, safeRespawn: [{ x: 15, y: 102, priority: 9 }] },
+    { id: 'D3_DEPTHS', rect: { x: 0, y: 116, w: 75, h: 20 }, tags: ['tension'],
+      camera: { minX: 0, maxX: 78, minY: 112, maxY: 138 }, safeRespawn: [{ x: 10, y: 132, priority: 8 }] },
+    { id: 'D3_SEC_HORDE_CAPTAIN', rect: { x: 75, y: 116, w: 25, h: 20 }, tags: ['secret', 'gallery', 'dark'],
+      camera: { minX: 73, maxX: 100, minY: 112, maxY: 138 }, safeRespawn: [{ x: 85, y: 132, priority: 9 }] },
+    { id: 'D3_ANTECHAMBER', rect: { x: 55, y: 136, w: 45, h: 15 }, tags: ['ascent'],
+      camera: { minX: 53, maxX: 100, minY: 134, maxY: 168 }, safeRespawn: [{ x: 75, y: 145, priority: 10 }] },
+    { id: 'D3_ARENA', rect: { x: 55, y: 151, w: 45, h: 17 }, tags: ['boss'],
+      camera: { minX: 53, maxX: 100, minY: 148, maxY: 168 }, safeRespawn: [{ x: 75, y: 155, priority: 10 }] },
+  ],
+
+  // ---- encounters verrouillés (gates:[] partout, même contrainte que R3/R4) ----
+  encounters: [
+    { id: 'E_D0_INTRO', roomId: 'D0_SURFACE',
+      trigger: { x: 4, y: 16, w: 8, h: 8 }, gates: [],
+      waves: [{ ids: ['trench_soldier', 'trench_soldier', 'flamethrower'] }],
+      reward: { coins: 10 } },
+    { id: 'E_D0_GAUNTLET', roomId: 'D0_SURFACE',
+      trigger: { x: 13, y: 16, w: 14, h: 8 }, gates: [],
+      waves: [{ ids: ['trench_soldier', 'trench_soldier', 'flamethrower'] },
+              { ids: ['flamethrower', 'bombardier', 'trench_soldier'] }],
+      reward: { coins: 18 } },
+    { id: 'E_D0_SEC_GUARD', roomId: 'D0_SEC_GALLERY',
+      trigger: { x: 8, y: 26, w: 16, h: 8 }, gates: [],
+      waves: [{ ids: ['armored_trooper'], elite: ['armored_trooper'] }],
+      reward: { coins: 24 } },
+
+    { id: 'E_D1_GAUNTLET', roomId: 'D1_GALLERIES',
+      trigger: { x: 4, y: 52, w: 28, h: 8 }, gates: [],
+      waves: [{ ids: ['trench_soldier', 'trench_soldier', 'armored_trooper'] },
+              { ids: ['flamethrower', 'flamethrower', 'bombardier'] },
+              { ids: ['trench_soldier', 'flamethrower', 'armored_trooper'] }],
+      reward: { coins: 26 } },
+    { id: 'E_D1_SEC_RELAY', roomId: 'D1_SEC_CAGE',
+      trigger: { x: 12, y: 60, w: 18, h: 8 }, gates: [],
+      waves: [{ ids: ['diesel_tunnel_stalker', 'diesel_tunnel_stalker', 'bombardier'] }],
+      reward: { coins: 16 } },
+    // Palier 2 de la cage : horde qui déferle (même esprit que R3/R4, 1 seule vague, 10 ennemis
+    // simultanés) — mélange corps-à-corps/distance/traqueurs pareurs.
+    { id: 'E_D1_SEC_SWARM', roomId: 'D1_SEC_CAGE',
+      trigger: { x: 12, y: 68, w: 18, h: 8 }, gates: [],
+      waves: [{ ids: ['trench_soldier', 'trench_soldier', 'flamethrower', 'flamethrower',
+                       'armored_trooper', 'armored_trooper', 'diesel_tunnel_stalker', 'diesel_tunnel_stalker',
+                       'bombardier', 'bombardier'] }],
+      reward: { coins: 36 } },
+    { id: 'E_D1_SEC_CAPTAIN', roomId: 'D1_SEC_CAGE',
+      trigger: { x: 12, y: 76, w: 18, h: 8 }, gates: [],
+      waves: [{ ids: ['roller_scout'], elite: ['roller_scout'] }],
+      reward: { coins: 30 } },
+
+    { id: 'E_D2_GAUNTLET', roomId: 'D2_GALLERIES',
+      trigger: { x: 4, y: 88, w: 14, h: 8 }, gates: [],
+      waves: [{ ids: ['armored_trooper', 'trench_soldier', 'bombardier'] },
+              { ids: ['flamethrower', 'armored_trooper', 'trench_soldier'] }],
+      reward: { coins: 22 } },
+    { id: 'E_D2_SEC_GALLERY', roomId: 'D2_SEC_GALLERY',
+      trigger: { x: 6, y: 98, w: 20, h: 8 }, gates: [],
+      waves: [{ ids: ['armored_trooper', 'armored_trooper', 'bombardier', 'diesel_tunnel_stalker'] },
+              { ids: ['roller_scout'], elite: ['roller_scout'] }],
+      reward: { coins: 28 } },
+
+    { id: 'E_D3_GAUNTLET', roomId: 'D3_DEPTHS',
+      trigger: { x: 10, y: 128, w: 30, h: 8 }, gates: [],
+      waves: [{ ids: ['trench_soldier', 'trench_soldier', 'armored_trooper'] },
+              { ids: ['flamethrower', 'flamethrower', 'bombardier'] },
+              { ids: ['armored_trooper', 'diesel_tunnel_stalker', 'diesel_tunnel_stalker'], elite: ['armored_trooper'] }],
+      reward: { coins: 32 } },
+    { id: 'E_D3_SEC_HORDE', roomId: 'D3_SEC_HORDE_CAPTAIN',
+      trigger: { x: 76, y: 128, w: 10, h: 8 }, gates: [],
+      waves: [{ ids: ['trench_soldier', 'trench_soldier', 'flamethrower', 'armored_trooper', 'bombardier'] }],
+      reward: { coins: 24 } },
+    { id: 'E_D3_SEC_CAPTAIN', roomId: 'D3_SEC_HORDE_CAPTAIN',
+      trigger: { x: 88, y: 128, w: 10, h: 8 }, gates: [],
+      waves: [{ ids: ['roller_scout'], elite: ['roller_scout'] }],
+      reward: { coins: 30 } },
+  ],
+
+  // ---- déclencheurs : chariots sur rail (cf. Player#riding, Game#_updateTriggers) ----
+  triggers: [
+    { id: 'RAIL_D0', rect: { x: 28, y: 16, w: 4, h: 8 }, action: 'startRail', speed: 260, endX: 36 },
+    { id: 'RAIL_D2', rect: { x: 19, y: 88, w: 4, h: 8 }, action: 'startRail', speed: 300, endX: 36 },
+  ],
+
+  // ---- ennemis libres (obstacles des chariots sur rail + ambiants) ----
+  spawns: [
+    // Chariot #1 (D0)
+    { tx: 30, ty: 20, id: 'trench_soldier' },
+    { tx: 34, ty: 20, id: 'trench_soldier' },
+    // Chariot #2 (D2, plus dur) : lance-flammes + traqueur, en plus de la poche de grisou.
+    { tx: 26, ty: 92, id: 'flamethrower' },
+    { tx: 32, ty: 92, id: 'diesel_tunnel_stalker' },
+
+    // ambiants
+    { tx: 8, ty: 20, id: 'flamethrower' },
+    { tx: 20, ty: 20, id: 'trench_soldier' },
+    { tx: 20, ty: 30, id: 'trench_soldier' },
+    { tx: 8, ty: 56, id: 'armored_trooper' },
+    { tx: 20, ty: 56, id: 'bombardier' },
+    { tx: 30, ty: 56, id: 'trench_soldier' },
+    { tx: 22, ty: 64, id: 'diesel_tunnel_stalker' },
+    { tx: 8, ty: 92, id: 'armored_trooper' },
+    { tx: 14, ty: 92, id: 'bombardier' },
+    { tx: 20, ty: 102, id: 'bombardier' },
+    { tx: 20, ty: 132, id: 'trench_soldier' },
+    { tx: 30, ty: 132, id: 'flamethrower' },
+    { tx: 50, ty: 132, id: 'armored_trooper' },
+    { tx: 46, ty: 132, id: 'bombardier' },
+  ],
+
+  // ---- coffres ----
+  chests: [
+    { x: 8, y: 20 },
+    { x: 18, y: 30, guaranteed: 'skillPoint' },
+    { x: 20, y: 56 },
+    { x: 20, y: 80, guaranteed: 'skillPoint' },
+    { x: 10, y: 92 },
+    { x: 20, y: 102, guaranteed: 'swordUp' },
+    { x: 46, y: 132 },
+    { x: 90, y: 132, guaranteed: 'swordUp' },
+    { x: 75, y: 145 },
+  ],
+
+  merchant: { x: 2, y: 20 },
+
+  localPortals: [],
+
+  // ---- poches sombres (plus on descend, plus c'est sombre) ----
+  darkZones: [
+    { x: 0, y: 26, w: 38, h: 12, tint: 0.35 },  // D0_SEC_GALLERY
+    { x: 0, y: 38, w: 38, h: 22, tint: 0.3 },   // D1
+    { x: 0, y: 60, w: 38, h: 26, tint: 0.45 },  // D1_SEC_CAGE
+    { x: 0, y: 86, w: 38, h: 12, tint: 0.45 },  // D2
+    { x: 0, y: 98, w: 38, h: 18, tint: 0.6 },   // D2_SEC_GALLERY
+    { x: 0, y: 116, w: 100, h: 20, tint: 0.55 }, // D3
+    { x: 75, y: 116, w: 25, h: 20, tint: 0.65 }, // galerie secrète D3
+  ],
+
+  // ---- décor ----
+  props: [
+    { type: 'crate', tx: 6, ty: 20 },
+    { type: 'sandbag', tx: 12, ty: 20 },
+    { type: 'wire', tx: 24, ty: 20 },
+    { type: 'crater', tx: 15, ty: 30 },
+    { type: 'wire', tx: 6, ty: 56 },
+    { type: 'crate', tx: 26, ty: 56 },
+    { type: 'fire', tx: 18, ty: 64, s: 0.85 },   // cage, palier relais
+    { type: 'fire', tx: 18, ty: 72, s: 0.85 },   // cage, palier horde
+    { type: 'fire', tx: 18, ty: 80, s: 0.85 },   // cage, palier capitaine
+    { type: 'sandbag', tx: 6, ty: 92 },
+    { type: 'wire', tx: 30, ty: 92 },
+    { type: 'crater', tx: 26, ty: 102 },
+    { type: 'wreck', tx: 20, ty: 132 },
+    { type: 'crater', tx: 50, ty: 132 },
+    { type: 'wire', tx: 90, ty: 132 },
+    { type: 'fire', tx: 75, ty: 145, s: 1.1 },   // antichambre
+  ],
+
+  // ---- indices pour l'IA de démonstration (documentation seule, cf. R3/R4 : demoai.js ne lit
+  // aucun de ces champs) ----
+  navHints: {
+    defaultRoute: 'main',
+    climbs: [
+      { id: 'CLIMB_D0_ROPE', x: 13, bottomY: 34, topY: 18, exitX: 16 },
+      { id: 'CLIMB_D1_ROPE', x: 13, bottomY: 72, topY: 54, exitX: 16 },
+      { id: 'CLIMB_D2_ROPE', x: 13, bottomY: 106, topY: 90, exitX: 16 },
+    ],
+  },
+};
+
 AR.LEVEL_SPECS = {
   stone: STONE,
   antiquity: ANTIQUITY,
   medieval: MEDIEVAL,
   renaissance: RENAISSANCE,
-  diesel: null,
+  diesel: DIESEL,
   cyber: null,
 };

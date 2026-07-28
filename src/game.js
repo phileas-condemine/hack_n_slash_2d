@@ -408,8 +408,11 @@ AR.Game = class {
 
     this.camera.follow(pl, lvl, dt);
 
-    // ---- déclenchement de l'arène du boss
-    if (!this.bossTriggered && pl.x > lvl.arenaStartTx * AR.C.TILE) this._startBossFight();
+    // ---- déclenchement de l'arène du boss (par distance horizontale, comme R1-R4 ; ou par
+    // profondeur `arenaStartTy` pour une carte verticale comme R5, où « avancer vers la droite »
+    // n'a pas de sens — cf. TODO.md/plan R5)
+    if (!this.bossTriggered && (pl.x > lvl.arenaStartTx * AR.C.TILE ||
+        (lvl.arenaStartTy != null && pl.y > lvl.arenaStartTy * AR.C.TILE))) this._startBossFight();
 
     // ---- interactions (coffre / marchand / portail / levier)
     // Une arène verrouillée (fin de boss ou Fosse aux Bêtes) réutilise le même espace de
@@ -426,7 +429,7 @@ AR.Game = class {
       else if (p.type === 'portal' && p.returnTo) this._useLocalPortal(p);
       else if (p.type === 'portal') this._enterPortal();
       else if (p.type === 'lever') lvl.activateInteractable(p._int, this);
-      else if (p.type === 'crank') lvl.activateLift(p._int.lift, this);
+      else if (p.type === 'crank') lvl.activateLift(p._int.lift, this, p._int.targetY);
       else if (p.type === 'cannon') this._fireCannon(p._int);
     }
     // ---- refroidissement des canons (cf. `_fireCannon`)
@@ -468,6 +471,11 @@ AR.Game = class {
             }
           }
           if (woke) { AR.HUD.notify('Une présence s\'éveille...', AR.C.COLORS.textDim); AR.Audio.sfx('telegraph'); }
+        } else if (tr.action === 'startRail') {
+          // Chariot sur rail (R5) : défilement horizontal forcé jusqu'à `endX`, cf. `Player#update`.
+          pl.riding = { speed: tr.speed || 320, endX: tr.endX * T };
+          AR.HUD.notify('Le wagonnet s\'élance !', AR.C.COLORS.textDim);
+          AR.Audio.sfx('gate');
         }
       }
     }

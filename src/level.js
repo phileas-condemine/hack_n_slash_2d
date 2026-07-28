@@ -267,7 +267,7 @@ AR.Level = class {
     for (const b of spec.breakables || []) {
       const obj = { id: b.id, type: b.type, rect: b.rect, hp: b.hp || 45, maxHp: b.hp || 45,
         broken: false, triggered: false, collapseT: 0, land: b.land, requires: b.requires || null,
-        radius: b.radius || 110, chainR: b.chainR || 140, fuseT: null };
+        radius: b.radius || 110, chainR: b.chainR || 140, fuseT: null, propType: b.propType || null };
       this.breakables.push(obj);
       if (b.type === 'bridge') {
         this.platforms.push({ tx: b.rect.x, ty: b.rect.y, w: b.rect.w, kind: 'bone_bridge', breakId: b.id });
@@ -275,15 +275,20 @@ AR.Level = class {
         this._fillRect(b.rect, F.SOLID | F.BREAKABLE);
       }
     }
+    // `propType` (optionnel) permet à un baril de poudre de reprendre un tout autre visuel sans
+    // dupliquer la logique — ex. les poches de grisou de R5 (`propType:'gaspocket'`), qui
+    // réutilisent 100% de `_kegBlast`/`hitBreakable`/`updateDynamics`, juste un nuage plutôt
+    // qu'un tonneau (cf. `_drawProp`).
     for (const b of this.breakables) {
-      if (b.type === 'keg') this.props.push({ type: 'keg', ref: b, x: (b.rect.x + b.rect.w / 2) * T, y: (b.rect.y + b.rect.h) * T, s: 1, r: 0 });
+      if (b.type === 'keg') this.props.push({ type: b.propType || 'keg', ref: b, x: (b.rect.x + b.rect.w / 2) * T, y: (b.rect.y + b.rect.h) * T, s: 1, r: 0 });
     }
 
     // --- interactables (leviers, portes, manivelles de monte-charge, canons) ; portes fermées = solides
     for (const o of spec.interactables || []) {
       const obj = { id: o.id, type: o.type, x: o.x, y: o.y, rect: o.rect, links: o.links || [],
         lift: o.lift || null, prompt: o.prompt, state: o.state || (o.type === 'door' ? 'closed' : 'off'),
-        oneShot: o.oneShot !== false, dir: o.dir || 1, cd: 0 };
+        oneShot: o.oneShot !== false, dir: o.dir || 1, cd: 0,
+        targetY: o.targetY !== undefined ? o.targetY : null };
       this.interactables.push(obj);
       if (o.type === 'door' && obj.state === 'closed' && o.rect) this._fillRect(o.rect, F.SOLID | F.DOOR);
     }
@@ -359,6 +364,9 @@ AR.Level = class {
     // --- arène de boss (réutilise le pipeline image existant)
     this.spawnX = (spec.spawnX !== undefined ? spec.spawnX : 3) * T;
     this.arenaStartTx = spec.arenaStartTx;
+    // Déclenchement par profondeur plutôt que par distance horizontale (carte verticale, R5) —
+    // cf. la condition dans `Game#frame`. `null` par défaut : aucun effet pour les autres ères.
+    this.arenaStartTy = spec.arenaStartTy !== undefined ? spec.arenaStartTy : null;
     this.gateTx = spec.gateTx !== undefined ? spec.gateTx : this.arenaStartTx + 1;
     this.arenaGy = spec.arenaGy || 23;
     this._buildBossArena();
@@ -572,12 +580,20 @@ AR.Level = class {
     return true;
   }
 
-  // ---- monte-charges à corde : manivelle -> déplacement vers l'extrémité opposée
-  activateLift(liftId, game) {
+  // ---- monte-charges à corde : manivelle -> déplacement vers l'extrémité opposée (ou vers
+  // `targetY` si fourni — cage de mine à paliers multiples de R5 : chaque manivelle d'un palier
+  // porte son propre `targetY`, `updateLifts` n'a besoin d'aucune modification, il déplace déjà
+  // `lift.ty` génériquement vers `lift.target` quel que soit le nombre d'arrêts réels).
+  activateLift(liftId, game, targetY) {
     const lift = this.lifts.find((l) => l.id === liftId);
     if (!lift || lift.state === 'moving') return false;
-    const goingUp = lift.ty > (lift.topY + lift.bottomY) / 2;
-    lift.target = goingUp ? lift.topY : lift.bottomY;
+    if (targetY !== undefined && targetY !== null) {
+      lift.target = targetY;
+    } else {
+      const goingUp = lift.ty > (lift.topY + lift.bottomY) / 2;
+      lift.target = goingUp ? lift.topY : lift.bottomY;
+    }
+    const goingUp = lift.target < lift.ty;
     lift.state = 'moving';
     if (game) { AR.Audio.sfx('gate'); AR.HUD.notify(goingUp ? 'Le monte-charge grince vers le haut...' : 'Le monte-charge redescend...', AR.C.COLORS.textDim); }
     return true;
@@ -723,15 +739,24 @@ AR.Level = class {
     const arena = this.bossArena;
     if (arena && arena.active && x >= arena.x && x <= arena.x + arena.width) return arena.ground.y;
     const tx = Math.floor(x / AR.C.TILE);
-    if (tx < 0 || tx >= this.tilesW) return AR.C.WORLD_H * AR.C.TILE;
+    const worldH = this.worldH || AR.C.WORLD_H;
+    if (tx < 0 || tx >= this.tilesW) return worldH * AR.C.TILE;
     const h = this.heights[tx];
-    return h === this.PIT ? AR.C.WORLD_H * AR.C.TILE * 2 : h * AR.C.TILE;
+    return h === this.PIT ? worldH * AR.C.TILE * 2 : h * AR.C.TILE;
   }
 
   // Cherche un segment de terrain assez long à gauche du dernier point connu
   // et replace le héros cinq tuiles avant son bord droit. Cela laisse le temps
   // de reprendre le contrôle ou de relancer un saut avant le précipice.
-  findSafeRespawn(anchorX, entityW, entityH) {
+  // `anchorY` (optionnel, en pixels) : sur une carte verticale (R5), deux ancres peuvent
+  // partager un `x` proche tout en étant à des dizaines de tuiles de profondeur d'écart — sans
+  // tenir compte de `y`, le score ne dépendait que de x et de la priorité déclarée, si bien
+  // qu'une ancre mieux priorisée mais à un tout autre palier (ex. le camp de surface) pouvait
+  // l'emporter sur l'ancre du palier réellement le plus proche (bug trouvé en testant : un
+  // recul pendant le combat de boss, tout en bas de la carte, renvoyait le héros au tout début).
+  // Sans `anchorY`, le comportement reste identique à avant (cartes horizontales, tous les x
+  // pertinents sont d'ordinaire à une hauteur similaire).
+  findSafeRespawn(anchorX, entityW, entityH, anchorY) {
     const T = AR.C.TILE, runway = 5;
     const arena = this.bossArena;
     if (arena && arena.active) {
@@ -743,9 +768,12 @@ AR.Level = class {
     if (this.grid && this.safeAnchors.length) {
       let best = null, bestScore = Infinity;
       for (const s of this.safeAnchors) {
-        const sx = (s.x + 0.5) * T;
-        const behind = sx <= anchorX + T * 2;
-        const score = Math.abs(sx - anchorX) + (behind ? 0 : 1e6) - s.priority;
+        const sx = (s.x + 0.5) * T, sy = s.y * T;
+        const behindX = sx <= anchorX + T * 2;
+        const behindY = anchorY === undefined || sy <= anchorY + T * 2;
+        const behind = behindX && behindY;
+        const dy = anchorY === undefined ? 0 : Math.abs(sy - anchorY);
+        const score = Math.abs(sx - anchorX) + dy + (behind ? 0 : 1e6) - s.priority;
         if (score < bestScore) { bestScore = score; best = s; }
       }
       if (best) return { x: (best.x + 0.5) * T - entityW / 2, y: best.y * T - entityH - 2 };
@@ -1343,6 +1371,21 @@ AR.Level = class {
         ctx.fillRect(-12, -17, 24, 4); ctx.fillRect(-12, -9, 24, 4);
         ctx.strokeStyle = 'rgba(0,0,0,0.35)'; ctx.lineWidth = 1.5;
         ctx.beginPath(); ctx.ellipse(0, -13, 12, 14, 0, 0, Math.PI * 2); ctx.stroke();
+        break;
+      }
+      // poche de grisou (R5) : même baril de poudre (`type:'keg'`, `propType:'gaspocket'`) —
+      // juste un nuage translucide plutôt qu'un tonneau, cf. commentaire sur `propType` plus haut.
+      case 'gaspocket': {
+        const lit = p.ref && p.ref.fuseT != null;
+        const pul = 1 + Math.sin(time * 4 + (p.r || 0) * 7) * 0.12;
+        ctx.globalAlpha = lit ? (Math.sin(time * 30) > 0 ? 0.75 : 0.4) : 0.4;
+        ctx.fillStyle = '#8a9a4a';
+        ctx.beginPath(); ctx.ellipse(0, -16, 22 * pul, 16 * pul, 0, 0, Math.PI * 2); ctx.fill();
+        ctx.globalAlpha = (lit ? 0.6 : 0.3) * pul;
+        ctx.fillStyle = '#c9d88a';
+        ctx.beginPath(); ctx.ellipse(-6, -18, 9, 7, 0, 0, Math.PI * 2); ctx.fill();
+        ctx.beginPath(); ctx.ellipse(8, -14, 7, 6, 0, 0, Math.PI * 2); ctx.fill();
+        ctx.globalAlpha = 1;
         break;
       }
       case 'tent':

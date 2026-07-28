@@ -320,7 +320,7 @@ AR.Enemy = class {
           const gx = AR.U.clamp(this.tpTarget.x, AR.C.TILE * 2, (lvl.tilesW - 2) * AR.C.TILE);
           const gy = lvl.groundYAtEntity(gx, this.y);
           AR.Particles.burst(this.centerX(), this.centerY(), 16, { color: '#c05cff', speed: 200, size: 3.5, life: 0.4 });
-          if (gy < AR.C.WORLD_H * AR.C.TILE) {
+          if (gy < (lvl.worldH || AR.C.WORLD_H) * AR.C.TILE) {
             this.x = gx - this.w / 2;
             this.y = gy - this.h - 2;
             this.vy = 0;
@@ -445,7 +445,7 @@ AR.Enemy = class {
         // petit saut pour franchir une marche
         if (this.onGround) this.vy = -430;
       }
-      if (this.y > AR.C.WORLD_H * AR.C.TILE + 100) { this.hp = 0; this.die(game, true); }
+      if (this.y > (game.level.worldH || AR.C.WORLD_H) * AR.C.TILE + 100) { this.hp = 0; this.die(game, true); }
     }
     // contact direct (hors charge, qui gère ses dégâts)
     if (!pl.dead && this.state !== 'charge' && this.state !== 'dive' &&

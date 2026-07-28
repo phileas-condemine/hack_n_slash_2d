@@ -44,7 +44,7 @@ AR.Pickups = {
         p.vx *= 0.985;
         const gy = game.level.groundYAtEntity(p.x, p.y);
         if (p.y >= gy - 4 && p.vy > 0) { p.y = gy - 4; p.vy = -p.vy * 0.35; if (Math.abs(p.vy) < 60) p.settled = true; }
-        if (p.y > AR.C.WORLD_H * AR.C.TILE + 200) { this.list.splice(i, 1); continue; }
+        if (p.y > (game.level.worldH || AR.C.WORLD_H) * AR.C.TILE + 200) { this.list.splice(i, 1); continue; }
       }
       // aimant à pièces
       if (p.type === 'coin' && p.t > 0.35) {
