@@ -700,7 +700,11 @@ const ANTIQUITY = {
 //   M08 escaliers sacrés -> arène du Seigneur Yōkai.
 const MEDIEVAL = {
   id: 'medieval',
-  tilesW: 367,
+  // arenaStartTx + 34 : même marge que STONE/ANTIQUITY, pour que la largeur pleine vue (VIEW_W
+  // = 1280px = ~27 tuiles) de l'arène du boss reste entièrement dans la grille. En dessous de ça,
+  // `solidAt` traite tout ce qui dépasse `tilesW` comme un mur plein, ce qui corrompt la
+  // collision des plateformes d'arène situées le plus à droite (ex. right_lower/right_upper).
+  tilesW: 381,
   worldH: 32,
   spawnX: 3,
   startRoom: 'M01_SACRED_FOREST',
@@ -746,7 +750,13 @@ const MEDIEVAL = {
     { x: 310, y: 11, w: 3, h: 21 }, { x: 313, y: 10, w: 3, h: 22 }, { x: 316, y: 9, w: 3, h: 23 },
 
     { x: 319, y: 9, w: 28, h: 23 },         // antichambre (aucun ennemi, respawn sûr avant la porte)
-    { x: 347, y: 9, w: 20, h: 23 },         // M09 sol d'arène (l'image d'arène prend le relais)
+    // M09 sol d'arène : filet de sécurité seulement (le sol réel vient de l'image d'arène,
+    // AR.BOSS_ARENAS.yokai_lord, ground_main ~tuile 10.5) — doit rester SOUS ce sol visuel,
+    // sinon `solidAt` (grille, testé avant les plateformes d'arène dans `moveRect`) intercepte
+    // la chute trop tôt et le héros marche en l'air bien au-dessus du sol dessiné. Même
+    // convention que STONE (y:23) et ANTIQUITY (y:22), pas la hauteur de l'antichambre (y:9).
+    { x: 347, y: 23, w: 34, h: 9 },
+
   ],
 
   // ---- creusements (poche secrète de la cascade, sous la rivière) ----
@@ -812,8 +822,8 @@ const MEDIEVAL = {
       camera: { minX: 240, maxX: 292, minY: 6, maxY: 32 }, safeRespawn: [{ x: 250, y: 18, priority: 7 }] },
     { id: 'M08_SHRINE_STAIRS', rect: { x: 292, y: 6, w: 55, h: 26 }, tags: ['ascent'],
       camera: { minX: 290, maxX: 347, minY: 2, maxY: 32 }, safeRespawn: [{ x: 322, y: 9, priority: 8 }] },
-    { id: 'M09_YOKAI_ARENA', rect: { x: 347, y: 6, w: 20, h: 26 }, tags: ['boss'],
-      camera: { minX: 347, maxX: 367, minY: 2, maxY: 32 }, safeRespawn: [{ x: 351, y: 9, priority: 10 }] },
+    { id: 'M09_YOKAI_ARENA', rect: { x: 347, y: 6, w: 34, h: 26 }, tags: ['boss'],
+      camera: { minX: 347, maxX: 381, minY: 2, maxY: 32 }, safeRespawn: [{ x: 351, y: 9, priority: 10 }] },
   ],
 
   // ---- encounters verrouillés ----
