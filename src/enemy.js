@@ -9,7 +9,13 @@ AR.Enemy = class {
     const sc = (elite ? 1.5 : 1) * (eraScale || 1);
     this.maxHp = Math.round(def.hp * sc);
     this.hp = this.maxHp;
-    this.dmg = Math.round(def.dmg * (elite ? 1.3 : 1) * Math.sqrt(eraScale || 1));
+    this._dmgScale = (elite ? 1.3 : 1) * Math.sqrt(eraScale || 1);
+    this.dmg = Math.round(def.dmg * this._dmgScale);
+    // multi-attaques (def.attacks, cf. AR.Enemy#_pickAttack) : sous-ensemble d'ennemis
+    // élite (arène des gladiateurs) avec 3 attaques distinctes, chacune sa propre
+    // animation windup/attack ('enemies/states/{id}_{key}_windup'/'_attack').
+    this.activeAtk = null;
+    this._lastAtkKey = null;
     this.drawH = def.h * (elite ? 1.18 : 1);
     this.h = this.drawH * 0.82;
     // sprite effectif : repli sur AR.ENEMY_FALLBACK si l'image de cet ennemi manque
@@ -61,6 +67,27 @@ AR.Enemy = class {
 
   centerX() { return this.x + this.w / 2; }
   centerY() { return this.y + this.h / 2; }
+
+  // Choisit une des 3 attaques de def.attacks (jamais deux fois de suite la même) et
+  // recalcule les dégâts en cours à partir d'elle ; ennemis sans `attacks` : no-op,
+  // this.dmg reste celui calculé au constructeur (comportement inchangé).
+  _pickAttack() {
+    const list = this.def.attacks;
+    if (!list || !list.length) return;
+    let pick = list[0];
+    if (list.length > 1) {
+      do { pick = list[Math.floor(Math.random() * list.length)]; } while (pick.key === this._lastAtkKey);
+    }
+    this.activeAtk = pick;
+    this._lastAtkKey = pick.key;
+    this.dmg = Math.round((pick.dmg != null ? pick.dmg : this.def.dmg) * this._dmgScale);
+  }
+
+  _enterTele() {
+    this._pickAttack();
+    this.state = 'tele';
+    this.t = 0;
+  }
 
   // Déclenche l'animation de creusement (terre qui tremble puis éboulis) avant
   // que l'ennemi ne devienne visible/actif/attaquable. Utilisé pour les ennemis
@@ -231,11 +258,11 @@ AR.Enemy = class {
           this.blinkTimer = def.blinkCd;
           AR.Particles.burst(this.centerX(), this.centerY(), 14, { color: '#8a8aff', speed: 160, size: 3, life: 0.4 });
           AR.Audio.sfx('dash');
-          this.state = 'tele'; this.t = 0;
+          this._enterTele();
           break;
         }
         if (b === 'charger') {
-          if (d < def.range && this.atkTimer <= 0) { this.state = 'tele'; this.t = 0; AR.Audio.sfx('telegraph'); }
+          if (d < def.range && this.atkTimer <= 0) { this._enterTele(); AR.Audio.sfx('telegraph'); }
           else { this.vx = this.facing * spd; if (!this._groundAhead(game.level)) this.vx = 0; }
           break;
         }
@@ -244,7 +271,7 @@ AR.Enemy = class {
           if (d < keep - 70) { this.vx = -this.facing * spd; if (!this._groundAhead(game.level, -this.facing)) this.vx = 0; }
           else if (d > keep + 90 && d < aggroR) { this.vx = this.facing * spd; if (!this._groundAhead(game.level)) this.vx = 0; }
           else this.vx = 0;
-          if (d < def.range && this.atkTimer <= 0) { this.state = 'tele'; this.t = 0; }
+          if (d < def.range && this.atkTimer <= 0) { this._enterTele(); }
           if (d > aggroR * 1.3 && this.rageT <= 0) this.state = 'idle';
           break;
         }
@@ -254,7 +281,7 @@ AR.Enemy = class {
           this.vx = AR.U.clamp((targetX - this.x) * 2.2, -spd, spd);
           const ty = pl.y - (def.flyH || 120) + Math.sin(this.t * 2 + this.bobPhase) * 18;
           this.vy = AR.U.clamp((ty - this.y) * 2.4, -160, 160);
-          if (this.atkTimer <= 0 && (def.dive ? d < 320 : d < def.range)) { this.state = 'tele'; this.t = 0; }
+          if (this.atkTimer <= 0 && (def.dive ? d < 320 : d < def.range)) { this._enterTele(); }
           break;
         }
         // mêlée / brute / bouclier : au contact, vite
@@ -265,7 +292,7 @@ AR.Enemy = class {
           else this.vx = 0;
         }
         if (d < def.range + this.w / 2 && this.atkTimer <= 0) {
-          this.state = 'tele'; this.t = 0;
+          this._enterTele();
           if (d < 260) AR.Audio.sfx('telegraph');
         }
         if (d > aggroR * 1.4 && this.rageT <= 0) this.state = 'idle';
@@ -298,7 +325,7 @@ AR.Enemy = class {
           AR.Audio.sfx('spell');
           this.tpCd = 6 + Math.random() * 3;
           this.tpTarget = null;
-          this.state = 'tele'; this.t = 0; // enchaîne directement un télégraphe d'attaque
+          this._enterTele(); // enchaîne directement un télégraphe d'attaque
         }
         break;
       }
@@ -306,19 +333,32 @@ AR.Enemy = class {
         // télégraphe : l'ennemi se fige et "s'arme" (contour renforcé au rendu)
         this.vx = 0;
         if (def.behavior === 'flyer') this.vy = Math.sin(this.t * 12) * 22;
-        if (this.t >= def.tele) {
+        // ennemis multi-attaques (def.attacks, cf. _pickAttack) : durée de télégraphe et
+        // "nature" du coup (kind) viennent de l'attaque tirée au sort, pas du comportement
+        // de base — un ennemi 'charger' peut ainsi avoir une attaque de zone ou de mêlée en
+        // plus de sa charge, avec sa propre animation. Ennemis sans `attacks` : kind retombe
+        // sur def.behavior, comportement strictement inchangé.
+        const atk = this.activeAtk;
+        const teleDur = atk ? atk.tele : def.tele;
+        const kind = atk ? atk.kind : def.behavior;
+        if (this.t >= teleDur) {
           this.t = 0;
-          if (def.behavior === 'charger') {
+          if (kind === 'charger' || kind === 'charge') {
             this.state = 'charge';
             this.chargeDir = AR.U.sign(pl.x - this.x || 1);
             this.facing = this.chargeDir;
             AR.Audio.sfx('bossRoar');
-          } else if (def.behavior === 'ranged' || def.behavior === 'caster' || def.behavior === 'artillery') {
+          } else if (kind === 'aoe') {
+            this._aoeStrike(game);
             this.state = 'recover';
-            if (def.burst) { this.burstN = def.burst; this.burstT = 0; }
+            this.atkTimer = def.atkCd * diff.atkCdMult;
+          } else if (kind === 'ranged' || kind === 'caster' || kind === 'artillery') {
+            this.state = 'recover';
+            const burst = (atk && atk.burst) || def.burst;
+            if (burst) { this.burstN = burst; this.burstT = 0; }
             else this._fire(game);
             this.atkTimer = def.atkCd * diff.atkCdMult;
-          } else if (def.dive) {
+          } else if (kind === 'dive' || (!atk && def.dive)) {
             this.state = 'dive';
             const ang = AR.U.angle(this.centerX(), this.centerY(), pl.x + pl.w / 2, pl.y + pl.h / 2);
             this.vx = Math.cos(ang) * 480; this.vy = Math.sin(ang) * 480;
@@ -472,16 +512,19 @@ AR.Enemy = class {
     this.flash = 0.3;
   }
 
-  // coup de mêlée : zone devant l'ennemi
+  // coup de mêlée : zone devant l'ennemi (range/knock : l'attaque active si multi-attaques)
   _strike(game) {
     this.attackPoseT = Math.max(this.attackPoseT, 0.24);
     const def = this.def;
     const pl = game.player;
+    const atk = this.activeAtk;
+    const range = (atk && atk.range != null) ? atk.range : def.range;
+    const knock = (atk && atk.knock != null) ? atk.knock : def.knock;
     const r = {
-      x: this.facing > 0 ? this.x + this.w * 0.4 : this.x - def.range,
-      y: this.y - 8, w: def.range + this.w * 0.6, h: this.h + 16,
+      x: this.facing > 0 ? this.x + this.w * 0.4 : this.x - range,
+      y: this.y - 8, w: range + this.w * 0.6, h: this.h + 16,
     };
-    AR.Particles.slashArc(this.centerX() + this.facing * def.range * 0.5, this.centerY(),
+    AR.Particles.slashArc(this.centerX() + this.facing * range * 0.5, this.centerY(),
       this.facing, def.behavior === 'brute', def.behavior === 'brute' ? '#ff7a5c' : '#ffce6a');
     if (def.behavior === 'brute') {
       game.camera.shake(4, 0.2);
@@ -489,7 +532,25 @@ AR.Enemy = class {
     } else AR.Audio.sfx('slash2');
     if (!pl.dead && AR.U.rectsOverlap(r, pl.getRect())) {
       game.hitPlayer(this.dmg, this.centerX());
-      if (def.knock) pl.knock(this.facing * def.knock);
+      if (knock) pl.knock(this.facing * knock);
+    }
+  }
+
+  // coup de zone (kind:'aoe', ennemis multi-attaques) : dégâts autour de l'ennemi,
+  // sans dépendre de son orientation (marteau au sol, rugissement...).
+  _aoeStrike(game) {
+    this.attackPoseT = Math.max(this.attackPoseT, 0.28);
+    const pl = game.player;
+    const atk = this.activeAtk || {};
+    const radius = atk.radius || 140;
+    game.camera.shake(atk.shake || 6, 0.25);
+    AR.Particles.burst(this.centerX(), this.y + this.h, 16,
+      { color: '#bbb094', speed: 220, size: 4, life: 0.5, spread: 1.6, up: 60 });
+    AR.Audio.sfx('slashHeavy');
+    const dd = AR.U.dist(this.centerX(), this.centerY(), pl.x + pl.w / 2, pl.y + pl.h / 2);
+    if (!pl.dead && dd < radius + pl.w / 2) {
+      game.hitPlayer(this.dmg, this.centerX());
+      if (atk.knock) pl.knock(AR.U.sign(pl.x - this.centerX() || 1) * atk.knock);
     }
   }
 
@@ -497,6 +558,9 @@ AR.Enemy = class {
     this.attackPoseT = Math.max(this.attackPoseT, 0.24);
     const def = this.def;
     const pl = game.player;
+    // projectile de l'attaque active si multi-attaques (ex. jet de pierres vs. rayon), sinon
+    // def.proj comme avant.
+    const proj = (this.activeAtk && this.activeAtk.proj) || def.proj;
     const sx = this.centerX() + this.facing * this.w * 0.4;
     const sy = this.y + this.h * 0.35;
     const txx = pl.x + pl.w / 2, tyy = pl.y + pl.h / 2;
@@ -504,8 +568,8 @@ AR.Enemy = class {
     // conscience du tir ami : ne pas arroser ses propres rangs (non pertinent pour un buff
     // de soutien sans dégâts — le tambour est justement voulu derrière ses alliés)
     const diff = game.diff || AR.DIFFICULTIES[0];
-    if (def.proj !== 'warBuff' && Math.random() < diff.ffAware) {
-      const splash = (def.proj === 'bomb' || def.proj === 'mortar');
+    if (proj !== 'warBuff' && Math.random() < diff.ffAware) {
+      const splash = (proj === 'bomb' || proj === 'mortar');
       const friendlyRisk = splash
         ? game.enemies.some((e) => e !== this && !e.dead && e.active &&
             AR.U.dist(txx, tyy, e.centerX(), e.centerY()) < 110)
@@ -519,8 +583,8 @@ AR.Enemy = class {
       }
     }
     const shoot = (o) => { o.owner = this; return AR.Projectiles.spawn(o); };
-    AR.Audio.sfx(def.proj === 'laser' ? 'laser' : def.proj === 'flame' ? 'flame' : 'enemyShoot');
-    switch (def.proj) {
+    AR.Audio.sfx(proj === 'laser' ? 'laser' : proj === 'flame' ? 'flame' : 'enemyShoot');
+    switch (proj) {
       case 'rock': {
         const t = 0.9;
         shoot({
@@ -751,6 +815,12 @@ AR.Enemy = class {
   }
 
   _spriteKey(visualState) {
+    // ennemis multi-attaques : pendant windup/attack, sprite dédié à l'attaque active
+    // ('..._atk2_windup' etc.) ; neutre et repli sinon inchangés.
+    if (visualState !== 'neutral' && this.activeAtk && this.activeAtk.key) {
+      const atkKey = 'enemies/states/' + this.spriteId + '_' + this.activeAtk.key + '_' + visualState;
+      if (AR.SPRITE_META[atkKey]) return atkKey;
+    }
     const stateKey = 'enemies/states/' + this.spriteId + '_' + visualState;
     return AR.SPRITE_META[stateKey] ? stateKey : 'enemies/' + this.spriteId;
   }

@@ -333,7 +333,10 @@ const STONE = {
 //   croûte au-dessus du tunnel, reliée par un escalier ET un monte-charge — retour joueur
 //   2026-07-27 après une 1ère version jugée trop discrète : « le rectangle du milieu avec la
 //   petite cache secrète est sous-utilisé, je veux une arène au-dessus, en plus grand/profond,
-//   avec le monte-charge au-dessus des escaliers pour choisir entre monter par l'un ou l'autre »)
+//   avec le monte-charge au-dessus des escaliers pour choisir entre monter par l'un ou l'autre »
+//   — puis, la zone du monte-charge elle-même jugée décevante une fois vidée : « La Fosse aux
+//   Bêtes », set-piece à 5 mini-boss uniques dans une arène illustrée, cf. `gladiatorArena` et
+//   `E_GLADIATOR_PIT_ARENA` plus bas)
 //   -> REMONTÉE -> A04 marché -> MONTÉE -> A05 Forum (plaza civique, plateformes étagées) ->
 //   A06 Arène des Gladiateurs (duels en série, du solo à la bête finale) -> DESCENTE ->
 //   A07 passe élite -> arène du boss.
@@ -347,6 +350,12 @@ const ANTIQUITY = {
   arenaStartTx: 530,
   gateTx: 531,
   arenaGy: 22,
+  // Arène des Gladiateurs (E_GLADIATOR_PIT_ARENA, encounter ci-dessous) : PAS le boss de fin
+  // d'ère — un set-piece à 5 duels en haut du monte-charge de la Fosse des Esclaves, dans une
+  // vraie arène illustrée (cf. AR.BOSS_ARENAS.gladiator_pit, src/arenas.js) au lieu d'une salle
+  // en tuiles. `tx` n'a besoin de correspondre à rien de visible : juste un ancrage pour l'écran
+  // verrouillé (cf. Level#activateGladiatorArena).
+  gladiatorArena: { defKey: 'gladiator_pit', tx: 178 },
   fallDamageRatio: 0.10,
 
   // ---- terrain solide ----
@@ -514,6 +523,24 @@ const ANTIQUITY = {
               { ids: ['crypt_wraith', 'crypt_wraith'] },
               { ids: ['manacled_brute', 'chain_overseer'] }],
       reward: { coins: 35 } },
+    // La Fosse aux Bêtes — set-piece dédié en haut du monte-charge (retour joueur : la zone
+    // qu'on atteint par le monte-charge, une fois E_SLAVE_PIT déjà nettoyé au sol, n'était
+    // qu'« un coffre, aucun monstre » — décevant vu l'effort du trajet). Déclencheur serré
+    // autour de la plateforme du monte-charge (x177-186, juste au-dessus de la manivelle du
+    // haut) plutôt que toute la fosse, pour ne pas se redéclencher avec E_SLAVE_PIT. `arena`
+    // fait basculer l'écran sur une vraie arène illustrée (cf. `gladiatorArena` ci-dessus,
+    // AR.BOSS_ARENAS.gladiator_pit) au lieu d'un combat en tuiles : 5 mini-boss uniques, un par
+    // vague (jamais utilisés ailleurs), montée en puissance jusqu'au champion invaincu de la
+    // fosse. `returnTo` (tuiles) : le pied du monte-charge, côté tunnel.
+    { id: 'E_GLADIATOR_PIT_ARENA', roomId: 'A03B_SLAVE_PIT', arena: 'gladiator_pit',
+      trigger: { x: 177, y: 16, w: 9, h: 5 },
+      gates: [],
+      waves: [{ ids: ['retiaire_spectral'] },
+              { ids: ['manticore'] },
+              { ids: ['gorgone'] },
+              { ids: ['molosse'] },
+              { ids: ['minotaure'] }],
+      reward: { coins: 70, guaranteed: 'swordUp', returnTo: { x: 180, y: 29 } } },
     // Forum — plaza civique : combat à ciel ouvert sur plusieurs vagues, gradins praticables.
     { id: 'E_FORUM_PLAZA', roomId: 'A05_FORUM',
       trigger: { x: 320, y: 6, w: 60, h: 16 },

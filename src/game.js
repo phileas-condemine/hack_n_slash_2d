@@ -155,15 +155,23 @@ AR.Game = class {
       e.activateGroup = s.activate || null;
       this.enemies.push(e);
     }
+    // worldPickup : distingue ces pickups "du monde normal" (position en coordonnées du
+    // niveau) de ceux dynamiquement apparus DANS une arène verrouillée (fin de boss, Fosse
+    // aux Bêtes) — cf. le filtre dans render()/le contrôle d'interaction : une arène
+    // verrouillée réutilise le même espace de coordonnées pixel que le niveau normal (ce
+    // n'est qu'un cadrage caméra + une image de fond), donc un coffre du monde proche de
+    // l'ancrage de l'arène s'y superposerait sinon (trouvé en testant la Fosse aux Bêtes,
+    // ancrée en plein milieu de la Fosse des Esclaves plutôt qu'en bout de niveau isolé
+    // comme les vraies arènes de boss).
     for (const c of lvl.chestSpots) {
-      AR.Pickups.spawn({ type: 'chest', x: c.x, y: c.y, opened: false, high: !!c.high, guaranteed: c.guaranteed || null });
+      AR.Pickups.spawn({ type: 'chest', x: c.x, y: c.y, opened: false, high: !!c.high, guaranteed: c.guaranteed || null, worldPickup: true });
     }
-    this.merchantPickup = AR.Pickups.spawn({ type: 'merchant', x: lvl.merchantX, y: lvl.groundYpx(lvl.merchantX), used: false });
+    this.merchantPickup = AR.Pickups.spawn({ type: 'merchant', x: lvl.merchantX, y: lvl.groundYpx(lvl.merchantX), used: false, worldPickup: true });
     // mini-portails locaux (poches secrètes) : même visuel que le portail de fin de boss (repris
     // sans changement dans AR.Pickups/HUD), mais `returnTo` le distingue au moment d'interagir —
     // téléportation immédiate au lieu d'un changement d'ère.
     for (const p of lvl.localPortals) {
-      AR.Pickups.spawn({ type: 'portal', x: p.x, y: p.y, returnTo: p.returnTo });
+      AR.Pickups.spawn({ type: 'portal', x: p.x, y: p.y, returnTo: p.returnTo, worldPickup: true });
     }
 
     // position du héros
@@ -404,6 +412,11 @@ AR.Game = class {
     if (!this.bossTriggered && pl.x > lvl.arenaStartTx * AR.C.TILE) this._startBossFight();
 
     // ---- interactions (coffre / marchand / portail / levier)
+    // Une arène verrouillée (fin de boss ou Fosse aux Bêtes) réutilise le même espace de
+    // coordonnées pixel que le niveau normal (cadrage caméra + image de fond, pas un espace
+    // séparé) : sans ce filtre, les coffres/marchand/portails locaux du monde normal proches
+    // de l'ancrage de l'arène resteraient visibles/interactifs par-dessus l'image verrouillée.
+    AR.Pickups.suppressWorld = !!(lvl.bossArena && lvl.bossArena.active);
     const lever = lvl.authored ? this._nearestLever(pl) : null;
     this.interactPrompt = AR.Pickups.nearestInteractive(pl) || lever;
     if (this.interactPrompt && AR.Input.pressed('interact') && !this.shopOpen) {
@@ -492,22 +505,54 @@ AR.Game = class {
     enc.waveIdx = 0;
     enc._live = [];
     for (const g of enc.gates) this.level.setGateSolid(g, true);
+    if (enc.arena) this._startGladiatorArena(enc);
     AR.HUD.notify('Embuscade !', AR.C.COLORS.danger);
     AR.Audio.sfx('gate');
     if (enc.waves && enc.waves[0]) this._spawnWave(enc, enc.waves[0]);
+  }
+
+  // Arène des Gladiateurs (encounter à waves normal, cf. `arena:'gladiator_pit'` dans
+  // level_specs.js) : en plus du cycle vagues/récompense habituel, verrouille l'écran sur
+  // l'arène illustrée (même traitement que `_startBossFight`, cf. Level#activateGladiatorArena
+  // pour le mécanisme d'emprunt de `bossArena`) et repositionne le héros dedans. `enc._arenaGround`
+  // sert ensuite à placer chaque duelliste (`_spawnWave`) puis le coffre/portail de sortie
+  // (`_clearEncounter`) dans les coordonnées pixels de l'arène plutôt que celles du niveau.
+  _startGladiatorArena(enc) {
+    const lvl = this.level, pl = this.player;
+    const scene = lvl.activateGladiatorArena();
+    if (!scene) return;
+    AR.Projectiles.clear();
+    AR.Particles.clear();
+    enc._arenaGround = scene.ground;
+    const ground = scene.ground;
+    pl.x = ground.x + ground.w * 0.16 - pl.w / 2;
+    pl.y = ground.y - pl.h - 0.01;
+    pl.vx = 0; pl.vy = 0; pl.kvx = 0;
+    pl.onGround = true; pl.dashing = false; pl.jumpsUsed = 0;
+    pl.lastSafe = { x: pl.x, y: pl.y };
+    this.camera.x = scene.x; this.camera.y = scene.y; this.camera.lookAhead = 0;
+    this.arenaTransitionT = 0.7;
+    AR.HUD.banner('LA FOSSE AUX BÊTES', '5 champions vous attendent...');
+    AR.Audio.sfx('bossRoar');
+    this.camera.shake(6, 0.5);
   }
 
   _spawnWave(enc, wave) {
     const lvl = this.level, T = AR.C.TILE;
     const scale = AR.ERA_SCALE[this.eraIdx] * (1 + this.ngPlus * 0.55) * this.diff.hpMult;
     const ids = wave.ids || [];
-    const centerTx = enc.trigger.x + enc.trigger.w / 2;
+    // Arène des Gladiateurs : un seul champion par vague, au centre du sol de l'arène
+    // (coordonnées pixels de l'arène active) plutôt qu'au centre du trigger (coordonnées
+    // tuiles du niveau normal, sans rapport une fois l'écran verrouillé sur l'image de fond).
+    const baseX = (enc.arena && enc._arenaGround)
+      ? enc._arenaGround.x + enc._arenaGround.w * 0.62
+      : (enc.trigger.x + enc.trigger.w / 2) * T;
     ids.forEach((id, i) => {
       const isElite = (wave.elite && wave.elite.indexOf(id) >= 0) || !!AR.ENEMIES[id].elite;
-      const tx = centerTx + (i - (ids.length - 1) / 2) * 3;
-      const x = tx * T;
+      const x = baseX + (i - (ids.length - 1) / 2) * 3 * T;
       // sol depuis la hauteur du joueur (qui a déclenché la vague) : évite de faire
-      // apparaître un ennemi dans le plafond de grotte au-dessus du sol réel.
+      // apparaître un ennemi dans le plafond de grotte au-dessus du sol réel (ou, dans
+      // l'arène, résout automatiquement sur son sol via Level#groundYpx).
       const y = lvl.groundYAtEntity(x, this.player.y);
       const e = new AR.Enemy(id, x, y, isElite, scale);
       e.active = true;
@@ -521,6 +566,20 @@ AR.Game = class {
   _clearEncounter(enc) {
     enc.state = 'cleared';
     for (const g of enc.gates) this.level.setGateSolid(g, false);
+    if (enc.arena && enc._arenaGround) {
+      // Pas de sortie automatique : le coffre + le portail apparaissent DANS l'arène encore
+      // verrouillée, le joueur choisit son moment pour repartir (portail = `exitArena`,
+      // cf. `_useLocalPortal`, qui restaure la caméra/le niveau normal à l'usage).
+      const ground = enc._arenaGround;
+      const cy = ground.y;
+      const T = AR.C.TILE, rt = enc.reward.returnTo; // returnTo en tuiles, comme localPortals
+      AR.Pickups.spawn({ type: 'chest', x: ground.x + ground.w * 0.42, y: cy, opened: false,
+        guaranteed: (enc.reward && enc.reward.guaranteed) || null });
+      AR.Pickups.spawn({ type: 'portal', x: ground.x + ground.w * 0.58, y: cy,
+        returnTo: { x: rt.x * T, y: rt.y * T }, exitArena: true });
+      AR.HUD.banner('ARÈNE CONQUISE', 'Un passage s\'ouvre vers la sortie...');
+      AR.Audio.sfx('portal');
+    }
     if (enc.reward && enc.reward.coins) {
       AR.Pickups.coinBurst(this.player.x + this.player.w / 2, this.player.y - 20,
         Math.round(enc.reward.coins * (this.mods.goldMult || 1)), 2);
@@ -982,6 +1041,11 @@ AR.Game = class {
   // qu'une fois (le joueur change de niveau), celui-ci reste utilisable à volonté.
   _useLocalPortal(p) {
     const pl = this.player;
+    // Sortie de l'Arène des Gladiateurs (`exitArena`, cf. `_clearEncounter`) : referme
+    // l'emprunt de `bossArena` avant de téléporter, sinon le héros réapparaîtrait hors
+    // caméra normale tout en restant "dans" l'arène verrouillée (Camera#follow, moveRect...
+    // continueraient de lire ses bornes).
+    if (p.exitArena) this.level.deactivateGladiatorArena();
     pl.x = p.returnTo.x - pl.w / 2;
     pl.y = p.returnTo.y - pl.h;
     pl.vx = 0; pl.vy = 0;

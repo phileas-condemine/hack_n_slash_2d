@@ -101,6 +101,50 @@ AR.ENEMIES = {
   pit_vermin:     { name: 'Vermine des fosses', hp: 30, dmg: 7, speed: 170, xp: 8, coins: 3, h: 64, behavior: 'melee', range: 50, aggro: 460, atkCd: 1.0, tele: 0.25, facing: 'l' },
   manacled_brute: { name: 'Forçat brisant ses chaînes', hp: 180, dmg: 20, speed: 60, xp: 35, coins: 14, h: 100, behavior: 'brute', range: 95, aggro: 400, atkCd: 1.8, tele: 0.6, facing: 'l', knock: 340 },
 
+  // Champions de l'Arène des Gladiateurs (Fosse des Esclaves, cf. level_specs.js) : 5
+  // mini-boss élite, un par manche, jamais réutilisés ailleurs. Chacun a 3 attaques
+  // distinctes (`attacks`), chacune sa propre paire d'animations windup/attack
+  // ('enemies/states/{id}_{key}_windup'/'_attack', {key} = atk1/atk2/atk3) — cf.
+  // AR.Enemy#_pickAttack/_enterTele (src/enemy.js) pour le mécanisme générique. `behavior`
+  // pilote toujours le déplacement/l'approche comme pour tout ennemi ; `attacks[].kind`
+  // (melee/ranged/aoe/charge) pilote la résolution du coup une fois le télégraphe choisi —
+  // un `charger` peut donc avoir une attaque de zone ou de mêlée en plus de sa charge.
+  retiaire_spectral: { name: 'Rétiaire Spectral', hp: 220, dmg: 14, speed: 150, xp: 60, coins: 25, h: 104,
+    behavior: 'assassin', range: 100, aggro: 600, atkCd: 1.8, tele: 0.4, blinkCd: 3.2, elite: true,
+    attacks: [
+      { key: 'atk1', kind: 'melee', tele: 0.5, dmg: 12, range: 150, knock: 200 },  // jet de filet (longue portée)
+      { key: 'atk2', kind: 'melee', tele: 0.32, dmg: 18, range: 95, knock: 260 }, // coup de trident
+      { key: 'atk3', kind: 'melee', tele: 0.4, dmg: 15, range: 110, knock: 320 }, // évanescence spectrale
+    ] },
+  manticore: { name: 'Manticore', hp: 320, dmg: 16, speed: 130, xp: 75, coins: 30, h: 130,
+    behavior: 'artillery', range: 420, keep: 340, aggro: 640, atkCd: 2.0, tele: 0.5, elite: true,
+    attacks: [
+      { key: 'atk1', kind: 'ranged', tele: 0.55, dmg: 14, proj: 'rock', burst: 3 }, // volée de piques
+      { key: 'atk2', kind: 'melee', tele: 0.4, dmg: 20, range: 120, knock: 280 },   // bond
+      { key: 'atk3', kind: 'aoe', tele: 0.45, dmg: 16, radius: 150, knock: 260, shake: 5 }, // coup de queue
+    ] },
+  gorgone: { name: 'Gorgone Enchaînée', hp: 300, dmg: 15, speed: 70, xp: 80, coins: 32, h: 140,
+    behavior: 'caster', range: 460, keep: 340, aggro: 660, atkCd: 2.2, tele: 0.6, elite: true,
+    attacks: [
+      { key: 'atk1', kind: 'ranged', tele: 0.6, dmg: 15, proj: 'laser' },          // regard pétrifiant
+      { key: 'atk2', kind: 'ranged', tele: 0.55, dmg: 12, proj: 'rock', burst: 3 }, // volée de pierres
+      { key: 'atk3', kind: 'melee', tele: 0.35, dmg: 18, range: 85, knock: 240 },  // fouet de serpents
+    ] },
+  molosse: { name: 'Molosse d\'Airain', hp: 420, dmg: 20, speed: 90, xp: 90, coins: 35, h: 120,
+    behavior: 'shield', range: 90, aggro: 460, atkCd: 1.8, tele: 0.5, block: 0.7, chargeSpeed: 420, elite: true,
+    attacks: [
+      { key: 'atk1', kind: 'aoe', tele: 0.55, dmg: 18, radius: 150, knock: 300, shake: 7 }, // martèlement au sol
+      { key: 'atk2', kind: 'melee', tele: 0.35, dmg: 20, range: 100, knock: 260 },          // morsure d'airain
+      { key: 'atk3', kind: 'charge', tele: 0.6, dmg: 24, knock: 380 },                      // charge enragée
+    ] },
+  minotaure: { name: 'Minotaure de la Fosse', hp: 520, dmg: 24, speed: 100, xp: 120, coins: 50, h: 150,
+    behavior: 'charger', range: 110, aggro: 560, atkCd: 2.2, tele: 0.55, chargeSpeed: 460, knock: 380, elite: true,
+    attacks: [
+      { key: 'atk1', kind: 'charge', tele: 0.55, dmg: 24, knock: 400 },                      // charge des cornes
+      { key: 'atk2', kind: 'aoe', tele: 0.6, dmg: 22, radius: 160, knock: 340, shake: 8 },    // fracas au sol
+      { key: 'atk3', kind: 'aoe', tele: 0.65, dmg: 14, radius: 190, knock: 420, shake: 6 },   // rugissement
+    ] },
+
   // --- Japon médiéval
   ronin:          { name: 'Rônin', hp: 110, dmg: 15, speed: 130, xp: 22, coins: 9, h: 80, behavior: 'melee', range: 78, aggro: 480, atkCd: 1.0, tele: 0.32, combo2: true, parry: true },
   ninja_assassin: { name: 'Assassin ninja', hp: 75, dmg: 14, speed: 190, xp: 26, coins: 11, h: 78, behavior: 'assassin', range: 58, aggro: 560, atkCd: 1.6, tele: 0.3, facing: 'l', blinkCd: 3.2, parry: true },

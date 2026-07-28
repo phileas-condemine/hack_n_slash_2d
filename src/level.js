@@ -304,7 +304,8 @@ AR.Level = class {
     // --- encounters + triggers
     for (const e of spec.encounters || []) {
       this.encounters.push({ id: e.id, roomId: e.roomId, trigger: e.trigger, gates: e.gates || [],
-        waves: e.waves || null, fixed: e.fixed || null, reward: e.reward || null, state: 'idle', waveIdx: 0 });
+        waves: e.waves || null, fixed: e.fixed || null, reward: e.reward || null, arena: e.arena || null,
+        state: 'idle', waveIdx: 0 });
     }
     for (const t of spec.triggers || []) this.triggers.push({ ...t, fired: false });
     this.navHints = spec.navHints || {};
@@ -355,6 +356,10 @@ AR.Level = class {
       this.bossX = (this.arenaStartTx + 20) * T;
       this.portalX = (this.arenaStartTx + 16) * T;
     }
+    // --- Arène des Gladiateurs (set-piece à 5 duels, milieu de niveau) : cf.
+    // activateGladiatorArena/deactivateGladiatorArena ci-dessous. { defKey, tx }.
+    this._gladiatorArenaSpec = spec.gladiatorArena || null;
+    this._gladiatorArenaActive = false;
   }
 
   // ---- grille : primitives
@@ -587,12 +592,11 @@ AR.Level = class {
     return true;
   }
 
-  _buildBossArena() {
-    const def = AR.BOSS_ARENAS[this.era.boss];
-    if (!def) { this.bossArena = null; return; }
-    const width = AR.C.VIEW_W, height = AR.C.VIEW_H;
-    const viewX = (this.arenaStartTx + 2) * AR.C.TILE;
-    const viewY = 0;
+  // Construit un objet arène (image de fond + plateformes en pixels) depuis une entrée
+  // AR.BOSS_ARENAS, ancrée à viewX. Factorisé pour être réutilisé par le vrai boss de fin
+  // d'ère ET par l'Arène des Gladiateurs (cf. activateGladiatorArena ci-dessous).
+  _makeArenaState(def, viewX) {
+    const width = AR.C.VIEW_W, height = AR.C.VIEW_H, viewY = 0;
     const platforms = def.platforms.map((p) => ({
       id: p.id,
       x: viewX + p.x * width,
@@ -602,19 +606,54 @@ AR.Level = class {
       ground: !!p.ground,
     }));
     const ground = platforms.find((p) => p.ground);
-    this.bossArena = {
+    return {
       id: def.id, image: def.image, active: false,
       x: viewX, y: viewY, width, height, platforms, ground,
       bounds: { x0: ground.x, x1: ground.x + ground.w },
     };
-    this.bossX = ground.x + ground.w * 0.72;
-    this.portalX = ground.x + ground.w * 0.5;
+  }
+
+  _buildBossArena() {
+    const def = AR.BOSS_ARENAS[this.era.boss];
+    if (!def) { this.bossArena = null; return; }
+    const viewX = (this.arenaStartTx + 2) * AR.C.TILE;
+    this.bossArena = this._makeArenaState(def, viewX);
+    this.bossX = this.bossArena.ground.x + this.bossArena.ground.w * 0.72;
+    this.portalX = this.bossArena.ground.x + this.bossArena.ground.w * 0.5;
   }
 
   activateBossArena() {
     if (!this.bossArena) return null;
     this.bossArena.active = true;
     return this.bossArena;
+  }
+
+  // ---- Arène des Gladiateurs (cf. `gladiatorArena` dans level_specs.js) : PAS un second
+  // emplacement d'arène permanent — un emprunt temporaire du même champ `this.bossArena`
+  // (toute la mécanique de collision/rendu/caméra qui le lit déjà — moveRect, groundYpx,
+  // findSafeRespawn, Camera#follow, Level#drawBossArena, la démo IA... — fonctionne donc
+  // sans aucun changement ailleurs). Le vrai boss de fin d'ère n'est jamais actif en même
+  // temps que l'Arène des Gladiateurs (l'un est un set-piece de milieu de niveau, l'autre la
+  // fin du niveau) : l'emprunt sauvegarde l'arène de fin de niveau et la restaure telle
+  // quelle (inactive) à la sortie.
+  activateGladiatorArena() {
+    const spec = this._gladiatorArenaSpec;
+    if (!spec || this._gladiatorArenaActive) return this._gladiatorArenaActive ? this.bossArena : null;
+    const def = AR.BOSS_ARENAS[spec.defKey];
+    if (!def) return null;
+    this._savedFinalArena = this.bossArena;
+    const viewX = (spec.tx + 2) * AR.C.TILE;
+    this.bossArena = this._makeArenaState(def, viewX);
+    this.bossArena.active = true;
+    this._gladiatorArenaActive = true;
+    return this.bossArena;
+  }
+
+  deactivateGladiatorArena() {
+    if (!this._gladiatorArenaActive) return;
+    this.bossArena = this._savedFinalArena || null;
+    this._savedFinalArena = null;
+    this._gladiatorArenaActive = false;
   }
 
   // ==================================================== COLLISIONS

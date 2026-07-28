@@ -3,6 +3,10 @@ window.AR = window.AR || {};
 
 AR.Pickups = {
   list: [],
+  // cf. Game#step : vrai tant qu'une arène verrouillée (fin de boss / Fosse aux Bêtes) est
+  // active — masque les pickups `worldPickup` (coffres/marchand/portails locaux du niveau
+  // normal) qui partageraient sinon les mêmes coordonnées pixel que l'image verrouillée.
+  suppressWorld: false,
   clear() { this.list.length = 0; },
 
   spawn(o) { o.t = 0; this.list.push(o); return o; },
@@ -76,6 +80,7 @@ AR.Pickups = {
   nearestInteractive(pl) {
     let best = null, bd = 70;
     for (const p of this.list) {
+      if (this.suppressWorld && p.worldPickup) continue;
       if (p.type !== 'chest' && p.type !== 'portal' && p.type !== 'merchant') continue;
       if (p.type === 'chest' && p.opened) continue;
       if (p.type === 'merchant' && p.used) continue;
@@ -88,6 +93,7 @@ AR.Pickups = {
   draw(ctx, cam, time, era) {
     const cx = cam.cx(), cy = cam.cy();
     for (const p of this.list) {
+      if (this.suppressWorld && p.worldPickup) continue;
       const x = p.x - cx, y = p.y - cy;
       if (x < -120 || x > AR.C.VIEW_W + 120) continue;
       ctx.save();

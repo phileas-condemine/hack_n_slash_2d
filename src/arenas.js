@@ -78,6 +78,19 @@ AR.BOSS_ARENAS = {
       { id: 'right_bunker_top', x: 0.691986, y: 0.505845, w: 0.245215, h: 0.025505 },
     ],
   },
+  // Arène des Gladiateurs (Fosse des Esclaves, ère 2) : PAS un boss de fin d'ère — un
+  // set-piece à 5 duels en haut du monte-charge (cf. `gladiatorArena` dans
+  // AR.LEVEL_SPECS.antiquity, `Level#activateGladiatorArena`). Réutilise entièrement le
+  // pipeline "arène illustrée" des vrais boss (image de fond + plateformes normalisées +
+  // écran verrouillé) via un emprunt temporaire de `Level#bossArena`, cf. le commentaire
+  // détaillé sur `activateGladiatorArena`.
+  gladiator_pit: {
+    id: 'antiquity_gladiator_pit', image: 'arenas/special/arena_07_slave_pit',
+    sourceSize: { width: 1672, height: 941 },
+    platforms: [
+      { id: 'ground_main', x: 0.06, y: 0.68, w: 0.88, h: 0.06, ground: true },
+    ],
+  },
   ai_overlord: {
     id: 'futuristic_cyber_ai_overlord', image: 'arenas/boss/arena_06_cite_flottante',
     sourceSize: { width: 1672, height: 941 },
