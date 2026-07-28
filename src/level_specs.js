@@ -724,9 +724,9 @@ const MEDIEVAL = {
   solids: [
     { x: 0, y: 22, w: 44, h: 10 },          // M01 forêt sacrée : plateau d'arrivée
 
-    // M02 rivière : 4 pierres de gué séparées par des sauts simples (3 tuiles). Le trou du
-    // milieu (x58-61) cache l'entrée de SEC_MEDIEVAL_GROTTO (cf. `empties` plus bas) ; les deux
-    // trous voisins (x50-53/x66-69) restent de vraies chutes jusqu'au bas du monde.
+    // M02 rivière : 4 pierres de gué séparées par des sauts simples (3 tuiles). Les deux trous
+    // du milieu (x58-61 et x66-69) mènent tous deux à SEC_MEDIEVAL_GROTTO (cf. `empties` plus
+    // bas) ; seul le premier trou (x50-53) reste une vraie chute jusqu'au bas du monde.
     { x: 45, y: 22, w: 5, h: 10 },
     { x: 53, y: 22, w: 5, h: 10 },
     { x: 61, y: 22, w: 5, h: 10 },
@@ -776,12 +776,19 @@ const MEDIEVAL = {
   // ---- creusements ----
   empties: [
     // SEC_MEDIEVAL_GROTTO : une seule grande cavité creusée sous M03/le bouchon sous le pont/
-    // M04 (x86-186, masse pleine avant creusement), croûte de surface (y21-24) et plancher
-    // (y31) préservés — même technique que le Quartier des Esclaves/A03B_SLAVE_PIT
-    // (ANTIQUITY). Les 4 zones de combat souterraines (garde d'entrée, gauntlet, embuscade au
-    // plafond, passage inondé, coffre-fort) se succèdent le long de cette même cavité plutôt
-    // que dans des salles séparées par des murs, comme les zones 1-4 de SEC_STONE_04.
-    { x: 86, y: 24, w: 100, h: 7 },
+    // M04, croûte de surface et plancher (y31) préservés — même technique que le Quartier des
+    // Esclaves/A03B_SLAVE_PIT (ANTIQUITY). Les 4 zones de combat souterraines (garde d'entrée,
+    // gauntlet, embuscade au plafond, passage inondé, coffre-fort) se succèdent le long de
+    // cette même cavité plutôt que dans des salles séparées par des murs, comme SEC_STONE_04.
+    // Part de x53 (pas x86) : les piliers des pierres de gué 2/3 (x53-58/x61-66, solides sur
+    // toute leur hauteur y22-32, cf. `solids`) plongeaient jusqu'au plancher de la grotte sans
+    // être creusés, découpant la cavité en poches encastrées — un joueur tombé par le trou
+    // x66-69 se retrouvait emmuré des deux côtés au fond, sans issue, et le coffre du garde
+    // d'entrée (x64,y31) se logeait dans la roche du pilier 3 plutôt qu'à l'air libre (retour
+    // joueur, capture à l'appui). Creusé aussi à cette profondeur (y24-30) pour que toute la
+    // zone d'entrée soit une seule caverne continue ; la partie haute des piliers (y22-23,
+    // le vrai jeu de saut entre pierres de gué en surface) reste inchangée.
+    { x: 53, y: 24, w: 133, h: 7 },
   ],
 
   // ---- plateformes traversables (one-way) ----
