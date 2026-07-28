@@ -810,7 +810,7 @@ const MEDIEVAL = {
     { x: 94, y: 8, w: 10, id: 'SPIRIT_POCKET_A' },            // poche 1 : simple relais
     { x: 118, y: 6, w: 16, id: 'SPIRIT_POCKET_B' },           // poche 2 : combat
     { x: 140, y: 4, w: 22, id: 'SPIRIT_POCKET_C' },           // poche 3 : horde qui déferle
-    { x: 168, y: 2, w: 14, id: 'SPIRIT_POCKET_D' },           // poche 4 : mini-boss + coffre garanti
+    { x: 168, y: 8, w: 14, id: 'SPIRIT_POCKET_D' },           // poche 4 : mini-boss + coffre garanti
 
     // SEC_MEDIEVAL_GROTTO : passage inondé (zone 10), plateformes étroites sous tir.
     { x: 146, y: 28, w: 6, id: 'GROTTO_FLOODED_1' },
@@ -822,15 +822,27 @@ const MEDIEVAL = {
 
   // ---- lianes grimpables (SEC_MEDIEVAL_CANOPY, humain uniquement) ----
   climbables: [
-    // Le haut de la liane doit dépasser nettement la plateforme visée (y:10) : `climbableAt`
-    // n'est interrogé qu'au CENTRE du héros (`player.js`), donc l'escalade s'arrête dès que ce
-    // centre franchit `y` — avec `y:10` pile au niveau de la plateforme, les pieds du héros
-    // restaient encore ~31px (0,65 tuile) en dessous au moment où l'escalade coupait, jamais
-    // assez haut pour retomber dessus. Remonté de 4 tuiles au-dessus de la plateforme par
-    // précaution (bas inchangé à y:21, au niveau du plancher du pont).
-    { id: 'CLIMB_MEDIEVAL_01', x: 148, y: 6, w: 2, h: 15, exitY: 12 },
-    { id: 'CLIMB_MEDIEVAL_02', x: 165, y: 6, w: 2, h: 15, exitY: 12 },
-    { id: 'CLIMB_MEDIEVAL_03', x: 182, y: 6, w: 2, h: 15, exitY: 12 },
+    // Le haut de la liane doit laisser les PIEDS du héros nettement au-dessus (donc à une valeur
+    // de pixel plus petite QUE) la plateforme visée (y:10) une fois l'escalade coupée, pas
+    // seulement dépassés de justesse. `climbableAt` n'est interrogé qu'au CENTRE du héros
+    // (`player.js`) : avec `y:10` pile au niveau de la plateforme, les pieds restaient ~31px
+    // en dessous au moment où l'escalade coupait — jamais assez haut (1er correctif, insuffisant
+    // seul). Un 2e correctif (`y:9`, ~17px de marge) s'est aussi révélé insuffisant : en
+    // grimpant jusqu'au sommet puis en relâchant « haut » (le héros reste suspendu, cf.
+    // ci-dessous), ses pieds étaient déjà TOMBÉS SOUS le niveau de la plateforme pendant qu'il
+    // était accroché (l'escalade ignore les collisions normales) — au moment où l'escalade
+    // coupait enfin (en sortant sur le côté), `prevBottom` valait déjà plus que la plateforme,
+    // et l'accrochage normal en chute (qui exige d'être passé PAR-DESSUS) ne se déclenchait
+    // jamais : chute directe au sol, en traversant la plateforme sans s'y poser. Remonté à
+    // `y:8` (~65px/1,35 tuile de marge) pour que les pieds restent clairement au-dessus de la
+    // plateforme à la coupure, quelle que soit la façon dont l'escalade se termine (bas
+    // inchangé à y:21). Relâcher « haut » sans bouger latéralement laisse le héros suspendu
+    // (`climbing` ne se coupe qu'en sortant de la zone, jamais juste en relâchant les touches,
+    // cf. `player.js`) — un appui sur le saut permet aussi de décrocher à tout moment désormais
+    // (cf. correctif dédié dans `player.js`).
+    { id: 'CLIMB_MEDIEVAL_01', x: 148, y: 8, w: 2, h: 13, exitY: 12 },
+    { id: 'CLIMB_MEDIEVAL_02', x: 165, y: 8, w: 2, h: 13, exitY: 12 },
+    { id: 'CLIMB_MEDIEVAL_03', x: 182, y: 8, w: 2, h: 13, exitY: 12 },
   ],
 
   breakables: [],
@@ -931,7 +943,7 @@ const MEDIEVAL = {
                        'spirit_caster', 'spirit_caster', 'spirit_caster', 'ninja_assassin', 'ninja_assassin'] }],
       reward: { coins: 30 } },
     { id: 'E_SEC_SPIRIT_ELDER', roomId: 'SEC_MEDIEVAL_SPIRIT',
-      trigger: { x: 168, y: 0, w: 14, h: 4 }, gates: [],
+      trigger: { x: 168, y: 6, w: 14, h: 4 }, gates: [],
       waves: [{ ids: ['spirit_caster'], elite: ['spirit_caster'] }],
       reward: { coins: 20 } },
 
@@ -978,7 +990,7 @@ const MEDIEVAL = {
     { x: 64, y: 31, guaranteed: 'skillPoint' },          // SEC_MEDIEVAL_GROTTO : garde d'entrée
     { x: 178, y: 31, guaranteed: 'swordUp' },            // SEC_MEDIEVAL_GROTTO : coffre-fort final
     { x: 124, y: 6, high: true },                        // SEC_MEDIEVAL_SPIRIT : poche 2
-    { x: 172, y: 2, high: true, guaranteed: 'skillPoint' }, // SEC_MEDIEVAL_SPIRIT : mini-boss final
+    { x: 172, y: 8, high: true, guaranteed: 'skillPoint' }, // SEC_MEDIEVAL_SPIRIT : mini-boss final
     { x: 180, y: 10, high: true },                       // SEC_MEDIEVAL_CANOPY : coffre perché
     { x: 250, y: 19 },                                   // cour du sanctuaire
     { x: 370, y: 9 },                                    // antichambre
@@ -1000,8 +1012,8 @@ const MEDIEVAL = {
     { x: 110, y: 12, returnTo: { x: 98, y: 8 } },     // corniche cachée -> poche 1 (relais)
     { x: 100, y: 8, returnTo: { x: 124, y: 6 } },     // poche 1 -> poche 2 (combat)
     { x: 132, y: 6, returnTo: { x: 150, y: 4 } },     // poche 2 -> poche 3 (horde)
-    { x: 158, y: 4, returnTo: { x: 174, y: 2 } },     // poche 3 -> poche 4 (mini-boss)
-    { x: 180, y: 2, returnTo: { x: 112, y: 21 } },    // poche 4 -> retour au carrefour
+    { x: 158, y: 4, returnTo: { x: 174, y: 8 } },     // poche 3 -> poche 4 (mini-boss)
+    { x: 180, y: 8, returnTo: { x: 112, y: 21 } },    // poche 4 -> retour au carrefour
   ],
 
   // ---- poches sombres ----
@@ -1023,7 +1035,7 @@ const MEDIEVAL = {
     { type: 'lantern', tx: 98, ty: 8 },       // SEC_MEDIEVAL_SPIRIT poche 1
     { type: 'lantern', tx: 122, ty: 6 },      // SEC_MEDIEVAL_SPIRIT poche 2
     { type: 'lantern', tx: 148, ty: 4 },      // SEC_MEDIEVAL_SPIRIT poche 3
-    { type: 'lantern', tx: 172, ty: 2 },      // SEC_MEDIEVAL_SPIRIT poche 4
+    { type: 'lantern', tx: 172, ty: 8 },      // SEC_MEDIEVAL_SPIRIT poche 4
     { type: 'lantern', tx: 145, ty: 21 },
     { type: 'lantern', tx: 160, ty: 10 },     // SEC_MEDIEVAL_CANOPY
     { type: 'lantern', tx: 190, ty: 21 },
@@ -1044,9 +1056,9 @@ const MEDIEVAL = {
   navHints: {
     defaultRoute: 'main',
     climbs: [
-      { id: 'CLIMB_MEDIEVAL_01', x: 149, bottomY: 21, topY: 6, exitX: 152 },
-      { id: 'CLIMB_MEDIEVAL_02', x: 166, bottomY: 21, topY: 6, exitX: 169 },
-      { id: 'CLIMB_MEDIEVAL_03', x: 183, bottomY: 21, topY: 6, exitX: 186 },
+      { id: 'CLIMB_MEDIEVAL_01', x: 149, bottomY: 21, topY: 8, exitX: 152 },
+      { id: 'CLIMB_MEDIEVAL_02', x: 166, bottomY: 21, topY: 8, exitX: 169 },
+      { id: 'CLIMB_MEDIEVAL_03', x: 183, bottomY: 21, topY: 8, exitX: 186 },
     ],
   },
 };

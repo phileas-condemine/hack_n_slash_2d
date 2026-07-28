@@ -13,7 +13,7 @@ AR.Player = class {
     this.jumpsUsed = 0;
     this.dashing = false; this.dashT = 0; this.dashCd = 0; this.dashCharges = 1;
     this.airDashed = false;
-    this.climbing = false; this.climbCooldown = 0;
+    this.climbing = false; this.climbCooldown = 0; this.climbLockout = 0; this._prevSpace = false;
     this.dropThrough = 0;
     this.dashHeld = 0;
     this.trail = [];
@@ -172,6 +172,33 @@ AR.Player = class {
     if (this.climbing || onClimb) this.climbCooldown = 0.18; else this.climbCooldown -= dt;
     const climbIntent = (onClimb || this.climbing || this.climbCooldown > 0) && (In.down('up') || In.down('down'));
 
+    // ---------------- décrochage d'une liane au saut : peut lâcher prise à N'IMPORTE QUELLE
+    // hauteur en appuyant sur le saut, pas seulement en sortant par le haut/bas/côté de la
+    // liane. Sans ça, un héros qui grimpe puis relâche « haut » avant le sommet logique reste
+    // suspendu indéfiniment (`climbing` ne se coupe que si `onClimb` devient faux — relâcher les
+    // touches ne fait *pas* retomber), et le saut normal ci-dessous est bloqué tant que
+    // `climbing` est vrai — sans échappatoire fiable pour rattraper une plateforme voisine
+    // (retour joueur : aucune des lianes de la canopée R3 ne permettait d'atterrir dessus).
+    // Lit directement la touche Espace (`AR.Input.keys`) plutôt que `In.pressed('jump')` : cette
+    // action est aussi mappée sur ArrowUp/KeyW (§config), donc tenir « haut » pour grimper la
+    // maintient déjà « enfoncée » en continu — un appui frais sur Espace ne produirait alors
+    // jamais de front montant détectable via l'action partagée (trouvé en testant : le
+    // décrochage ne se déclenchait jamais tant que « haut » restait tenu, exactement le cas
+    // d'usage visé). Suivi de front dédié (`_prevSpace`) pour ne pas dépendre de `In.pressed`.
+    const spaceHeld = !!In.keys['Space'];
+    const spacePressed = spaceHeld && !this._prevSpace;
+    this._prevSpace = spaceHeld;
+    if (this.climbing && spacePressed) {
+      this.climbing = false;
+      this.climbLockout = 0.25; // évite que la détection d'escalade juste en dessous ne raccroche aussitôt
+      this.vy = P.JUMP_VY;
+      this.vx = (dir !== 0 ? dir : this.facing) * P.WALK;
+      this.jumpsUsed = 1; this.jumpBuffer = 0;
+      AR.Audio.sfx('jump');
+      AR.EventLog.push('player', { event: 'jump', x: Math.round(this.x), y: Math.round(this.y) });
+    }
+    this.climbLockout -= dt;
+
     // ---------------- saut / double saut
     this.jumpBuffer -= dt; this.coyote -= dt;
     if (In.pressed('jump') && !climbIntent) {
@@ -198,7 +225,8 @@ AR.Player = class {
     if (In.released('jump') && this.vy < 0 && !this.climbing) this.vy *= P.JUMP_CUT;
 
     // ---------------- escalade (lianes / échelles) — cf. 00_pre_requis §7.1
-    if (!this.climbing && onClimb && !this.dashing && (In.down('up') || In.down('down'))) {
+    if (!this.climbing && onClimb && !this.dashing && this.climbLockout <= 0 &&
+        (In.down('up') || In.down('down'))) {
       this.climbing = true; this.jumpsUsed = 0; this.airDashed = false;
     }
     if (this.climbing) {
