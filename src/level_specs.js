@@ -815,9 +815,15 @@ const MEDIEVAL = {
 
   // ---- lianes grimpables (SEC_MEDIEVAL_CANOPY, humain uniquement) ----
   climbables: [
-    { id: 'CLIMB_MEDIEVAL_01', x: 148, y: 10, w: 2, h: 11, exitY: 12 },
-    { id: 'CLIMB_MEDIEVAL_02', x: 165, y: 10, w: 2, h: 11, exitY: 12 },
-    { id: 'CLIMB_MEDIEVAL_03', x: 182, y: 10, w: 2, h: 11, exitY: 12 },
+    // Le haut de la liane doit dépasser nettement la plateforme visée (y:10) : `climbableAt`
+    // n'est interrogé qu'au CENTRE du héros (`player.js`), donc l'escalade s'arrête dès que ce
+    // centre franchit `y` — avec `y:10` pile au niveau de la plateforme, les pieds du héros
+    // restaient encore ~31px (0,65 tuile) en dessous au moment où l'escalade coupait, jamais
+    // assez haut pour retomber dessus. Remonté de 4 tuiles au-dessus de la plateforme par
+    // précaution (bas inchangé à y:21, au niveau du plancher du pont).
+    { id: 'CLIMB_MEDIEVAL_01', x: 148, y: 6, w: 2, h: 15, exitY: 12 },
+    { id: 'CLIMB_MEDIEVAL_02', x: 165, y: 6, w: 2, h: 15, exitY: 12 },
+    { id: 'CLIMB_MEDIEVAL_03', x: 182, y: 6, w: 2, h: 15, exitY: 12 },
   ],
 
   breakables: [],
@@ -1031,9 +1037,9 @@ const MEDIEVAL = {
   navHints: {
     defaultRoute: 'main',
     climbs: [
-      { id: 'CLIMB_MEDIEVAL_01', x: 149, bottomY: 21, topY: 10, exitX: 152 },
-      { id: 'CLIMB_MEDIEVAL_02', x: 166, bottomY: 21, topY: 10, exitX: 169 },
-      { id: 'CLIMB_MEDIEVAL_03', x: 183, bottomY: 21, topY: 10, exitX: 186 },
+      { id: 'CLIMB_MEDIEVAL_01', x: 149, bottomY: 21, topY: 6, exitX: 152 },
+      { id: 'CLIMB_MEDIEVAL_02', x: 166, bottomY: 21, topY: 6, exitX: 169 },
+      { id: 'CLIMB_MEDIEVAL_03', x: 183, bottomY: 21, topY: 6, exitX: 186 },
     ],
   },
 };
