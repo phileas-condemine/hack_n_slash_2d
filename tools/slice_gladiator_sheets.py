@@ -1,11 +1,14 @@
 """One-off slicer for the gladiator-arena monster sheets (assets/raw/gladiator_arena_monsters/).
 
-Each sheet is N poses stacked vertically, evenly divided in height, each pose prefixed
-by a bold white text label on the green background. This crops each band, strips the
-label row, and writes one file per pose into assets/enemies/states/.
+Each sheet stacks N poses vertically, each pose preceded by a bold white text label on the
+green background. Panels are NOT reliably equal height and some sheets have no divider line
+at all, so instead of dividing by height/N this finds each pose's actual content bounding box:
+a row is "content" if it has pixels that are neither chroma-green nor near-white (label text
+and any divider lines are pure green+white, so they're excluded automatically). Contiguous
+content rows (small gaps bridged) form one pose cluster each, top to bottom.
 
-Not a general tool (unlike build_sprite_meta.py) - the crop boundaries are specific to
-this one batch of ChatGPT-generated sheets. Run once, then delete/ignore.
+Not a general tool (unlike build_sprite_meta.py) - specific to this one batch of ChatGPT
+sheets. Run once, then delete/ignore.
 """
 import os
 from PIL import Image
@@ -14,7 +17,6 @@ ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 SRC = os.path.join(ROOT, 'assets', 'raw', 'gladiator_arena_monsters')
 DST = os.path.join(ROOT, 'assets', 'enemies', 'states')
 
-# (sheet filename, [pose suffixes top-to-bottom])
 SHEETS = [
     ('retiaire_spectral_sheet1.png', ['retiaire_spectral_neutral', 'retiaire_spectral_atk1_windup', 'retiaire_spectral_atk1_attack']),
     ('retiaire_spectral_sheet2.png', ['retiaire_spectral_atk2_windup', 'retiaire_spectral_atk2_attack', 'retiaire_spectral_atk3_windup', 'retiaire_spectral_atk3_attack']),
@@ -28,26 +30,144 @@ SHEETS = [
     ('minotaure_sheet2.png', ['minotaure_atk2_windup', 'minotaure_atk2_attack', 'minotaure_atk3_windup', 'minotaure_atk3_attack']),
 ]
 
+MARGIN = 10          # px kept around each detected content cluster
+GAP_TOLERANCE = 34   # px of blank rows allowed inside one pose (disjoint particles/fx)
+RUN_THRESH = 18      # min run of consecutive non-green/non-white px to count a row as content
+                      # (ignores scattered anti-aliasing noise around text edges)
+
 
 def is_green(r, g, b):
-    return g > 100 and g > r * 1.35 and g > b * 1.35
+    return g > 100 and g > r * 1.3 and g > b * 1.3
 
 
-def find_label_end(band, band_w, band_h):
-    """Scan from the top of a pose band for rows containing white-ish label text
-    pixels; return the y just below the last such row (within the top 30%)."""
-    px = band.load()
-    last_label_y = -1
-    scan_limit = int(band_h * 0.30)
-    for y in range(scan_limit):
-        white_count = 0
-        for x in range(0, band_w, 3):  # sample every 3rd px for speed
+def is_white(r, g, b):
+    return r > 205 and g > 205 and b > 205
+
+
+def is_whitish(r, g, b):
+    # looser than is_white: catches the anti-aliased blend pixels along the edge of a
+    # white divider line/text glyph fading into the green backdrop, which are neither
+    # pure green nor pure white but still shouldn't count as "content"
+    return r > 175 and g > 175 and b > 175
+
+
+def content_rows(img, w, h):
+    px = img.load()
+    rows = []
+    for y in range(h):
+        run = 0
+        best = 0
+        for x in range(w):
             r, g, b = px[x, y][:3]
-            if r > 200 and g > 200 and b > 200:
-                white_count += 1
-        if white_count > (band_w / 3) * 0.02:  # >2% of sampled px are white
-            last_label_y = y
-    return last_label_y + 6 if last_label_y >= 0 else 0  # small margin below text
+            if not is_green(r, g, b) and not is_whitish(r, g, b):
+                run += 1
+                if run > best:
+                    best = run
+            else:
+                run = 0
+            if best >= RUN_THRESH:
+                break
+        rows.append(best >= RUN_THRESH)
+    return rows
+
+
+def is_art_pixel(r, g, b):
+    # true colour content: neither chroma-green nor near-white. Unlike is_whitish (used
+    # for the row-content pass), this uses a slightly tighter white cutoff so it reliably
+    # separates the (white/near-white only) caption text from actual painted artwork even
+    # when a pose's silhouette sits only a couple of px below its label with no real gap.
+    if is_green(r, g, b) or (r > 190 and g > 190 and b > 190):
+        return False
+    # reject the anti-aliased blend band between white text and green backdrop: those
+    # pixels sit on the green<->white line (r approx== b, fairly bright) and aren't real
+    # brown/red/metal artwork, which always deviates in hue (r far from b).
+    if abs(r - b) < 25 and g > 150 and r > 120:
+        return False
+    return True
+
+
+def find_art_start(img, top, bottom, w):
+    """Within [top, bottom), skip any leading rows that are pure caption text (white/green
+    only, no real colour) and return the row where actual artwork begins."""
+    px = img.load()
+    run_needed = 10
+    for y in range(top, bottom):
+        run = 0
+        for x in range(0, w, 2):
+            r, g, b = px[x, y][:3]
+            if is_art_pixel(r, g, b):
+                run += 2
+                if run >= run_needed:
+                    return y
+            else:
+                run = 0
+    return top
+
+
+def row_is_pure_green(img, y, w):
+    """True only if the row is 100% chroma-green with no text/anti-aliasing remnants at
+    all. MARGIN is only allowed to eat into rows like this - anything else (even a faint
+    sub-threshold blend pixel from a caption glyph) blocks further expansion, since that's
+    exactly the kind of pixel that shows up as a visible sliver in the final crop."""
+    px = img.load()
+    for x in range(0, w, 2):
+        if not is_green(*px[x, y][:3]):
+            return False
+    return True
+
+
+def cluster_rows(rows, n_expected):
+    h = len(rows)
+    clusters = []
+    y = 0
+    while y < h:
+        if rows[y]:
+            start = y
+            end = y
+            gap = 0
+            yy = y + 1
+            while yy < h:
+                if rows[yy]:
+                    end = yy
+                    gap = 0
+                else:
+                    gap += 1
+                    if gap > GAP_TOLERANCE:
+                        break
+                yy += 1
+            clusters.append([start, end])
+            y = yy
+        else:
+            y += 1
+    # merge clusters that are implausibly small (stray noise) into neighbours
+    clusters = [c for c in clusters if c[1] - c[0] > 20]
+    return clusters
+
+
+def trim_divider_lines(img):
+    """Strip solid near-white divider-line rows that may have been pulled in by MARGIN
+    at the very top/bottom of a crop (chroma-key only removes green, so a leftover
+    white line would otherwise survive as a visible artifact)."""
+    w, h = img.size
+    px = img.load()
+
+    def row_is_white(y):
+        cnt = 0
+        for x in range(0, w, 4):
+            r, g, b = px[x, y][:3]
+            if is_whitish(r, g, b):
+                cnt += 1
+        return cnt > (w / 4) * 0.85
+
+    top = 0
+    while top < h and row_is_white(top):
+        top += 1
+    bottom = h
+    while bottom > top and row_is_white(bottom - 1):
+        bottom -= 1
+    if top > 0 or bottom < h:
+        return img.crop((0, top, w, bottom))
+    return img
 
 
 def main():
@@ -56,17 +176,25 @@ def main():
         path = os.path.join(SRC, fname)
         img = Image.open(path).convert('RGB')
         w, h = img.size
-        n = len(poses)
-        band_h = h / n
-        for i, pose_name in enumerate(poses):
-            top = int(round(i * band_h))
-            bottom = int(round((i + 1) * band_h))
-            band = img.crop((0, top, w, bottom))
-            label_end = find_label_end(band, w, bottom - top)
-            cropped = band.crop((0, label_end, w, bottom - top))
+        rows = content_rows(img, w, h)
+        clusters = cluster_rows(rows, len(poses))
+        if len(clusters) != len(poses):
+            print(f'!! {fname}: expected {len(poses)} poses, found {len(clusters)} clusters -> SKIPPED, needs manual review')
+            print('   clusters:', clusters)
+            continue
+        for (top, bottom), pose_name in zip(clusters, poses):
+            art_top = find_art_start(img, top, bottom, w)
+            crop_top = art_top
+            y = art_top - 1
+            while y >= 0 and (art_top - y) <= MARGIN and row_is_pure_green(img, y, w):
+                crop_top = y
+                y -= 1
+            crop_bottom = min(h, bottom + MARGIN)
+            cropped = img.crop((0, crop_top, w, crop_bottom))
+            cropped = trim_divider_lines(cropped)
             out_path = os.path.join(DST, pose_name + '.png')
             cropped.save(out_path)
-            print(f'{fname} pose {i} ({pose_name}) -> {cropped.size}, label_end={label_end}')
+            print(f'{fname} -> {pose_name} rows[{crop_top}:{crop_bottom}] size={cropped.size}')
 
 
 if __name__ == '__main__':

@@ -253,7 +253,11 @@ AR.Enemy = class {
           AR.Particles.burst(this.centerX(), this.centerY(), 14, { color: '#8a8aff', speed: 160, size: 3, life: 0.4 });
           const side = -pl.facing || 1;
           this.x = pl.x + side * 55 - this.w / 2;
-          this.y = pl.y - 10;
+          // se cale sur le vrai sol (et non `pl.y - 10`) : un ennemi bien plus grand/petit
+          // que le joueur se retrouverait sinon partiellement enterré, et moveRect ne
+          // rattrape pas un atterrissage sur plateforme déjà entamé sous la surface
+          // (cf. arène de gladiateurs, sol = plateforme et non tuiles pleines) -> chute infinie.
+          this.y = game.level.groundYAtEntity(this.x + this.w / 2, pl.y) - this.h;
           this.vy = 0;
           this.blinkTimer = def.blinkCd;
           AR.Particles.burst(this.centerX(), this.centerY(), 14, { color: '#8a8aff', speed: 160, size: 3, life: 0.4 });
