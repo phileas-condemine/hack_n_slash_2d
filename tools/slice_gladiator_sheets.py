@@ -180,13 +180,22 @@ def trim_divider_lines(img):
     return img
 
 
+def is_pure_bg_green(r, g, b):
+    # the actual flat chroma-key backdrop colour, e.g. (3,206,3)/(5,194,5) - tight enough
+    # that it excludes not just the border itself but its anti-aliased fade into the green
+    # (e.g. (167,235,169), which passes the looser ratio-based is_green() but is still
+    # visibly tinted and would otherwise survive as a faint line after chroma-keying).
+    return r < 30 and b < 30 and 150 < g < 230
+
+
 def is_border_pixel(r, g, b):
     # the frame some sheets (gorgone_*, molosse_sheet1) have around the whole canvas: a
     # near-white but slightly-off (sometimes greenish-tinted) opaque strip a few px thick,
     # distinct from both the pure chroma-green backdrop and real artwork. Left in place, it
     # survives build_sprite_meta.py's chroma-key (which only strips green) as a visible
-    # straight white line on every pose cut from that sheet.
-    return r > 165 and g > 165 and b > 165 and not is_green(r, g, b)
+    # straight white line on every pose cut from that sheet. Includes its anti-aliased
+    # fade into the backdrop, not just its solid core.
+    return not is_pure_bg_green(r, g, b)
 
 
 def strip_canvas_border(img):
