@@ -1787,17 +1787,23 @@ const CYBER = {
     { x: 23, y: 44, w: 47, h: 8 },          // x23-69
 
     { x: 5, y: 54, w: 20, h: 4 },           // SEC_C0_SERVERS (sous la rue) x5-24
+    // SEC_C0_ANNEX : petite plateforme bonus, reliée UNIQUEMENT par le 2e portail de
+    // SEC_C0_SERVERS (celui qu'on emprunte après le mini-boss) au lieu de le faire revenir tout
+    // simplement au point de départ — retour joueur 2026-07-28 (« dommage que les 2 portails
+    // emmènent au même endroit [...] je verrais bien une autre plateforme reliée à l'un des 2
+    // portails avec d'autres monstres pour continuer le massacre »). Sa propre sortie (portail)
+    // ramène ensuite sur C0_STREET, plus loin que le premier portail (pas de boucle).
+    { x: 35, y: 58, w: 20, h: 4 },          // x35-54
 
-    // C1_ROOFTOPS (y32) : sol continu, brèche gardée x90-92 (GRID_C1 -> SEC_C1_WALKWAY). Colonnes
-    // 66-68 (atterrissage de PAD_C0_C1) exclues du solide : un bloc plein de 8 tuiles d'épaisseur
-    // (rows32-39) n'est praticable QUE par le dessus, y compris sa propre face supérieure (row32)
-    // qui bloque tout autant une remontée par en dessous qu'un plafond ordinaire (bug trouvé en
-    // testant : creuser seulement le dessous en `empties` ne suffisait pas, le héros butait quand
-    // même contre le plafond restant à row32). Ce carré est plutôt une plateforme `oneWay` (cf.
-    // plus bas) : traversable en montant, solide seulement en retombant dessus — exactement ce
-    // qu'il faut pour un point d'atterrissage de pad.
-    { x: 60, y: 32, w: 6, h: 8 },           // x60-65
-    { x: 69, y: 32, w: 21, h: 8 },          // x69-89
+    // C1_ROOFTOPS (y32) : sol continu, brèche gardée x90-92 (GRID_C1 -> SEC_C1_WALKWAY). Le premier
+    // tronçon (x60-89, celui que PAD_C0_C1 doit rejoindre) est une plateforme `oneWay` (cf. plus
+    // bas) plutôt qu'un solide : un bloc plein est praticable UNIQUEMENT par le dessus — sa propre
+    // face supérieure bloque une remontée par en dessous exactement comme un plafond, quelle que
+    // soit son épaisseur (bug remonté par le joueur : « il y a un mur donc on retombe et on est
+    // bloqué » — un premier correctif n'évidant qu'une bande étroite de 3 tuiles sous le pad
+    // suffisait dans un test scripté centré au pixel près, mais pas dès que l'approche réelle du
+    // joueur dérive de quelques tuiles, ce qui le faisait heurter le solide voisin resté plein).
+    // `oneWay` sur TOUT le tronçon élimine le problème quelle que soit la dérive.
     { x: 93, y: 32, w: 37, h: 8 },          // x93-129
 
     { x: 78, y: 40, w: 25, h: 4 },          // SEC_C1_WALKWAY (sous les toits) x78-102
@@ -1809,11 +1815,10 @@ const CYBER = {
 
     { x: 140, y: 40, w: 20, h: 4 },         // SEC_C2_VAULT x140-159
 
-    // C3_SPIRE : petite plateforme d'atterrissage du pad PAD_C2_C3, puis escalier de 6 marches
-    // (1 tuile/marche, toujours franchissable en un saut simple si besoin — même patron que le
-    // rempart de RENAISSANCE, `h` croissant pour garder chaque marche ancrée à une base commune
-    // y40, aucun trou en dessous).
-    { x: 172, y: 24, w: 15, h: 2 },         // atterrissage du pad
+    // C3_SPIRE : atterrissage du pad PAD_C2_C3 en `oneWay` plus bas (x160-190, même raison que
+    // C1_ROOFTOPS ci-dessus), puis escalier de 6 marches (1 tuile/marche, toujours franchissable
+    // en un saut simple si besoin — même patron que le rempart de RENAISSANCE, `h` croissant pour
+    // garder chaque marche ancrée à une base commune y40, aucun trou en dessous).
     { x: 189, y: 23, w: 3, h: 17 }, { x: 192, y: 22, w: 3, h: 18 },
     { x: 195, y: 21, w: 3, h: 19 }, { x: 198, y: 20, w: 3, h: 20 },
     { x: 201, y: 19, w: 3, h: 21 }, { x: 204, y: 18, w: 3, h: 22 },
@@ -1826,11 +1831,14 @@ const CYBER = {
   ],
 
   empties: [],
-  // Atterrissage de PAD_C0_C1 : cf. commentaire détaillé sur `solids` (C1_ROOFTOPS) juste
-  // au-dessus — une plateforme à sens unique plutôt qu'un solide, seule façon de laisser le pad
-  // traverser librement en montant tout en catchant normalement la retombée.
+  // Atterrissages des 2 pads : cf. commentaire détaillé sur `solids` (C1_ROOFTOPS) plus haut —
+  // des plateformes à sens unique plutôt que des solides, seule façon de laisser chaque pad
+  // traverser librement en montant tout en catchant normalement la retombée. Larges (tout le
+  // tronçon C1 pour l'un, x160-190 pour l'autre — couvre la colonne du pad ET la cible visée)
+  // pour rester fiables quelle que soit la dérive horizontale réelle du joueur.
   oneWay: [
-    { x: 66, y: 32, w: 3, id: 'PAD_C0_C1_LEDGE' },
+    { x: 60, y: 32, w: 30, id: 'PAD_C0_C1_LEDGE' },
+    { x: 160, y: 24, w: 30, id: 'PAD_C2_C3_LEDGE' },
   ],
   climbables: [],
 
@@ -1875,6 +1883,8 @@ const CYBER = {
   // ---- rooms (secrets listées avant leur voisine obligatoire, chevauchement Y volontaire —
   // même règle que R3/R4 : `currentRoomAt` retient le premier rect qui contient le point) ----
   rooms: [
+    { id: 'SEC_C0_ANNEX', rect: { x: 30, y: 56, w: 30, h: 8 }, tags: ['secret', 'gallery', 'dark'],
+      camera: { minX: 28, maxX: 62, minY: 54, maxY: 66 }, safeRespawn: [{ x: 45, y: 58, priority: 9 }] },
     { id: 'SEC_C0_SERVERS', rect: { x: 0, y: 52, w: 30, h: 10 }, tags: ['secret', 'vault', 'dark'],
       camera: { minX: 0, maxX: 32, minY: 50, maxY: 62 }, safeRespawn: [{ x: 15, y: 54, priority: 9 }] },
     { id: 'C0_STREET', rect: { x: 0, y: 36, w: 70, h: 16 }, tags: [],
@@ -1913,6 +1923,12 @@ const CYBER = {
       trigger: { x: 8, y: 52, w: 16, h: 8 }, gates: [],
       waves: [{ ids: ['mech_assassin'], elite: ['mech_assassin'] }],
       reward: { coins: 26 } },
+    // Continuation bonus (SEC_C0_ANNEX) : pas de mini-boss, juste une poignée d'ennemis de plus
+    // pour « continuer le massacre » après le premier — cf. commentaire sur `solids` ci-dessus.
+    { id: 'E_SEC_C0_ANNEX', roomId: 'SEC_C0_ANNEX',
+      trigger: { x: 38, y: 56, w: 14, h: 8 }, gates: [],
+      waves: [{ ids: ['corp_trooper', 'corp_trooper', 'laser_trooper', 'corp_trooper'] }],
+      reward: { coins: 20 } },
 
     { id: 'E_C1_GAUNTLET', roomId: 'C1_ROOFTOPS',
       trigger: { x: 64, y: 24, w: 22, h: 8 }, gates: [],
@@ -2005,6 +2021,7 @@ const CYBER = {
   chests: [
     { x: 10, y: 44 },
     { x: 20, y: 54, guaranteed: 'skillPoint' },
+    { x: 48, y: 58 },                        // SEC_C0_ANNEX : petite récompense après la vague bonus
     { x: 100, y: 32 },
     { x: 95, y: 40, guaranteed: 'skillPoint' },
     { x: 145, y: 32 },
@@ -2018,7 +2035,10 @@ const CYBER = {
   // donc ne devrait jamais y tomber, mais la sortie inconditionnelle reste un filet de sécurité) ----
   localPortals: [
     { x: 15, y: 54, returnTo: { x: 25, y: 44 } },
-    { x: 22, y: 54, returnTo: { x: 40, y: 44 } },
+    // 2e portail (après le mini-boss) : mène à SEC_C0_ANNEX plutôt que de reboucler sur la rue.
+    { x: 22, y: 54, returnTo: { x: 40, y: 58 } },
+    // Sortie propre de SEC_C0_ANNEX, plus loin sur la rue que le premier portail (pas de boucle).
+    { x: 50, y: 58, returnTo: { x: 45, y: 44 } },
     { x: 90, y: 40, returnTo: { x: 95, y: 32 } },
     { x: 100, y: 40, returnTo: { x: 110, y: 32 } },
     { x: 150, y: 40, returnTo: { x: 155, y: 32 } },
@@ -2028,6 +2048,7 @@ const CYBER = {
   // ---- poches sombres (salles secrètes) ----
   darkZones: [
     { x: 0, y: 52, w: 30, h: 10, tint: 0.4 },
+    { x: 30, y: 56, w: 30, h: 8, tint: 0.45 },
     { x: 70, y: 38, w: 40, h: 8, tint: 0.45 },
     { x: 135, y: 38, w: 30, h: 8, tint: 0.5 },
   ],
@@ -2038,6 +2059,7 @@ const CYBER = {
     { type: 'pylon', tx: 40, ty: 44 },
     { type: 'holo', tx: 55, ty: 44 },
     { type: 'vent', tx: 18, ty: 54 },
+    { type: 'screen', tx: 42, ty: 58 },
     { type: 'pylon', tx: 70, ty: 32 },
     { type: 'screen', tx: 110, ty: 32 },
     { type: 'holo', tx: 82, ty: 40 },
