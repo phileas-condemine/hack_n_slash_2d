@@ -260,25 +260,35 @@ AR.Level = class {
       this._fillRect({ x: c.x, y: c.y, w: c.w, h: c.h }, F.CLIMBABLE);
     }
 
-    // --- destructibles : murs (SOLID+BREAKABLE) et ponts fragiles (one-way + effondrement)
+    // --- destructibles : murs (SOLID+BREAKABLE), ponts fragiles (one-way + effondrement) et
+    // barils de poudre (`type:'keg'`, PAS solides — un tonneau posé au sol, pas un mur, cf.
+    // `Level#_kegBlast`/`Game#_fireCannon`). `requires` (optionnel, ex. 'cannon') gate les dégâts
+    // dans `hitBreakable` : un blocus renforcé qui ne cède qu'à une source précise.
     for (const b of spec.breakables || []) {
       const obj = { id: b.id, type: b.type, rect: b.rect, hp: b.hp || 45, maxHp: b.hp || 45,
-        broken: false, triggered: false, collapseT: 0, land: b.land };
+        broken: false, triggered: false, collapseT: 0, land: b.land, requires: b.requires || null,
+        radius: b.radius || 110, chainR: b.chainR || 140, fuseT: null };
       this.breakables.push(obj);
       if (b.type === 'bridge') {
         this.platforms.push({ tx: b.rect.x, ty: b.rect.y, w: b.rect.w, kind: 'bone_bridge', breakId: b.id });
-      } else {
+      } else if (b.type !== 'keg') {
         this._fillRect(b.rect, F.SOLID | F.BREAKABLE);
       }
     }
+    for (const b of this.breakables) {
+      if (b.type === 'keg') this.props.push({ type: 'keg', ref: b, x: (b.rect.x + b.rect.w / 2) * T, y: (b.rect.y + b.rect.h) * T, s: 1, r: 0 });
+    }
 
-    // --- interactables (leviers, portes, manivelles de monte-charge) ; portes fermées = solides
+    // --- interactables (leviers, portes, manivelles de monte-charge, canons) ; portes fermées = solides
     for (const o of spec.interactables || []) {
       const obj = { id: o.id, type: o.type, x: o.x, y: o.y, rect: o.rect, links: o.links || [],
         lift: o.lift || null, prompt: o.prompt, state: o.state || (o.type === 'door' ? 'closed' : 'off'),
-        oneShot: o.oneShot !== false };
+        oneShot: o.oneShot !== false, dir: o.dir || 1, cd: 0 };
       this.interactables.push(obj);
       if (o.type === 'door' && obj.state === 'closed' && o.rect) this._fillRect(o.rect, F.SOLID | F.DOOR);
+    }
+    for (const o of this.interactables) {
+      if (o.type === 'cannon') this.props.push({ type: 'cannon', ref: o, x: o.x * T, y: o.y * T, s: 1, r: 0 });
     }
 
     // --- monte-charges à corde : plateforme verticale entre bottomY et topY, activée par une
@@ -459,8 +469,17 @@ AR.Level = class {
     }
     return null;
   }
-  hitBreakable(b, dmg, game) {
+  // `source` (optionnel : 'melee'|'cannon'|projectile.kind|'explosion') sert uniquement à faire
+  // respecter `b.requires` — un blocus renforcé (`requires:'cannon'`) qui ignore tout le reste.
+  hitBreakable(b, dmg, game, source) {
     if (!b || b.broken) return false;
+    if (b.requires && b.requires !== source) {
+      if (game && !b._hintShown) {
+        b._hintShown = true;
+        AR.HUD.notify('Ce blocus renforcé résiste — il faut un canon.', AR.C.COLORS.textDim);
+      }
+      return false;
+    }
     b.hp -= dmg;
     if (game) {
       const T = AR.C.TILE;
@@ -481,13 +500,45 @@ AR.Level = class {
       AR.Particles.burst((b.rect.x + b.rect.w / 2) * T, (b.rect.y + b.rect.h / 2) * T, 18,
         { color: ['#7a6a52', '#a89a80', '#57503a'], speed: 220, size: 4, life: 0.6 });
       AR.Audio.sfx('boom'); game.camera.shake(4, 0.3);
+      if (b.type === 'keg') this._kegBlast(b, game);
     }
   }
 
-  // ponts fragiles : déclenchés au passage, s'effondrent après un délai
+  // Baril de poudre : dégâts de zone au joueur ET aux ennemis (risque/récompense assumé — pas de
+  // filtre camp), puis amorce (délai court) tout autre baril vivant dans `chainR` pour un effet
+  // de chaîne visible plutôt qu'instantané. Le décompte de `fuseT` est fait dans `updateDynamics`.
+  _kegBlast(b, game) {
+    const T = AR.C.TILE;
+    const cx = (b.rect.x + b.rect.w / 2) * T, cy = (b.rect.y + b.rect.h) * T;
+    const dmg = 55, r = b.radius || 110;
+    for (const e of game.enemies) {
+      if (e.dead || !e.active || e.emergeT > 0) continue;
+      if (AR.U.dist(cx, cy, e.centerX(), e.centerY()) < r + Math.max(e.w, e.h) / 2) {
+        game.hitEnemy(e, dmg, { knockX: AR.U.sign(e.x - cx) * 220 });
+      }
+    }
+    const pl = game.player;
+    if (pl && !pl.dead && AR.U.dist(cx, cy, pl.x + pl.w / 2, pl.y + pl.h / 2) < r) {
+      game.hitPlayer(Math.round(dmg * 0.7), cx);
+    }
+    const chainR = b.chainR || 140;
+    for (const bb of this.breakables) {
+      if (bb === b || bb.broken || bb.type !== 'keg' || bb.fuseT != null) continue;
+      const bcx = (bb.rect.x + bb.rect.w / 2) * T, bcy = (bb.rect.y + bb.rect.h) * T;
+      if (AR.U.dist(cx, cy, bcx, bcy) < chainR) bb.fuseT = 0.15;
+    }
+  }
+
+  // ponts fragiles (déclenchés au passage, s'effondrent après un délai) + mèche des barils amorcés
+  // en chaîne (cf. `_kegBlast`) — même patron de minuterie que les ponts, juste plus court.
   updateDynamics(dt, game) {
     const T = AR.C.TILE, pl = game.player;
     for (const b of this.breakables) {
+      if (b.type === 'keg' && b.fuseT != null && !b.broken) {
+        b.fuseT -= dt;
+        if (b.fuseT <= 0) { b.fuseT = null; this.breakOpen(b, game); }
+        continue;
+      }
       if (b.type !== 'bridge' || b.broken) continue;
       const p = this.platforms.find((pp) => pp.breakId === b.id);
       if (!p) continue;
@@ -1276,11 +1327,24 @@ AR.Level = class {
         ctx.beginPath(); ctx.moveTo(-14, -28); ctx.lineTo(14, 0); ctx.stroke();
         break;
       case 'cannon':
+        if (p.ref && p.ref.dir === -1) ctx.scale(-1, 1);
         ctx.fillStyle = '#3a3a3a';
         ctx.save(); ctx.rotate(-0.3); ctx.fillRect(-6, -30, 12, 30); ctx.restore();
         ctx.fillStyle = '#6a5238';
         ctx.beginPath(); ctx.arc(0, -8, 10, 0, Math.PI * 2); ctx.fill();
         break;
+      // baril de poudre (destructible, non solide) — cf. Level#_kegBlast/breakOpen. Le fuseT
+      // (amorçage en chaîne) fait clignoter la bande d'avertissement plus vite.
+      case 'keg': {
+        const lit = p.ref && p.ref.fuseT != null;
+        ctx.fillStyle = '#6a4a2e';
+        ctx.beginPath(); ctx.ellipse(0, -13, 12, 14, 0, 0, Math.PI * 2); ctx.fill();
+        ctx.fillStyle = lit ? (Math.sin(time * 30) > 0 ? '#ff5a3d' : '#c9a86a') : '#c9a86a';
+        ctx.fillRect(-12, -17, 24, 4); ctx.fillRect(-12, -9, 24, 4);
+        ctx.strokeStyle = 'rgba(0,0,0,0.35)'; ctx.lineWidth = 1.5;
+        ctx.beginPath(); ctx.ellipse(0, -13, 12, 14, 0, 0, Math.PI * 2); ctx.stroke();
+        break;
+      }
       case 'tent':
         ctx.fillStyle = '#9a8560';
         ctx.beginPath(); ctx.moveTo(-26, 0); ctx.lineTo(0, -38); ctx.lineTo(26, 0); ctx.closePath(); ctx.fill();

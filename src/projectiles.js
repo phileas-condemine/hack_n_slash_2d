@@ -85,8 +85,18 @@ AR.Projectiles = {
 
       // terrain
       const tx = Math.floor(p.x / AR.C.TILE), ty = Math.floor(p.y / AR.C.TILE);
+      // Barils de poudre (`type:'keg'`) : jamais solides (posés au sol, pas un mur), donc
+      // invisibles au test `solidAt` ci-dessous — un projectile ami qui les traverse doit quand
+      // même les déclencher (cf. Level#_kegBlast). Vérifié en premier, indépendamment du sol.
+      if (p.friendly && lvl.breakableAt) {
+        const kb = lvl.breakableAt(tx, ty);
+        if (kb && kb.type === 'keg' && !kb.broken) {
+          lvl.hitBreakable(kb, p.dmg || 10, game, p.source || p.kind);
+          this._expire(p, game, true); this.list.splice(i, 1); continue;
+        }
+      }
       if (lvl.solidAt(tx, ty)) {
-        if (p.friendly && lvl.breakableAt) { const b = lvl.breakableAt(tx, ty); if (b) lvl.hitBreakable(b, p.dmg || 10, game); }
+        if (p.friendly && lvl.breakableAt) { const b = lvl.breakableAt(tx, ty); if (b) lvl.hitBreakable(b, p.dmg || 10, game, p.source || p.kind); }
         this._expire(p, game, true); this.list.splice(i, 1); continue;
       }
 
@@ -175,6 +185,16 @@ AR.Projectiles = {
     AR.Particles.burst(p.x, p.y, 16, { color: ['#ff9a3d', '#ffce6a', '#fff'], speed: 260, size: 4, life: 0.5 });
     AR.Audio.sfx('boom');
     game.camera.shake(5, 0.25);
+    // Un tir de canon ou un mortier ennemi qui explose près d'un baril de poudre le déclenche
+    // aussi (chaîne indirecte, en plus de la chaîne baril-à-baril de `Level#_kegBlast`).
+    if (game.level && game.level.breakables) {
+      const T = AR.C.TILE;
+      for (const b of game.level.breakables) {
+        if (b.type !== 'keg' || b.broken) continue;
+        const bx = (b.rect.x + b.rect.w / 2) * T, by = (b.rect.y + b.rect.h) * T;
+        if (AR.U.dist(p.x, p.y, bx, by) < r + 40) game.level.hitBreakable(b, p.dmg * 0.7, game, 'explosion');
+      }
+    }
     if (p.friendly) {
       for (const e of game.enemies) {
         if (e.dead || !e.active || e.emergeT > 0) continue;

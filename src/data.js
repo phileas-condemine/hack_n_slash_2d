@@ -164,8 +164,14 @@ AR.ENEMIES = {
   bombardier:     { name: 'Bombardier', hp: 90, dmg: 18, speed: 75, xp: 28, coins: 12, h: 84, behavior: 'artillery', range: 520, keep: 320, aggro: 600, atkCd: 2.6, tele: 0.6, proj: 'bomb' },
   mortar_crew:    { name: 'Servants de mortier', hp: 150, dmg: 20, speed: 40, xp: 34, coins: 14, h: 92, behavior: 'artillery', range: 720, keep: 420, aggro: 780, atkCd: 3.2, tele: 0.8, proj: 'mortar' },
   armored_captain:{ name: 'Capitaine cuirassé', hp: 160, dmg: 22, speed: 70, xp: 60, coins: 26, h: 106, behavior: 'shield', range: 84, aggro: 420, atkCd: 1.8, tele: 0.55, block: 0.8, knock: 360, elite: true },
-  // Sbire dédié de l'Ingénieur de Guerre (summon uniquement)
+  // Sbire dédié de l'Ingénieur de Guerre (summon), réutilisé comme ennemi de terrain sur la
+  // carte authored R4 (même précédent que lantern_wisp pour R3).
   gear_servitor:  { name: 'Serviteur à engrenages', hp: 50, dmg: 15, speed: 65, xp: 24, coins: 10, h: 78, behavior: 'brute', range: 80, aggro: 420, atkCd: 1.7, tele: 0.55, knock: 280 },
+  // Monstre dédié des zones secrètes de la carte authored R4 (Souterrain des Sapeurs / Tour de
+  // Siège) — premier archétype `parry` de l'ère (chaque ère précédente en a un dédié aux zones
+  // secrètes : stone_cave_stalker, crypt_wraith, medieval_bamboo_stalker). Pas de nouvel art :
+  // sprite emprunté via AR.ENEMY_FALLBACK (même mécanisme que stone_cave_stalker/crypt_wraith).
+  powder_saboteur:{ name: 'Saboteur des tranchées', hp: 90, dmg: 13, speed: 150, xp: 26, coins: 11, h: 80, behavior: 'assassin', range: 60, aggro: 520, atkCd: 1.7, tele: 0.35, blinkCd: 2.8, facing: 'l', parry: true },
 
   // --- Guerre diesel
   trench_soldier: { name: 'Soldat des tranchées', hp: 115, dmg: 14, speed: 95, xp: 28, coins: 11, h: 82, behavior: 'ranged', range: 520, keep: 300, aggro: 620, atkCd: 1.8, tele: 0.5, proj: 'bullet', bayonet: true },
@@ -196,6 +202,7 @@ AR.ENEMY_FALLBACK = {
   chain_overseer: 'temple_guardian',
   pit_vermin: 'desert_raider',
   manacled_brute: 'hoplite',
+  powder_saboteur: 'musketeer',
 };
 
 // ------------------------------------------------------------------ LES BOSS

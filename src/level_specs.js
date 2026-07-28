@@ -1063,11 +1063,369 @@ const MEDIEVAL = {
   },
 };
 
+// ========================================================= NIVEAU 4 : RENAISSANCE
+// « Le Siège de la Cité-Forteresse » — première carte authored de l'ère 4, construite d'emblée
+// au format v2 (densité + zones secrètes + mécaniques inédites), cf. TODO.md. L'Ingénieur de
+// Guerre (`war_engineer`, boss déjà défini, art d'arène déjà livré) transforme la faille en
+// instrument de siège mécanisé ; le joueur traverse un camp de siège de plus en plus mécanisé
+// à mesure qu'il approche de son repaire.
+// Chemin obligatoire (saut/double-saut/dash uniquement, jamais de grimpe/manivelle/canon sur la
+// route du boss, même contrainte que STONE/ANTIQUITY/MEDIEVAL) : R01 camp -> R02 tranchées
+// (entrée cachée du Souterrain des Sapeurs) -> R03 gantelet de la barricade -> R04 dépôt (safe/
+// marchand) -> R05 porte de la Cité (+ SEC Tour de Siège au-dessus, monte-charge) -> R06 cour
+// intérieure -> R07 chantier des machines de siège (élite) -> R08 escaliers du rempart (+ SEC
+// Passerelles Hautes en surplomb, échafaudages) -> arène de l'Ingénieur de Guerre.
+// Deux mécaniques inédites de cette ère (cf. Level#_kegBlast/hitBreakable, Game#_fireCannon) :
+// canon actionnable (`interactables` type 'cannon', casse un mur `requires:'cannon'`) et barils
+// de poudre en chaîne (`breakables` type 'keg', non solides, dégâts de zone + chaîne).
+// 15 encounters verrouillés + 1 embuscade libre au plafond (même patron que STONE/MEDIEVAL,
+// cf. TUNNEL_CEILING_WAKE) + spawns ambiants ≈ 87-89 monstres au total, 5 mini-boss élites.
+const RENAISSANCE = {
+  id: 'renaissance',
+  // arenaStartTx + 34 : même marge que STONE/ANTIQUITY/MEDIEVAL (cf. leurs en-têtes) pour que la
+  // largeur pleine vue de l'arène du boss (déjà livrée, AR.BOSS_ARENAS.war_engineer) tienne sans
+  // reproduire le bug de bord de grille déjà corrigé sur R3.
+  tilesW: 420,
+  worldH: 32,
+  spawnX: 3,
+  startRoom: 'R01_SIEGE_CAMP',
+  bossArenaRoom: 'R09_ENGINEER_ARENA',
+  arenaStartTx: 386,
+  gateTx: 387,
+  // Approche élevée (escaliers du rempart, comme les marches sacrées de MEDIEVAL) : arenaGy
+  // suit la hauteur de l'antichambre (y9), pas un sol à hauteur normale (cf. commentaire détaillé
+  // sur le filet de sécurité dans `solids` plus bas, même convention que MEDIEVAL).
+  arenaGy: 9,
+  fallDamageRatio: 0.10,
+
+  // ---- terrain solide ----
+  solids: [
+    { x: 0, y: 22, w: 24, h: 10 },           // R01 camp de siège : plateau d'arrivée
+
+    // R02 lignes de tranchées : sol continu coupé d'une brèche (x62-66, un saut simple la
+    // franchit sans y tomber) qui mène, si on choisit de s'y laisser tomber, à l'entrée du
+    // Souterrain des Sapeurs (cf. `empties` plus bas) — même technique que le trou de rivière
+    // de MEDIEVAL vers SEC_MEDIEVAL_GROTTO.
+    { x: 24, y: 22, w: 38, h: 10 },          // x24-62
+    { x: 66, y: 22, w: 34, h: 10 },          // x66-100
+    // Plancher fin de la brèche + du Souterrain des Sapeurs (x62-150, y31) : referme la chute
+    // sur un vrai sol de tunnel au lieu d'un puits sans fond (même patron que MEDIEVAL, y31).
+    { x: 62, y: 31, w: 88, h: 1 },
+
+    { x: 100, y: 22, w: 28, h: 10 },         // R03 gantelet de la barricade
+    { x: 128, y: 22, w: 30, h: 10 },         // R04 dépôt de vivres (safe/marchand)
+    { x: 158, y: 22, w: 70, h: 10 },         // R05 porte de la Cité (+ SEC Tour de Siège au-dessus)
+    { x: 228, y: 22, w: 30, h: 10 },         // R06 cour intérieure
+    { x: 258, y: 22, w: 66, h: 10 },         // R07 chantier des machines de siège
+
+    // R08 escaliers du rempart : 6 marches (y21->16), un palier plat (embuscade), puis 7 marches
+    // de plus (y15->9) — même patron que les marches sacrées de MEDIEVAL (1 tuile/marche, toujours
+    // franchissable en un saut simple), juste plus long (le camp part d'un sol y22, pas y18).
+    { x: 324, y: 21, w: 3, h: 11 }, { x: 327, y: 20, w: 3, h: 12 },
+    { x: 330, y: 19, w: 3, h: 13 }, { x: 333, y: 18, w: 3, h: 14 },
+    { x: 336, y: 17, w: 3, h: 15 }, { x: 339, y: 16, w: 3, h: 16 },
+    { x: 342, y: 16, w: 12, h: 16 },         // palier plat : E_R_RAMPART_AMBUSH
+    { x: 354, y: 15, w: 3, h: 17 }, { x: 357, y: 14, w: 3, h: 18 },
+    { x: 360, y: 13, w: 3, h: 19 }, { x: 363, y: 12, w: 3, h: 20 },
+    { x: 366, y: 11, w: 3, h: 21 }, { x: 369, y: 10, w: 3, h: 22 },
+    { x: 372, y: 9, w: 3, h: 23 },
+    { x: 375, y: 9, w: 11, h: 23 },          // antichambre (aucun ennemi, respawn sûr avant la porte)
+
+    // R09 sol d'arène : filet de sécurité seulement (le sol réel vient de l'image d'arène,
+    // AR.BOSS_ARENAS.war_engineer, ground_main ~0.75 de la hauteur source) — doit rester SOUS ce
+    // sol visuel (sinon `solidAt`, testé avant les plateformes d'arène dans `moveRect`, intercepte
+    // la chute trop tôt). Même convention que STONE (y:23)/ANTIQUITY (y:22)/MEDIEVAL (y:23), pas
+    // la hauteur de l'antichambre (y:9).
+    { x: 386, y: 23, w: 34, h: 9 },
+  ],
+
+  // ---- creusements : Souterrain des Sapeurs (cavité sous R02/R03, même technique que le
+  // Quartier des Esclaves d'ANTIQUITY / SEC_MEDIEVAL_GROTTO) ----
+  empties: [
+    { x: 62, y: 24, w: 88, h: 7 },
+  ],
+
+  // ---- plateformes traversables (one-way) ----
+  oneWay: [
+    // Souterrain des Sapeurs : deux corniches étroites dans la salle des barils (zone 11),
+    // sous tir, où se trouvent les kegs (cf. `breakables`).
+    { x: 116, y: 28, w: 6, id: 'KEGROOM_LEDGE_1' },
+    { x: 126, y: 28, w: 6, id: 'KEGROOM_LEDGE_2' },
+
+    // SEC_RENAISSANCE_TOWER : poches flottantes reliées par une chaîne de portails à sens unique
+    // (cf. `localPortals`), même patron que SEC_MEDIEVAL_SPIRIT.
+    { x: 186, y: 16, w: 14, id: 'TOWER_POCKET_RELAY' },
+    { x: 186, y: 9, w: 20, id: 'TOWER_POCKET_SWARM' },
+    { x: 186, y: 3, w: 20, id: 'TOWER_POCKET_CAPTAIN' },
+
+    // SEC_RENAISSANCE_CATWALKS : plateforme continue au sommet des 3 échelles (cf. `climbables`).
+    { x: 326, y: 9, w: 46, id: 'CATWALK_WALK' },
+  ],
+
+  // ---- échelles/cordages grimpables (SEC_RENAISSANCE_CATWALKS, humain uniquement) ----
+  climbables: [
+    // Même calibration que les lianes de MEDIEVAL (y du sommet = y de la plateforme visée - 2,
+    // cf. leur commentaire détaillé) : plateforme à y9, sommet d'échelle à y7.
+    { id: 'CLIMB_RENAISSANCE_01', x: 330, y: 7, w: 2, h: 17, exitY: 11 },
+    { id: 'CLIMB_RENAISSANCE_02', x: 348, y: 7, w: 2, h: 17, exitY: 11 },
+    { id: 'CLIMB_RENAISSANCE_03', x: 366, y: 7, w: 2, h: 17, exitY: 11 },
+  ],
+
+  // ---- destructibles : barricade au canon (Souterrain des Sapeurs, zone 12) + barils de
+  // poudre en chaîne (zone 11 + décor) ----
+  breakables: [
+    // Barricade renforcée : `requires:'cannon'` — un coup d'épée/une flèche ne fait rien (cf.
+    // `Level#hitBreakable`), seul le canon juste à côté (cf. `interactables`) l'ouvre.
+    { id: 'BARRICADE_VAULT', type: 'wall', rect: { x: 136, y: 29, w: 2, h: 3 }, hp: 65, requires: 'cannon' },
+    // Salle des barils (zone 11) : 3 kegs sur/entre les corniches étroites, parmi les ennemis.
+    // chainR:220 (pas la valeur par défaut 140) : espacés de 4 tuiles/192px pour rester lisibles
+    // visuellement sur les 2 corniches, donc plus que le rayon de chaîne par défaut — sinon la
+    // chaîne ne se propage jamais d'un baril au suivant (vérifié : sans ce relevé, aucun autre
+    // baril ne détonait après le premier).
+    { id: 'KEG_ROOM_1', type: 'keg', rect: { x: 118, y: 30, w: 1, h: 1 }, hp: 18, radius: 110, chainR: 220 },
+    { id: 'KEG_ROOM_2', type: 'keg', rect: { x: 122, y: 30, w: 1, h: 1 }, hp: 18, radius: 110, chainR: 220 },
+    { id: 'KEG_ROOM_3', type: 'keg', rect: { x: 126, y: 30, w: 1, h: 1 }, hp: 18, radius: 110, chainR: 220 },
+    // Kegs isolés en décor/utilitaires (pas obligatoires à utiliser).
+    { id: 'KEG_GAUNTLET', type: 'keg', rect: { x: 84, y: 30, w: 1, h: 1 }, hp: 18, radius: 110, chainR: 140 },
+    { id: 'KEG_WORKSHOP', type: 'keg', rect: { x: 300, y: 21, w: 1, h: 1 }, hp: 18, radius: 110, chainR: 140 },
+  ],
+
+  // ---- interactables : canon (ouvre la barricade) + manivelles du monte-charge de la Tour ----
+  interactables: [
+    { id: 'CANNON_VAULT', type: 'cannon', x: 132, y: 31, dir: 1, prompt: 'Actionner le canon' },
+    { id: 'CRANK_TOWER_BOTTOM', type: 'crank', x: 182, y: 22, lift: 'TOWER_LIFT', prompt: 'Actionner la manivelle' },
+    { id: 'CRANK_TOWER_TOP', type: 'crank', x: 182, y: 8, lift: 'TOWER_LIFT', prompt: 'Actionner la manivelle' },
+  ],
+
+  // ---- monte-charge de la Tour de Siège ----
+  lifts: [
+    { id: 'TOWER_LIFT', x: 182, w: 4, bottomY: 22, topY: 8, startY: 22, speed: 2.8 },
+  ],
+
+  // ---- rooms (les rooms secrètes précèdent la room de surface dont elles partagent
+  // l'empreinte X — currentRoomAt() retient le premier rect qui contient le point) ----
+  rooms: [
+    { id: 'SEC_RENAISSANCE_TUNNELS', rect: { x: 62, y: 24, w: 88, h: 8 }, tags: ['secret', 'tunnel', 'dark'],
+      camera: { minX: 60, maxX: 152, minY: 18, maxY: 32 }, safeRespawn: [{ x: 66, y: 31, priority: 9 }, { x: 120, y: 31, priority: 7 }] },
+    { id: 'R01_SIEGE_CAMP', rect: { x: 0, y: 16, w: 24, h: 16 }, tags: ['start'],
+      camera: { minX: 0, maxX: 26, minY: 12, maxY: 32 }, safeRespawn: [{ x: 3, y: 22, priority: 10 }] },
+    { id: 'R02_TRENCH_HUB', rect: { x: 24, y: 14, w: 76, h: 18 }, tags: ['hub'],
+      camera: { minX: 24, maxX: 100, minY: 10, maxY: 32 }, safeRespawn: [{ x: 30, y: 22, priority: 8 }, { x: 80, y: 22, priority: 6 }] },
+    { id: 'R03_BARRICADE_GAUNTLET', rect: { x: 100, y: 14, w: 28, h: 18 }, tags: ['tension'],
+      camera: { minX: 98, maxX: 128, minY: 10, maxY: 32 }, safeRespawn: [{ x: 112, y: 22, priority: 7 }] },
+    { id: 'R04_SUPPLY_DEPOT', rect: { x: 128, y: 14, w: 30, h: 18 }, tags: ['safe', 'no_enemy', 'merchant'],
+      camera: { minX: 126, maxX: 158, minY: 10, maxY: 32 }, safeRespawn: [{ x: 140, y: 22, priority: 10 }] },
+    // h:21 (pas 24) : reste strictement AU-DESSUS du sol principal (y22, partagé avec R05) — sinon
+    // currentRoomAt() (borne haute inclusive) classerait à tort le chemin obligatoire du sol comme
+    // étant "dans" la tour secrète (vérifié via un passage démo IA : sans ce recadrage, le joueur
+    // qui marche normalement sous la tour était étiqueté SEC_RENAISSANCE_TOWER).
+    { id: 'SEC_RENAISSANCE_TOWER', rect: { x: 178, y: 0, w: 40, h: 21 }, tags: ['secret', 'tower'],
+      camera: { minX: 176, maxX: 220, minY: 0, maxY: 26 }, safeRespawn: [{ x: 182, y: 16, priority: 9 }] },
+    { id: 'R05_CITY_GATE', rect: { x: 158, y: 14, w: 70, h: 18 }, tags: ['tension'],
+      camera: { minX: 156, maxX: 228, minY: 10, maxY: 32 }, safeRespawn: [{ x: 165, y: 22, priority: 7 }, { x: 215, y: 22, priority: 8 }] },
+    { id: 'R06_INNER_COURTYARD', rect: { x: 228, y: 14, w: 30, h: 18 }, tags: ['convergence'],
+      camera: { minX: 226, maxX: 258, minY: 10, maxY: 32 }, safeRespawn: [{ x: 240, y: 22, priority: 8 }] },
+    { id: 'R07_SIEGE_WORKSHOP', rect: { x: 258, y: 14, w: 66, h: 18 }, tags: ['tension'],
+      camera: { minX: 256, maxX: 324, minY: 10, maxY: 32 }, safeRespawn: [{ x: 270, y: 22, priority: 7 }, { x: 310, y: 22, priority: 7 }] },
+    // Borné à x324-372/y2-15 (pas toute la largeur/hauteur des échelles) : reste au-dessus du
+    // palier d'embuscade obligatoire (y16) et à l'écart de l'antichambre (x375-386) — même
+    // correctif que SEC_RENAISSANCE_TOWER, vérifié via la même passe démo IA.
+    { id: 'SEC_RENAISSANCE_CATWALKS', rect: { x: 324, y: 2, w: 48, h: 13 }, tags: ['secret', 'catwalk'],
+      camera: { minX: 322, maxX: 386, minY: 0, maxY: 28 }, safeRespawn: [{ x: 340, y: 9, priority: 9 }] },
+    { id: 'R08_RAMPART_STAIRS', rect: { x: 324, y: 2, w: 62, h: 30 }, tags: ['ascent'],
+      camera: { minX: 322, maxX: 386, minY: 0, maxY: 32 }, safeRespawn: [{ x: 375, y: 9, priority: 8 }] },
+    { id: 'R09_ENGINEER_ARENA', rect: { x: 386, y: 2, w: 34, h: 30 }, tags: ['boss'],
+      camera: { minX: 386, maxX: 420, minY: 0, maxY: 32 }, safeRespawn: [{ x: 390, y: 9, priority: 10 }] },
+  ],
+
+  // ---- encounters verrouillés (gates:[] partout — pas de barrière physique, cf. MEDIEVAL) ----
+  encounters: [
+    // --- chemin obligatoire ---
+    { id: 'E_R_CAMP_INTRO', roomId: 'R01_SIEGE_CAMP',
+      trigger: { x: 8, y: 18, w: 16, h: 6 }, gates: [],
+      waves: [{ ids: ['pikeman', 'pikeman', 'musketeer'] }],
+      reward: { coins: 10 } },
+    { id: 'E_R_TRENCH_LOW', roomId: 'R02_TRENCH_HUB',
+      trigger: { x: 40, y: 18, w: 20, h: 6 }, gates: [],
+      waves: [{ ids: ['pikeman', 'pikeman', 'musketeer'] }, { ids: ['bombardier', 'musketeer', 'pikeman'] }],
+      reward: { coins: 16 } },
+    { id: 'E_R_TRENCH_HIGH', roomId: 'R02_TRENCH_HUB',
+      trigger: { x: 78, y: 18, w: 16, h: 6 }, gates: [],
+      waves: [{ ids: ['musketeer', 'musketeer', 'bombardier'] }],
+      reward: { coins: 12 } },
+    { id: 'E_R_BARRICADE_GAUNTLET', roomId: 'R03_BARRICADE_GAUNTLET',
+      trigger: { x: 106, y: 18, w: 16, h: 6 }, gates: [],
+      waves: [{ ids: ['pikeman', 'pikeman', 'musketeer'] }, { ids: ['bombardier', 'mortar_crew', 'pikeman'] }],
+      reward: { coins: 18 } },
+    { id: 'E_R_GATE_SIEGE', roomId: 'R05_CITY_GATE',
+      trigger: { x: 170, y: 18, w: 50, h: 6 }, gates: [],
+      waves: [{ ids: ['pikeman', 'pikeman', 'musketeer'] },
+              { ids: ['musketeer', 'musketeer', 'bombardier'] },
+              { ids: ['armored_captain', 'gear_servitor', 'gear_servitor'], elite: ['armored_captain'] }],
+      reward: { coins: 35 } },
+    { id: 'E_R_WORKSHOP_ELITE', roomId: 'R07_SIEGE_WORKSHOP',
+      trigger: { x: 270, y: 18, w: 40, h: 6 }, gates: [],
+      waves: [{ ids: ['gear_servitor', 'gear_servitor', 'pikeman'] },
+              { ids: ['musketeer', 'musketeer', 'mortar_crew'] },
+              { ids: ['armored_captain', 'bombardier', 'bombardier'], elite: ['armored_captain'] }],
+      reward: { coins: 35 } },
+    { id: 'E_R_RAMPART_AMBUSH', roomId: 'R08_RAMPART_STAIRS',
+      trigger: { x: 342, y: 10, w: 12, h: 8 }, gates: [],
+      waves: [{ ids: ['musketeer', 'musketeer', 'gear_servitor', 'gear_servitor'] }],
+      reward: { coins: 16 } },
+
+    // --- Souterrain des Sapeurs : garde d'entrée (mini-boss) -> gantelet -> (embuscade au
+    // plafond, cf. `spawns`/`triggers`, pas un encounter formel — même patron que MEDIEVAL) ->
+    // salle des barils -> chambre-forte (barricade au canon) ---
+    { id: 'E_SEC_R_TUNNEL_GUARD', roomId: 'SEC_RENAISSANCE_TUNNELS',
+      trigger: { x: 66, y: 28, w: 10, h: 4 }, gates: [],
+      waves: [{ ids: ['armored_captain'], elite: ['armored_captain'] }],
+      reward: { coins: 22 } },
+    { id: 'E_SEC_R_TUNNEL_GAUNTLET', roomId: 'SEC_RENAISSANCE_TUNNELS',
+      trigger: { x: 80, y: 28, w: 14, h: 4 }, gates: [],
+      waves: [{ ids: ['pikeman', 'pikeman', 'musketeer', 'powder_saboteur', 'bombardier'] }],
+      reward: { coins: 18 } },
+    { id: 'E_SEC_R_TUNNEL_KEGROOM', roomId: 'SEC_RENAISSANCE_TUNNELS',
+      trigger: { x: 114, y: 28, w: 16, h: 4 }, gates: [],
+      waves: [{ ids: ['musketeer', 'musketeer', 'mortar_crew', 'powder_saboteur'] }],
+      reward: { coins: 18 } },
+    { id: 'E_SEC_R_TUNNEL_VAULT', roomId: 'SEC_RENAISSANCE_TUNNELS',
+      trigger: { x: 138, y: 28, w: 12, h: 4 }, gates: [],
+      waves: [{ ids: ['gear_servitor', 'gear_servitor', 'armored_captain'], elite: ['armored_captain'] }],
+      reward: { coins: 26 } },
+
+    // --- Tour de Siège : relais -> horde qui déferle (10 ennemis simultanés) -> capitaine ---
+    { id: 'E_SEC_R_TOWER_RELAY', roomId: 'SEC_RENAISSANCE_TOWER',
+      trigger: { x: 186, y: 14, w: 14, h: 4 }, gates: [],
+      waves: [{ ids: ['musketeer', 'musketeer', 'bombardier'] }],
+      reward: { coins: 14 } },
+    { id: 'E_SEC_R_TOWER_SWARM', roomId: 'SEC_RENAISSANCE_TOWER',
+      trigger: { x: 186, y: 7, w: 20, h: 4 }, gates: [],
+      waves: [{ ids: ['pikeman', 'pikeman', 'pikeman', 'musketeer', 'musketeer', 'musketeer',
+                       'bombardier', 'bombardier', 'powder_saboteur', 'powder_saboteur'] }],
+      reward: { coins: 32 } },
+    { id: 'E_SEC_R_TOWER_CAPTAIN', roomId: 'SEC_RENAISSANCE_TOWER',
+      trigger: { x: 186, y: 1, w: 20, h: 4 }, gates: [],
+      waves: [{ ids: ['armored_captain'], elite: ['armored_captain'] }],
+      reward: { coins: 24 } },
+
+    // --- Passerelles Hautes : embuscade avant le coffre perché ---
+    { id: 'E_SEC_R_CATWALK_LOOKOUT', roomId: 'SEC_RENAISSANCE_CATWALKS',
+      trigger: { x: 330, y: 5, w: 40, h: 6 }, gates: [],
+      waves: [{ ids: ['musketeer', 'musketeer', 'musketeer', 'powder_saboteur', 'powder_saboteur', 'powder_saboteur'] }],
+      reward: { coins: 24 } },
+  ],
+
+  // ---- déclencheurs de scène ----
+  triggers: [
+    // Souterrain des Sapeurs : saboteurs suspendus au plafond, tombent une fois le joueur au
+    // centre de la salle (même mécanisme que BATS_WAKE/GROTTO_CEILING_WAKE).
+    { id: 'TUNNEL_CEILING_WAKE', rect: { x: 96, y: 24, w: 20, h: 5 }, action: 'wakeSpawns', group: 'tunnel_ceiling' },
+  ],
+
+  // ---- ennemis libres (hors encounters) ----
+  spawns: [
+    // Souterrain des Sapeurs : 4 saboteurs suspendus au plafond (juste sous la croûte, y24, même
+    // patron que GROTTO_CEILING_WAKE/MEDIEVAL), réveillés par TUNNEL_CEILING_WAKE.
+    { tx: 98, ty: 24, id: 'powder_saboteur', suspended: true, activate: 'tunnel_ceiling' },
+    { tx: 102, ty: 24, id: 'powder_saboteur', suspended: true, activate: 'tunnel_ceiling' },
+    { tx: 106, ty: 24, id: 'powder_saboteur', suspended: true, activate: 'tunnel_ceiling' },
+    { tx: 110, ty: 24, id: 'powder_saboteur', suspended: true, activate: 'tunnel_ceiling' },
+
+    // ambiants (hors zones de rencontre verrouillées)
+    { tx: 18, ty: 22, id: 'musketeer' },      // camp
+    { tx: 36, ty: 22, id: 'pikeman' },        // tranchées
+    { tx: 88, ty: 22, id: 'musketeer' },      // tranchées
+    { tx: 118, ty: 22, id: 'pikeman' },       // barricade
+    { tx: 200, ty: 22, id: 'pikeman' },       // porte de la Cité
+    { tx: 220, ty: 22, id: 'musketeer' },     // porte de la Cité
+    { tx: 240, ty: 22, id: 'gear_servitor' }, // cour intérieure
+    { tx: 265, ty: 22, id: 'pikeman' },       // chantier
+    { tx: 305, ty: 22, id: 'musketeer' },     // chantier
+    { tx: 315, ty: 22, id: 'gear_servitor' }, // chantier, lisière des marches
+  ],
+
+  // ---- coffres ----
+  chests: [
+    { x: 14, y: 22 },                                     // camp
+    { x: 148, y: 22 },                                    // dépôt
+    { x: 240, y: 22 },                                    // cour intérieure
+    { x: 74, y: 31, guaranteed: 'skillPoint' },           // Souterrain : garde d'entrée
+    { x: 146, y: 31, guaranteed: 'swordUp' },             // Souterrain : chambre-forte finale
+    { x: 198, y: 3, guaranteed: 'skillPoint' },           // Tour de Siège : capitaine
+    { x: 368, y: 9, high: true },                         // Passerelles Hautes
+    { x: 380, y: 9 },                                     // antichambre
+  ],
+
+  merchant: { x: 140, y: 22 },
+
+  // ---- portails courts (jamais sur le chemin obligatoire du boss) ----
+  localPortals: [
+    // Souterrain des Sapeurs : sortie immédiate depuis l'aire d'atterrissage (quiconque tombe
+    // dans la brèche, volontairement ou non, doit pouvoir en ressortir sans dépendre d'une
+    // action optionnelle — même leçon que MEDIEVAL). Sortie finale depuis la chambre-forte, plus
+    // loin (récompense : on ressort près de R06 plutôt que de revenir en arrière).
+    { x: 64, y: 31, returnTo: { x: 90, y: 22 } },
+    { x: 146, y: 31, returnTo: { x: 230, y: 22 } },
+
+    // Tour de Siège : chaîne de portails à sens unique le long des 3 poches. Le premier part de
+    // l'emprise du monte-charge lui-même (x182-186) au sommet (topY:8) : il devient un palier
+    // normal (`this.platforms`) une fois arrêté là, pas besoin d'une plateforme séparée.
+    { x: 184, y: 8, returnTo: { x: 190, y: 16 } },   // sommet du monte-charge -> poche relais
+    { x: 198, y: 16, returnTo: { x: 195, y: 9 } },   // relais -> poche horde
+    { x: 204, y: 9, returnTo: { x: 195, y: 3 } },    // horde -> poche capitaine
+    { x: 200, y: 3, returnTo: { x: 230, y: 22 } },   // capitaine -> retour à la cour intérieure
+  ],
+
+  // ---- poches sombres ----
+  darkZones: [
+    { x: 62, y: 24, w: 88, h: 8, tint: 0.65 },  // Souterrain des Sapeurs
+    { x: 178, y: 0, w: 40, h: 24, tint: 0.3 },  // Tour de Siège (brume légère, à ciel ouvert)
+  ],
+
+  // ---- décor ----
+  props: [
+    { type: 'tent', tx: 8, ty: 22 },
+    { type: 'crate', tx: 18, ty: 22 },
+    { type: 'flag', tx: 30, ty: 22 },
+    { type: 'crate', tx: 70, ty: 22 },
+    { type: 'flag', tx: 110, ty: 22 },
+    { type: 'crate', tx: 140, ty: 22 },
+    { type: 'tent', tx: 150, ty: 22 },
+    { type: 'cannon', tx: 170, ty: 22 },       // décoratif (pas interactable)
+    { type: 'flag', tx: 210, ty: 22 },
+    { type: 'crate', tx: 240, ty: 22 },
+    { type: 'cannon', tx: 270, ty: 22 },       // décoratif (pas interactable)
+    { type: 'crate', tx: 300, ty: 22 },
+    { type: 'flag', tx: 375, ty: 9 },
+    // Souterrain des Sapeurs : torches
+    { type: 'fire', tx: 66, ty: 31, s: 0.8 },
+    { type: 'fire', tx: 84, ty: 31, s: 0.8 },
+    { type: 'fire', tx: 100, ty: 31, s: 0.7 },
+    { type: 'fire', tx: 118, ty: 31, s: 0.85 },
+    { type: 'fire', tx: 140, ty: 31, s: 0.9 },
+    // Tour de Siège
+    { type: 'flag', tx: 182, ty: 16 },
+    { type: 'flag', tx: 195, ty: 9 },
+  ],
+
+  // ---- indices pour l'IA de démonstration (documentation seule, cf. MEDIEVAL : demoai.js ne
+  // lit aucun de ces champs) ----
+  navHints: {
+    defaultRoute: 'main',
+    climbs: [
+      { id: 'CLIMB_RENAISSANCE_01', x: 331, bottomY: 24, topY: 7, exitX: 334 },
+      { id: 'CLIMB_RENAISSANCE_02', x: 349, bottomY: 24, topY: 7, exitX: 352 },
+      { id: 'CLIMB_RENAISSANCE_03', x: 367, bottomY: 24, topY: 7, exitX: 370 },
+    ],
+  },
+};
+
 AR.LEVEL_SPECS = {
   stone: STONE,
   antiquity: ANTIQUITY,
   medieval: MEDIEVAL,
-  renaissance: null,
+  renaissance: RENAISSANCE,
   diesel: null,
   cyber: null,
 };

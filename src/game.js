@@ -427,7 +427,10 @@ AR.Game = class {
       else if (p.type === 'portal') this._enterPortal();
       else if (p.type === 'lever') lvl.activateInteractable(p._int, this);
       else if (p.type === 'crank') lvl.activateLift(p._int.lift, this);
+      else if (p.type === 'cannon') this._fireCannon(p._int);
     }
+    // ---- refroidissement des canons (cf. `_fireCannon`)
+    if (lvl.authored) for (const o of lvl.interactables) if (o.type === 'cannon' && o.cd > 0) o.cd -= dt;
 
     // ---- mort du joueur
     if (pl.dead) {
@@ -614,9 +617,30 @@ AR.Game = class {
         if (lift && lift.state === 'moving') continue; // déjà en mouvement : rien à actionner
         const lx = o.x * T, ly = o.y * T;
         if (AR.U.dist(lx, ly - 10, pcx, pcy) < 70) return { type: 'crank', x: lx, y: ly, _int: o };
+      } else if (o.type === 'cannon') {
+        if (o.cd > 0) continue; // en recharge : pas d'invite tant qu'il n'est pas prêt
+        const lx = o.x * T, ly = o.y * T;
+        if (AR.U.dist(lx, ly - 10, pcx, pcy) < 70) return { type: 'cannon', x: lx, y: ly, _int: o };
       }
     }
     return null;
+  }
+
+  // Canon actionnable (carte authored ère 4) : tire un boulet explosif dans la direction `dir`
+  // de l'interactable. Le projectile réutilise entièrement le pipeline existant (AOE via
+  // `explodeR`, dégâts terrain via `hitBreakable` sur `solidAt` — cf. `Projectiles.update`) ;
+  // seul le `source:'cannon'` change, pour pouvoir gater un mur `requires:'cannon'`.
+  _fireCannon(o) {
+    if (o.cd > 0) return;
+    const T = AR.C.TILE;
+    AR.Projectiles.spawn({
+      x: o.x * T, y: o.y * T - 20, vx: o.dir * 520, vy: -60, g: 520,
+      dmg: 70, friendly: true, explodeR: 120, kind: 'bomb', r: 10,
+      source: 'cannon', owner: this.player,
+    });
+    o.cd = 1.4;
+    AR.Audio.sfx('boom');
+    this.camera.shake(5, 0.3);
   }
 
   // ================================================== COMBAT
@@ -665,7 +689,7 @@ AR.Game = class {
       for (let ty = Math.floor(rect.y / T); ty <= Math.floor((rect.y + rect.h) / T); ty++) {
         for (let tx = Math.floor(rect.x / T); tx <= Math.floor((rect.x + rect.w) / T); tx++) {
           const b = this.level.breakableAt(tx, ty);
-          if (b && !seen.has(b)) { seen.add(b); this.level.hitBreakable(b, dmg, this); }
+          if (b && !seen.has(b)) { seen.add(b); this.level.hitBreakable(b, dmg, this, 'melee'); }
         }
       }
     }
