@@ -101,6 +101,15 @@ AR.HUD = {
         ctx.strokeRect(sx - 1.5, sy - 1.5, slot + 3, slot + 3);
         ctx.restore();
       }
+      // liseré plein (au lieu du halo pulsé) tant que la Lévitation est engagée — sort à
+      // bascule (cf. Player#update) : sans repère visuel, on oublie facilement qu'elle draine
+      // toujours l'Esprit une fois activée.
+      if (sp.channel && pl.levitating) {
+        ctx.save();
+        ctx.strokeStyle = C.spirit; ctx.lineWidth = 2.5;
+        ctx.strokeRect(sx - 2, sy - 2, slot + 4, slot + 4);
+        ctx.restore();
+      }
       // touche (coin haut-gauche)
       ctx.fillStyle = 'rgba(0,0,0,0.75)';
       ctx.fillRect(sx, sy, 15, 15);

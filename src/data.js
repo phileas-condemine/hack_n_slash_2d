@@ -412,12 +412,15 @@ AR.SPELLS = [
   { id: 'veil', name: 'Voile temporel', key: '4', cost: 45, dmg: 0, desc: 'Ralentit tous les ennemis de 50% pendant 5 s',
     icon: 'spells/icons/veil', cast: 'spells/veil_cast' },
   // `channel: true` : contrairement aux autres sorts (cast instantané, `cost` = coût ponctuel),
-  // la Lévitation se maintient tant que la touche est tenue et `cost` représente un coût en
-  // Esprit PAR SECONDE (cf. Player#_computeLevitating). Purement une aide au déplacement — le
-  // joueur garde sabre/arc/dash normalement en volant (cf. update()) — donc pas d'art dédié,
-  // réutilise l'icône/pose de Voile temporel.
-  { id: 'levitate', name: 'Lévitation', key: '5', cost: 16, dmg: 0, channel: true,
-    desc: 'Maintenir : flotte et s\'élève doucement, draine l\'Esprit en continu',
+  // la Lévitation se maintient tant qu'elle est active et `cost` représente un coût en Esprit
+  // PAR SECONDE (cf. Player#update, bloc lévitation). Sort à BASCULE (retour joueur 2026-07-30 :
+  // touche 5 = active/désactive, plus une touche à tenir) puis haut/bas pilotent la vitesse
+  // verticale tant qu'elle est active. Coût divisé par 5 (retour joueur 2026-07-30, 16 -> 3.2)
+  // pour un vol prolongé jouable. Purement une aide au déplacement — le joueur garde sabre/arc/
+  // dash normalement en volant (cf. update()) — donc pas d'art dédié, réutilise l'icône/pose de
+  // Voile temporel.
+  { id: 'levitate', name: 'Lévitation', key: '5', cost: 3.2, dmg: 0, channel: true,
+    desc: 'Bascule : active/désactive le vol. Haut/bas pilotent la montée/descente, draine l\'Esprit en continu',
     icon: 'spells/icons/veil', cast: 'spells/veil_cast' },
   // Téléporte le héros à l'emplacement du curseur (cf. Player#castSpell, case 'teleport') —
   // portée déjà limitée à l'écran visible puisque `aim` est la position souris convertie en

@@ -3,6 +3,15 @@
 Outputs src/sprites_meta.js (global AR.SPRITE_META) so the game does not need
 getImageData at runtime (works from file:// without canvas tainting issues).
 Run from repo root:  python tools/build_sprite_meta.py
+
+Sortie finale en WebP sans perte (2026-07-29, cf. discussion perf du chargement) : ~54% plus
+léger que le PNG (mesuré sur les 289 sprites chargés en jeu) sans aucune différence de pixel
+visible (seuls les pixels totalement transparents, alpha=0, peuvent différer — invisibles par
+définition). Le pipeline reste tolérant au format en entrée : les feuilles brutes vert
+chroma-key fraîchement découpées par les scripts `slice_*.py` sont en PNG, les sprites déjà
+traités par une exécution précédente sont déjà en WebP — les deux sont acceptés, la sortie est
+toujours WebP, et un `.png` résiduel du même nom est supprimé après conversion pour ne jamais
+garder les deux formats à la fois pour un même sprite.
 """
 import json, os, sys
 from PIL import Image
@@ -87,21 +96,30 @@ def trim_box(img, alpha_min=8):
     box = mask.getbbox()
     return box if box else (0, 0, img.size[0], img.size[1])
 
+def save_webp(img, path):
+    """Sauvegarde `img` en WebP sans perte au même chemin (extension changée), et supprime
+    l'original s'il n'était pas déjà au format WebP (transition PNG -> WebP au premier passage,
+    no-op sur les exécutions suivantes)."""
+    webp_path = os.path.splitext(path)[0] + ".webp"
+    img.save(webp_path, format="WEBP", lossless=True, quality=100, method=6)
+    if webp_path != path and os.path.exists(path):
+        os.remove(path)
+    return webp_path
+
+
 meta = {}
 total_spill = 0
 for group, rel in GROUPS.items():
     folder = os.path.join(ROOT, rel)
     paths = []
     for current, _, files in os.walk(folder):
-        paths.extend(os.path.join(current, fn) for fn in files if fn.endswith(".png"))
+        paths.extend(os.path.join(current, fn) for fn in files if fn.endswith((".png", ".webp")))
     for path in sorted(paths):
         fn = os.path.basename(path)
         img = Image.open(path).convert("RGBA")
-        dirty = False
         n = chroma_key(img)
         n += despill(img)
         if n > 0:
-            dirty = True
             total_spill += n
         # redimensionnement éventuel
         rel = os.path.relpath(path, ROOT).replace(os.sep, "/")
@@ -110,19 +128,33 @@ for group, rel in GROUPS.items():
                 ratio = cap / max(img.size)
                 img = img.resize((max(1, round(img.size[0] * ratio)),
                                   max(1, round(img.size[1] * ratio))), Image.LANCZOS)
-                dirty = True
         for frag, margin in BORDER_CLEAR.items():
             if frag in rel:
-                if clear_border(img, margin) > 0:
-                    dirty = True
-        if dirty:
-            img.save(path)
+                clear_border(img, margin)
+        path = save_webp(img, path)
         x0, y0, x1, y1 = trim_box(img)
-        sprite_name = os.path.relpath(path, folder).replace(os.sep, "/")[:-4]
+        sprite_name = os.path.relpath(path, folder).replace(os.sep, "/")
+        sprite_name = os.path.splitext(sprite_name)[0]
         key = f"{group}/{sprite_name}"
         meta[key] = {"w": img.size[0], "h": img.size[1],
                      "t": [x0, y0, x1 - x0, y1 - y0]}
         print(f"{key:40s} {img.size[0]}x{img.size[1]} trim={x0},{y0},{x1-x0},{y1-y0} spill={n}")
+
+# Fonds d'arène de boss (assets/arenas/boss, assets/arenas/special) : pas de chroma-key (images
+# opaques, pas de vert à retirer) ni d'entrée dans AR.SPRITE_META (chargées directement via
+# AR.BOSS_ARENAS, cf. src/level.js) — même conversion WebP sans perte pour rester cohérent avec
+# le reste des sprites chargés en jeu (cf. discussion perf du 2026-07-29).
+for arena_dir in ("assets/arenas/boss", "assets/arenas/special"):
+    folder = os.path.join(ROOT, arena_dir)
+    if not os.path.isdir(folder):
+        continue
+    for fn in sorted(os.listdir(folder)):
+        if not fn.endswith((".png", ".webp")):
+            continue
+        path = os.path.join(folder, fn)
+        img = Image.open(path).convert("RGB")
+        path = save_webp(img, path)
+        print(f"{os.path.relpath(path, ROOT).replace(os.sep, '/'):40s} {img.size[0]}x{img.size[1]} (arène, sans chroma-key)")
 
 out = os.path.join(ROOT, "src", "sprites_meta.js")
 os.makedirs(os.path.dirname(out), exist_ok=True)

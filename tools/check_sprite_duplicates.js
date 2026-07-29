@@ -5,7 +5,7 @@
 //      (src/enemy.js) - états dédiés -> sprite de base -> AR.ENEMY_FALLBACK - pointent vers
 //      la MÊME identité visuelle, sans qu'aucun fichier ne soit dupliqué sur le disque (le
 //      fallback réutilise directement le fichier de l'autre monstre).
-//   2. Doublons "physiques" : deux fichiers PNG différents strictement identiques
+//   2. Doublons "physiques" : deux fichiers différents strictement identiques
 //      octet-par-octet, ce qui trahirait un copier-coller involontaire lors d'une génération
 //      d'art (indépendant du mécanisme de fallback).
 //
@@ -61,7 +61,7 @@ function walk(dir, out) {
   for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
     const p = path.join(dir, entry.name);
     if (entry.isDirectory()) walk(p, out);
-    else if (entry.name.endsWith('.png')) out.push(p);
+    else if (entry.name.endsWith('.png') || entry.name.endsWith('.webp')) out.push(p);
   }
 }
 
@@ -76,16 +76,16 @@ for (const file of enemyFiles) {
   byHash.get(hash).push(rel);
 }
 
-// id porté par un chemin ('assets/enemies/{id}.png' ou '.../states/{id}_{state}.png')
+// id porté par un chemin ('assets/enemies/{id}.webp' ou '.../states/{id}_{state}.webp')
 function idOf(relPath) {
-  const base = path.basename(relPath, '.png');
+  const base = path.basename(relPath, path.extname(relPath));
   return relPath.includes('/states/') ? base.replace(/_(neutral|windup|attack)$/, '') : base;
 }
 
 const rawDupes = Array.from(byHash.values()).filter((files) => files.length > 1);
 
-// Convention attendue (build_sprite_meta.py + ce projet) : assets/enemies/{id}.png est une copie
-// exacte de assets/enemies/states/{id}_neutral.png - à ignorer. On sépare le reste en deux cas :
+// Convention attendue (build_sprite_meta.py + ce projet) : assets/enemies/{id}.webp est une copie
+// exacte de assets/enemies/states/{id}_neutral.webp - à ignorer. On sépare le reste en deux cas :
 // même id sur 3+ fichiers (neutral==windup==attack : le monstre n'a en fait aucune animation
 // distincte, juste informatif) vs ids différents (vrai doublon physique, probablement un
 // copier-coller accidentel entre deux générations d'art).
@@ -119,5 +119,5 @@ if (noAnimationVariants.length === 0) {
   }
 }
 
-console.log(`\n${allDefs ? Object.keys(allDefs).length : 0} ids vérifiés, ${enemyFiles.length} fichiers PNG scannés.`);
+console.log(`\n${allDefs ? Object.keys(allDefs).length : 0} ids vérifiés, ${enemyFiles.length} fichiers scannés.`);
 process.exitCode = (logicalDupes.length > 0 || physicalDupes.length > 0) ? 1 : 0;

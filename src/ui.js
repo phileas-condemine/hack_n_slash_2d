@@ -3,9 +3,11 @@ window.AR = window.AR || {};
 
 AR.UI = {
   _clicked: null,
+  _rightClicked: null,
 
   beginFrame() {
     this._clicked = AR.Input.consumeClick();
+    this._rightClicked = AR.Input.consumeRightClick();
   },
 
   _hover(r) {
@@ -14,6 +16,9 @@ AR.UI = {
   },
   _click(r) {
     return this._clicked && AR.U.pointInRect(this._clicked.x, this._clicked.y, r);
+  },
+  _rightClick(r) {
+    return this._rightClicked && AR.U.pointInRect(this._rightClicked.x, this._rightClicked.y, r);
   },
 
   button(ctx, x, y, w, h, label, opts) {
@@ -193,7 +198,8 @@ AR.UI = {
     ctx.fillText(game.eraStartIdx === 0
       ? startEra.name + ' — départ classique (niveau 1, sans équipement)'
       : startEra.name + ' — départ niveau ' + startProfile.level + ', ' + startProfile.coins + ' or, sabre ' +
-        (startProfile.swordTier + 1) + '/' + AR.WEAPONS.sword.length + ', arc ' + (startProfile.bowTier + 1) + '/' + AR.WEAPONS.bow.length,
+        (startProfile.swordTier + 1) + '/' + AR.WEAPONS.sword.length + ', arc ' + (startProfile.bowTier + 1) + '/' + AR.WEAPONS.bow.length +
+        ', ' + (startProfile.skillPoints + game._skillsCost(startProfile.skills)) + ' points de compétence libres',
       W / 2, 610);
     ctx.restore();
 
@@ -401,11 +407,13 @@ AR.UI = {
     const pl = game.player;
     const W = AR.C.VIEW_W;
     this.panel(ctx, 90, 40, W - 180, AR.C.VIEW_H - 80, '— ARBRE DE COMPÉTENCES —');
+    // Coin haut-droit du panneau plutôt que centré sous le titre : à 78px, la ligne se
+    // superposait au titre 26px de `panel()` (même alignement centré, quasi même y).
     ctx.save();
-    ctx.textAlign = 'center';
+    ctx.textAlign = 'right';
     ctx.fillStyle = AR.C.COLORS.xp;
     ctx.font = 'bold 17px "Segoe UI", sans-serif';
-    ctx.fillText('★ Points disponibles : ' + pl.skillPoints, W / 2, 78);
+    ctx.fillText('★ Points disponibles : ' + pl.skillPoints, W - 110, 65);
     ctx.restore();
 
     // Nombre de colonnes calculé sur AR.SKILLS (5 voies depuis l'ajout de la Voie du Vent,
@@ -447,11 +455,23 @@ AR.UI = {
         ctx.textAlign = 'left';
         ctx.fillStyle = AR.C.COLORS.textDim;
         this._wrapText(ctx, node.desc, r.x + 10, y + 46, r.w - 20, 16);
+        // Indice de réinitialisation (clic droit) : seulement au survol d'un nœud acquis,
+        // pour ne pas encombrer les 20 cartes en permanence.
+        if (owned && hov) {
+          ctx.textAlign = 'right';
+          ctx.font = '11px "Segoe UI", sans-serif';
+          ctx.fillStyle = AR.C.COLORS.textDim;
+          ctx.fillText('clic droit : annuler', r.x + r.w - 8, y + r.h - 8);
+        }
         ctx.restore();
         if (canBuy && this._click(r)) game.buySkill(node.id);
+        if (owned && this._rightClick(r)) game.resetSkill(node.id);
       }
     }
-    if (this.button(ctx, W / 2 - 110, AR.C.VIEW_H - 74, 220, 40, 'Fermer  [T / Échap]')) game.skillOpen = false;
+    if (this.button(ctx, W / 2 - 230, AR.C.VIEW_H - 74, 220, 40, '↺ Réinitialiser', { disabled: pl.skills.size === 0 })) {
+      game.resetAllSkills();
+    }
+    if (this.button(ctx, W / 2 + 10, AR.C.VIEW_H - 74, 220, 40, 'Fermer  [T / Échap]')) game.skillOpen = false;
   },
 
   // ================================================ RÉVÉLATION DE SORTS

@@ -45,7 +45,12 @@ AR.VERSION = '1.0.0';
   }
   drawLoading();
 
+  // Ère de départ mémorisée (menu titre) : lue directement ici, avant même la création de
+  // AR.Game, pour ne charger d'emblée que les sprites de cette ère + le tronc commun
+  // (héros/armes/icônes) plutôt que les 6 ères d'un bloc — cf. AR.Assets.load().
+  const bootEraIdx = AR.U.clamp(AR.Save.data.settings.eraStart | 0, 0, AR.ERAS.length - 1);
   AR.Assets.load(
+    bootEraIdx,
     () => { game = new AR.Game(canvas, ctx); AR.game = game; },
     (p) => { progress = p; drawLoading(); }
   );

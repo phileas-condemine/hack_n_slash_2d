@@ -12,7 +12,8 @@ AR.Input = {
   touch: {},         // état des actions pilotées par les contrôles tactiles (s'ajoute au clavier, ne l'écrase pas)
   canvas: null,
   scale: 1, offX: 0, offY: 0,
-  clicks: [],        // clics UI (consommés par les menus)
+  clicks: [],        // clics gauche UI (consommés par les menus)
+  rightClicks: [],   // clics droit UI (ex: réinitialiser une compétence dans l'arbre)
 
   init(canvas) {
     this.canvas = canvas;
@@ -29,7 +30,7 @@ AR.Input = {
     canvas.addEventListener('mousedown', (e) => {
       this._updateMouse(e);
       if (e.button === 0) { this.mouse.left = true; this.clicks.push({ x: this.mouse.x, y: this.mouse.y }); }
-      if (e.button === 2) this.mouse.right = true;
+      if (e.button === 2) { this.mouse.right = true; this.rightClicks.push({ x: this.mouse.x, y: this.mouse.y }); }
       AR.Audio.unlock();
       e.preventDefault();
     });
@@ -92,5 +93,6 @@ AR.Input = {
   },
 
   consumeClick() { return this.clicks.shift(); },
-  clearClicks() { this.clicks.length = 0; },
+  consumeRightClick() { return this.rightClicks.shift(); },
+  clearClicks() { this.clicks.length = 0; this.rightClicks.length = 0; },
 };

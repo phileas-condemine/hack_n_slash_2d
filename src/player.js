@@ -102,27 +102,6 @@ AR.Player = class {
     return false;
   }
 
-  // Sort « Lévitation » (cf. AR.SPELLS, id 'levitate') : maintenu (pas de cast instantané),
-  // draine l'Esprit en continu tant que la touche est tenue plutôt qu'un coût forfaitaire —
-  // cf. `channel: true` sur sa définition. Retourne true si le vol plané est actif ce tick,
-  // pour que le bloc gravité de `update()` sache remplacer la chute par une portée douce.
-  _updateLevitate(dt, game, In) {
-    const idx = AR.SPELLS.findIndex((s) => s.id === 'levitate');
-    if (idx < 0 || !this.spellUnlocked(idx)) return false;
-    const active = In.down('spell' + (idx + 1)) && this.spirit > 0 &&
-      !this.dashing && !this.climbing && !this.riding;
-    if (!active) return false;
-    const cost = AR.SPELLS[idx].cost * this.stats.spellCostMult;
-    this.spirit = Math.max(0, this.spirit - cost * dt);
-    if (Math.random() < 0.4) {
-      AR.Particles.spawn({
-        x: this.x + this.w / 2 + (Math.random() - 0.5) * this.w, y: this.y + this.h,
-        vx: 0, vy: 40, g: -20, life: 0.5, size: 3, color: AR.C.COLORS.spirit, type: 'dot',
-      });
-    }
-    return this.spirit > 0;
-  }
-
   // =========================================================== UPDATE
   update(dt, game) {
     if (this.dead) return;
@@ -240,6 +219,39 @@ AR.Player = class {
       if (this.trail[i].t <= 0) this.trail.splice(i, 1);
     }
 
+    // ---------------- lévitation (sort à bascule, cf. AR.SPELLS 'levitate') : une pression sur
+    // la touche active ou désactive le vol (plus une touche à tenir) ; calculé ici, AVANT les
+    // blocs escalade/saut plus bas, pour pouvoir les désactiver via `this.levitating` tant que
+    // le vol est actif (sinon « haut » — aussi mappé sur `jump`, cf. config.js — consommerait un
+    // saut ou accrocherait une liane à chaque pression, sans effet visible mais en gâchant l'état
+    // pour l'atterrissage). Vitesse verticale (haut/bas) appliquée plus bas, dans le bloc gravité.
+    // Le dash reste utilisable en volant (cahier des charges d'origine : « on doit pouvoir
+    // continuer d'attaquer et dasher en volant ») — seuls escalade et chariot sur rail, deux
+    // états qui imposent leur propre contrôle vertical/horizontal complet, coupent le vol.
+    const lvIdx = AR.SPELLS.findIndex((s) => s.id === 'levitate');
+    if (lvIdx >= 0 && this.spellUnlocked(lvIdx)) {
+      if (In.pressed('spell' + (lvIdx + 1))) {
+        if (this.levitating) this.levitating = false;
+        else if (this.spirit > 0 && !this.climbing && !this.riding) this.levitating = true;
+      }
+      if (this.levitating) {
+        if (this.climbing || this.riding) this.levitating = false;
+        else {
+          const lvCost = AR.SPELLS[lvIdx].cost * st.spellCostMult;
+          this.spirit = Math.max(0, this.spirit - lvCost * dt);
+          if (this.spirit <= 0) this.levitating = false;
+          else if (Math.random() < 0.4) {
+            AR.Particles.spawn({
+              x: this.x + this.w / 2 + (Math.random() - 0.5) * this.w, y: this.y + this.h,
+              vx: 0, vy: 40, g: -20, life: 0.5, size: 3, color: AR.C.COLORS.spirit, type: 'dot',
+            });
+          }
+        }
+      }
+    } else {
+      this.levitating = false;
+    }
+
     // ---------------- escalade : détection préalable (la touche « haut » sert aussi au saut)
     const climbCx = this.x + this.w / 2, climbCy = this.y + this.h / 2;
     const onClimb = game.level.climbableAt && game.level.climbableAt(climbCx, climbCy);
@@ -275,9 +287,12 @@ AR.Player = class {
     }
     this.climbLockout -= dt;
 
-    // ---------------- saut / double saut
+    // ---------------- saut / double saut (désactivé pendant le vol : « haut »/« bas » pilotent
+    // alors directement la vitesse verticale, cf. bloc lévitation plus haut et bloc gravité plus
+    // bas — sans ce garde-fou, « haut » consommerait aussi un saut à chaque pression, invisible
+    // sur le moment mais épuisant les sauts disponibles pour après la désactivation du vol)
     this.jumpBuffer -= dt; this.coyote -= dt;
-    if (In.pressed('jump') && !climbIntent) {
+    if (In.pressed('jump') && !climbIntent && !this.levitating) {
       if (In.down('down') && this.onGround) { this.dropThrough = 0.25; }
       else this.jumpBuffer = P.BUFFER;
     }
@@ -309,7 +324,7 @@ AR.Player = class {
     if (In.released('jump') && this.vy < 0 && !this.climbing) this.vy *= P.JUMP_CUT;
 
     // ---------------- escalade (lianes / échelles) — cf. 00_pre_requis §7.1
-    if (!this.climbing && onClimb && !this.dashing && this.climbLockout <= 0 &&
+    if (!this.climbing && onClimb && !this.dashing && !this.levitating && this.climbLockout <= 0 &&
         (In.down('up') || In.down('down'))) {
       this.climbing = true; this.jumpsUsed = 0; this.airDashed = false;
     }
@@ -334,10 +349,16 @@ AR.Player = class {
       }
     }
 
-    // ---------------- gravité + collision
-    this.levitating = this._updateLevitate(dt, game, In);
+    // ---------------- gravité + collision (vol actif -> gravité remplacée par un pilotage
+    // vertical direct haut/bas, cf. bloc lévitation plus haut ; ni haut ni bas tenu = vol
+    // stationnaire, pas de dérive). Vitesse verticale = `targetSpeed` (même vitesse que le
+    // déplacement horizontal, marche/sprint confondus, cf. calcul plus haut) — retour joueur
+    // 2026-07-30 : le vol doit se déplacer aussi vite dans n'importe quelle direction, pas à
+    // une vitesse dédiée plus lente.
     if (this.levitating) {
-      this.vy = Math.max(P.LEVITATE_MAX_VY, this.vy - P.LEVITATE_LIFT * dt);
+      if (In.down('up')) this.vy = -targetSpeed;
+      else if (In.down('down')) this.vy = targetSpeed;
+      else this.vy = 0;
     } else if (!this.dashing && !this.climbing) this.vy += AR.C.GRAV * dt;
     this.vy = Math.min(this.vy, 980);
     this.kvx *= Math.pow(0.01, dt);
@@ -387,6 +408,7 @@ AR.Player = class {
       game.hitPlayer(Math.round(this.stats.maxHp * fallRatio), undefined, true);
       this.vx = 0; this.vy = 0; this.kvx = 0;
       this.dashing = false; this.dashT = 0; this.dropThrough = 0;
+      this.levitating = false;
       this.jumpsUsed = 0; this.airDashed = false;
       this.trail.length = 0;
       this.lastSafe = { x: safe.x, y: safe.y };

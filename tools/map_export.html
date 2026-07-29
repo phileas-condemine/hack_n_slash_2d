@@ -65,15 +65,15 @@
   <!-- Sous-ensemble minimal de src/*.js nécessaire à la génération de niveau + à la miniature
        de la minimap, plus sprites_meta.js/assets.js pour dessiner les icônes neutres des
        monstres dans la galerie (pas de rendu de terrain/audio/UI complet). -->
-  <script src="../src/config.js?v=20260729v"></script>
-  <script src="../src/arenas.js?v=20260729v"></script>
-  <script src="../src/utils.js?v=20260729v"></script>
-  <script src="../src/data.js?v=20260729v"></script>
-  <script src="../src/level_specs.js?v=20260729v"></script>
-  <script src="../src/level.js?v=20260729v"></script>
-  <script src="../src/minimap.js?v=20260729v"></script>
-  <script src="../src/sprites_meta.js?v=20260729v"></script>
-  <script src="../src/assets.js?v=20260729v"></script>
+  <script src="../src/config.js?v=20260729x"></script>
+  <script src="../src/arenas.js?v=20260729x"></script>
+  <script src="../src/utils.js?v=20260729x"></script>
+  <script src="../src/data.js?v=20260729x"></script>
+  <script src="../src/level_specs.js?v=20260729x"></script>
+  <script src="../src/level.js?v=20260729x"></script>
+  <script src="../src/minimap.js?v=20260729x"></script>
+  <script src="../src/sprites_meta.js?v=20260729x"></script>
+  <script src="../src/assets.js?v=20260729x"></script>
 
   <script>
     const SCALE = 4; // agrandissement de la miniature (1px/tuile en natif -> illisible tel quel)
@@ -252,7 +252,7 @@
         AR.Assets.images[key] = img;
         img.onload = () => drawKey(key);
         img.onerror = () => console.error('Sprite de monstre introuvable :', key);
-        img.src = '../assets/' + key + '.png';
+        img.src = '../assets/' + key + '.webp';
       }
     }
 

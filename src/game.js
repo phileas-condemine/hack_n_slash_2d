@@ -55,6 +55,9 @@ AR.Game = class {
     this.eraStartIdx = AR.U.clamp(i, 0, AR.ERAS.length - 1);
     AR.Save.data.settings.eraStart = this.eraStartIdx;
     AR.Save.save();
+    // chargement différé par ère (cf. AR.Assets) : donne un maximum d'avance à l'ère choisie
+    // dès le menu titre, avant même que le joueur ne clique sur Jouer
+    AR.Assets.ensureEra(this.eraStartIdx);
   }
 
   setStartAtBoss(v) {
@@ -63,31 +66,51 @@ AR.Game = class {
     AR.Save.save();
   }
 
+  // Coût total en points de compétence d'une liste d'ids de nœuds (somme des `cost`
+  // de chacun dans AR.SKILLS) — sert à convertir les compétences "déjà acquises" d'un
+  // profil de départ d'ère en points libres (cf. `_applyEraStartProfile`).
+  _skillsCost(skillIds) {
+    let total = 0;
+    for (const branch of AR.SKILLS) {
+      for (const node of branch.nodes) {
+        if (skillIds.includes(node.id)) total += node.cost;
+      }
+    }
+    return total;
+  }
+
   // Applique le profil de progression "moyenne" de l'ère choisie au menu
-  // titre (niveau, or, crans d'armes, compétences, potions). Ère 1 = profil
-  // par défaut, identique à un départ classique. Quand on saute directement
-  // à l'arène du boss (atBoss), on compense l'XP/or/coffres manqués en route
-  // avec un profil un peu plus généreux que le simple début d'ère.
+  // titre (niveau, or, crans d'armes, potions). Ère 1 = profil par défaut,
+  // identique à un départ classique. Quand on saute directement à l'arène
+  // du boss (atBoss), on compense l'XP/or/coffres manqués en route avec un
+  // profil un peu plus généreux que le simple début d'ère.
+  //
+  // Les compétences du profil ne sont PLUS auto-acquises (retour joueur du
+  // 2026-07-29 : démarrer directement à une ère avancée avec des compétences
+  // déjà imposées empêchait de composer sa propre build) : leur coût cumulé
+  // est reversé en points libres, à dépenser par le joueur (`newRun` ouvre
+  // le menu de compétences juste après si des points restent disponibles).
   _applyEraStartProfile(eraIdx, atBoss) {
     const base = AR.ERA_START_PROFILE[eraIdx] || AR.ERA_START_PROFILE[0];
     const pl = this.player;
+    const freePoints = base.skillPoints + this._skillsCost(base.skills);
     if (atBoss) {
       pl.level = base.level + 3;
-      pl.skillPoints = base.skillPoints + 1;
+      pl.skillPoints = freePoints + 1;
       pl.swordTier = Math.min(AR.WEAPONS.sword.length - 1, base.swordTier + 1);
       pl.bowTier = Math.min(AR.WEAPONS.bow.length - 1, base.bowTier + 1);
       pl.potions = 3;
       this.coins = Math.round(base.coins * 1.6);
     } else {
       pl.level = base.level;
-      pl.skillPoints = base.skillPoints;
+      pl.skillPoints = freePoints;
       pl.swordTier = base.swordTier;
       pl.bowTier = base.bowTier;
       pl.potions = base.potions;
       this.coins = base.coins;
     }
     pl.xp = 0;
-    pl.skills = new Set(base.skills);
+    pl.skills = new Set();
   }
 
   // ================================================== CYCLE DE VIE D'UNE RUN
@@ -116,7 +139,12 @@ AR.Game = class {
     this.loadLevel();
     if (this.startAtBoss) this._startBossFight();
     this.state = 'play';
-    this.paused = false; this.skillOpen = false; this.shopOpen = false; this.spellReveal = null; this.weaponReveal = null;
+    this.paused = false; this.shopOpen = false; this.spellReveal = null; this.weaponReveal = null;
+    // Démarrage direct sur une ère avancée = des points de compétence libres à dépenser
+    // (cf. `_applyEraStartProfile`) : ouvre le menu tout de suite pour éviter d'envoyer le
+    // joueur au combat sans la moindre compétence choisie. Pas en mode démo (l'IA les
+    // dépense elle-même via `buySkillAuto`, et le menu bloquerait sa boucle).
+    this.skillOpen = !demo && this.player.skillPoints > 0;
     if (demo) AR.HUD.notify('Plan IA équilibré — affinité ' + AR.DemoAI.focusLabel(), AR.C.COLORS.spirit);
   }
 
@@ -131,6 +159,13 @@ AR.Game = class {
   }
 
   loadLevel() {
+    // filet de sécurité du chargement différé par ère (cf. AR.Assets) : couvre tous les
+    // chemins d'entrée dans une ère (nouvelle run, partie chargée, NG+, faille, démarrage
+    // direct à un boss...) puisqu'ils passent tous par `loadLevel`, même si l'ère n'a pas eu
+    // le temps d'être priorisée plus tôt (ex. `setEraStart`) — sans effet si déjà chargée/en
+    // cours. Les sprites pas encore prêts ne font que ne pas s'afficher un court instant
+    // (cf. `AR.Assets.draw`), jamais planter.
+    AR.Assets.ensureEra(this.eraIdx);
     this.level = new AR.Level(this.eraIdx, this.runSeed + this.eraIdx * 1013);
     const lvl = this.level;
     AR.Projectiles.clear();
@@ -1062,6 +1097,54 @@ AR.Game = class {
     return true;
   }
 
+  // Annule une compétence acquise (clic droit dans l'arbre, cf. `AR.UI.drawSkills`) et
+  // rembourse ses points. Les prérequis étant strictement séquentiels par branche (idx-1
+  // requis pour acheter idx, cf. `buySkill`), annuler le nœud idx invaliderait le prérequis de
+  // idx+1.. s'ils étaient conservés : on annule donc aussi en cascade tout le reste de la
+  // branche au-delà de idx, remboursé au même titre.
+  resetSkill(nodeId) {
+    const pl = this.player;
+    const branch = AR.SKILLS.find((b) => b.nodes.some((n) => n.id === nodeId));
+    if (!branch || !pl.skills.has(nodeId)) return false;
+    const idx = branch.nodes.findIndex((n) => n.id === nodeId);
+    let refund = 0, count = 0;
+    for (let i = branch.nodes.length - 1; i >= idx; i--) {
+      const node = branch.nodes[i];
+      if (pl.skills.has(node.id)) {
+        pl.skills.delete(node.id);
+        refund += node.cost;
+        count++;
+      }
+    }
+    pl.skillPoints += refund;
+    pl.recalcStats(this);
+    AR.Audio.sfx('ui');
+    AR.HUD.notify('↺ ' + count + ' compétence' + (count > 1 ? 's' : '') + ' réinitialisée' + (count > 1 ? 's' : '') +
+      ' (+' + refund + ' pt' + (refund > 1 ? 's' : '') + ')', AR.C.COLORS.textDim);
+    return true;
+  }
+
+  // Vide entièrement l'arbre (bouton "Réinitialiser" du menu compétences) et rembourse tous
+  // les points dépensés — même remboursement nœud par nœud que `resetSkill`, juste sur toutes
+  // les branches d'un coup plutôt qu'à partir d'un nœud précis.
+  resetAllSkills() {
+    const pl = this.player;
+    if (pl.skills.size === 0) return false;
+    let refund = 0, count = 0;
+    for (const branch of AR.SKILLS) {
+      for (const node of branch.nodes) {
+        if (pl.skills.has(node.id)) { refund += node.cost; count++; }
+      }
+    }
+    pl.skills.clear();
+    pl.skillPoints += refund;
+    pl.recalcStats(this);
+    AR.Audio.sfx('ui');
+    AR.HUD.notify('↺ Arbre réinitialisé : ' + count + ' compétence' + (count > 1 ? 's' : '') +
+      ' (+' + refund + ' pt' + (refund > 1 ? 's' : '') + ')', AR.C.COLORS.textDim);
+    return true;
+  }
+
   buySkillAuto() {
     const order = ['blade1', 'bow1', 'body1', 'spirit1', 'wind1', 'blade3', 'bow2', 'body2', 'spirit2', 'wind2',
       'blade2', 'bow3', 'body3', 'spirit3', 'wind3', 'blade4', 'bow4', 'body4', 'spirit4', 'wind4'];
@@ -1125,6 +1208,10 @@ AR.Game = class {
     this.riftChoices = AR.U.shuffle(rng, AR.RIFTS).slice(0, 3);
     this.state = 'rift';
     AR.DemoAI.uiT = 0;
+    // chargement différé par ère : priorise la prochaine ère dès l'écran de faille, pendant
+    // que le joueur choisit sa récompense — quelques secondes d'avance gratuites avant que
+    // `riftPick` -> `loadLevel` n'en ait réellement besoin (cf. AR.Assets.ensureEra)
+    AR.Assets.ensureEra(this.eraIdx + 1);
   }
 
   riftPick(i) {
