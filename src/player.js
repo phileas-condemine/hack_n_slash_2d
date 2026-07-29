@@ -291,10 +291,13 @@ AR.Player = class {
     // alors directement la vitesse verticale, cf. bloc lévitation plus haut et bloc gravité plus
     // bas — sans ce garde-fou, « haut » consommerait aussi un saut à chaque pression, invisible
     // sur le moment mais épuisant les sauts disponibles pour après la désactivation du vol)
+    // Le saut ne dépend plus de la direction tenue (retour joueur 2026-07-30 : sur tactile, un
+    // pouce légèrement en bas sur le stick de déplacement empêchait le bouton de sauter de
+    // fonctionner). Descendre à travers une plateforme one-way reste possible sans ce couplage,
+    // via le double-tap bas ci-dessus (ligne ~153).
     this.jumpBuffer -= dt; this.coyote -= dt;
     if (In.pressed('jump') && !climbIntent && !this.levitating) {
-      if (In.down('down') && this.onGround) { this.dropThrough = 0.25; }
-      else this.jumpBuffer = P.BUFFER;
+      this.jumpBuffer = P.BUFFER;
     }
     if (this.jumpBuffer > 0 && !this.climbing) {
       if (this.onGround || this.coyote > 0) {
