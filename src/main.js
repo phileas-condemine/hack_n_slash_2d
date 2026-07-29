@@ -24,6 +24,28 @@ AR.VERSION = '1.0.0';
   AR.Touch.init(canvas);
   AR.TextEdit.init(canvas);
 
+  // Plein écran (bouton coin haut-droit, cf. index.html/style.css) : plein écran de la PAGE
+  // entière (document.documentElement), pas seulement du canvas - sinon les contrôles tactiles
+  // (#touchUI, sibling du canvas, pas descendant) disparaîtraient en plein écran. `resize()`
+  // ci-dessus gère déjà le redimensionnement en letterbox, y compris sur l'événement `resize`
+  // déclenché par l'entrée/sortie du plein écran, donc rien d'autre à faire côté canvas.
+  // Absent sur Safari iOS (pas d'implémentation de la Fullscreen API pour un élément
+  // quelconque) - le bouton se masque tout seul dans ce cas plutôt que de rester inerte.
+  const fsBtn = document.getElementById('fullscreenBtn');
+  if (fsBtn) {
+    if (!document.documentElement.requestFullscreen) {
+      fsBtn.style.display = 'none';
+    } else {
+      fsBtn.addEventListener('click', () => {
+        if (document.fullscreenElement) document.exitFullscreen();
+        else document.documentElement.requestFullscreen().catch(() => {});
+      });
+      document.addEventListener('fullscreenchange', () => {
+        fsBtn.title = document.fullscreenElement ? 'Quitter le plein écran' : 'Plein écran';
+      });
+    }
+  }
+
   let progress = 0;
   let game = null;
   let last = performance.now();

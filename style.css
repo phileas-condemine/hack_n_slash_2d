@@ -160,3 +160,20 @@ body.touch-mode #rotateHint {
 @media (orientation: landscape) {
   body.touch-mode #rotateHint { display: none; }
 }
+
+/* Bouton plein écran (masqué en JS si l'API Fullscreen n'est pas supportée, ex. Safari iOS) */
+#fullscreenBtn {
+  position: fixed;
+  top: 8px; right: 8px;
+  z-index: 7;
+  width: 34px; height: 34px;
+  border: 1px solid rgba(53, 224, 192, 0.4);
+  border-radius: 6px;
+  background: rgba(10, 14, 18, 0.75);
+  color: #e8e2d4;
+  font-size: 17px;
+  line-height: 1;
+  cursor: pointer;
+  padding: 0;
+}
+#fullscreenBtn:hover { border-color: rgba(53, 224, 192, 0.9); color: #35e0c0; }
