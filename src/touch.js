@@ -47,6 +47,12 @@ AR.Touch = {
       <button class="tbtn tbtn-bow" data-action="bow">Arc</button>
       <button class="tbtn tbtn-potion" data-action="potion">Potion</button>
       <button class="tbtn tbtn-interact" data-action="interact">E</button>
+      <button class="tbtn tbtn-spell1" data-action="spell1">1</button>
+      <button class="tbtn tbtn-spell2" data-action="spell2">2</button>
+      <button class="tbtn tbtn-spell3" data-action="spell3">3</button>
+      <button class="tbtn tbtn-spell4" data-action="spell4">4</button>
+      <button class="tbtn tbtn-spell5" data-action="spell5">5</button>
+      <button class="tbtn tbtn-spell6" data-action="spell6">6</button>
       <button class="tbtn tbtn-skills" data-action="skills">★</button>
       <button class="tbtn tbtn-stats" data-action="toggleStats">📊</button>
       <button class="tbtn tbtn-pause" data-action="pause">⏸</button>

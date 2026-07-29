@@ -66,7 +66,3 @@ Référence de qualité déjà en place : Yōkai (boules d'énergie flottantes, 
 - [ ] Tenir ce fichier à jour à chaque session : cocher les items traités, ajouter les nouvelles idées identifiées en jouant (ex. logs de combat dans `combat-log-*.jsonl`), et retirer régulièrement ce qui est déjà implémenté pour garder le fichier lisible.
 - [ ] `node tools/check_sprite_duplicates.js` (ajouté le 2026-07-29) audite tout le roster de monstres et signale deux types de problèmes : les doublons "logiques" (plusieurs ids qui, via `AR.ENEMY_FALLBACK`, pointent vers le même sprite — le bug qui affectait Traqueur des galeries/Spectre des catacombes/Vermine des fosses/Contremaître enchaîné/Sapeur avant correction) et les doublons "physiques" (deux fichiers PNG différents strictement identiques, signe d'un copier-coller accidentel). À relancer après toute nouvelle génération d'art de monstre.
 
-
-some keys are not available on the smartphone such as tab to reduce the stats menu, or N to show the map, maybe others are missing. fix them.
-
-fullscreen on smartphone ?

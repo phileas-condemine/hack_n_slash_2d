@@ -104,6 +104,20 @@ html, body {
 #touchUI .tbtn-potion { width: 48px; height: 48px; right: 38%; bottom: 4%; font-size: 11px; }
 #touchUI .tbtn-interact { width: 48px; height: 48px; right: 50%; bottom: 4%; font-size: 15px; }
 
+/* Sorts 1-6 : aucun équivalent tactile aux touches Digit1-6 n'existait (retour joueur
+   2026-07-30 - même famille de manque que T/Tab/N ci-dessous) - le sort est de toute façon
+   déjà un no-op silencieux tant qu'il n'est pas débloqué (`Player#castSpell`/le bloc lévitation
+   vérifient `spellUnlocked` en premier), donc rien à cacher/désactiver ici tant qu'aucune
+   compétence n'a été prise. Alignés en bas à gauche, à l'emplacement de la barre de sorts
+   dessinée par le HUD (`bx=22, sy=VIEW_H-66, slot=48`, cf. hud.js) pour rester intuitif. */
+#touchUI [class*="tbtn-spell"] { width: 36px; height: 36px; bottom: 3%; font-size: 14px; transform: translateX(-50%); }
+#touchUI .tbtn-spell1 { left: 3.6%; }
+#touchUI .tbtn-spell2 { left: 7.3%; }
+#touchUI .tbtn-spell3 { left: 11.1%; }
+#touchUI .tbtn-spell4 { left: 14.8%; }
+#touchUI .tbtn-spell5 { left: 18.6%; }
+#touchUI .tbtn-spell6 { left: 22.3%; }
+
 /* Compétences / stats / pause / IA / vitesse : rassemblés dans le creux libre en haut du HUD
    (entre la barre de vie à gauche et le panneau de caractéristiques à droite) - ces actions
    n'avaient pas d'équivalent tactile aux touches T/Tab/N (retour joueur 2026-07-30) */
