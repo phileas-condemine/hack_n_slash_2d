@@ -20,6 +20,8 @@ AR.Player = class {
     this.dropThrough = 0;
     this.dashHeld = 0;
     this.trail = [];
+    this._clock = 0;
+    this._tapLeftT = -10; this._tapRightT = -10; this._tapDownT = -10;
 
     this.dead = false;
     this.invulnT = 0;
@@ -31,7 +33,8 @@ AR.Player = class {
     this.buffs = { crit: 0, speed: 0, hpUp: 0, spiritUp: 0 };
     this.swordTier = 0; this.bowTier = 0;
     this.potions = 1;
-    this.spellCds = [0, 0, 0, 0];
+    this.spellCds = AR.SPELLS.map(() => 0);
+    this.levitating = false;
 
     // combat
     this.swordHold = -1;    // -1 = relâché
@@ -89,7 +92,35 @@ AR.Player = class {
 
   spellUnlocked(i) {
     if (i <= 1) return this.skills.has('spirit1');
-    return this.skills.has('spirit3');
+    if (i <= 3) return this.skills.has('spirit3');
+    // Sorts 5/6 (Lévitation/Téléport, voie du Vent) : chacun débloqué par son propre nœud,
+    // contrairement aux paires spirit1/spirit3 ci-dessus — comparaison par id plutôt que par
+    // index pour rester correct si l'ordre d'AR.SPELLS change.
+    const sp = AR.SPELLS[i];
+    if (sp && sp.id === 'levitate') return this.skills.has('wind3');
+    if (sp && sp.id === 'teleport') return this.skills.has('wind4');
+    return false;
+  }
+
+  // Sort « Lévitation » (cf. AR.SPELLS, id 'levitate') : maintenu (pas de cast instantané),
+  // draine l'Esprit en continu tant que la touche est tenue plutôt qu'un coût forfaitaire —
+  // cf. `channel: true` sur sa définition. Retourne true si le vol plané est actif ce tick,
+  // pour que le bloc gravité de `update()` sache remplacer la chute par une portée douce.
+  _updateLevitate(dt, game, In) {
+    const idx = AR.SPELLS.findIndex((s) => s.id === 'levitate');
+    if (idx < 0 || !this.spellUnlocked(idx)) return false;
+    const active = In.down('spell' + (idx + 1)) && this.spirit > 0 &&
+      !this.dashing && !this.climbing && !this.riding;
+    if (!active) return false;
+    const cost = AR.SPELLS[idx].cost * this.stats.spellCostMult;
+    this.spirit = Math.max(0, this.spirit - cost * dt);
+    if (Math.random() < 0.4) {
+      AR.Particles.spawn({
+        x: this.x + this.w / 2 + (Math.random() - 0.5) * this.w, y: this.y + this.h,
+        vx: 0, vy: 40, g: -20, life: 0.5, size: 3, color: AR.C.COLORS.spirit, type: 'dot',
+      });
+    }
+    return this.spirit > 0;
   }
 
   // =========================================================== UPDATE
@@ -107,6 +138,7 @@ AR.Player = class {
     this.launchCd = Math.max(0, this.launchCd - dt);
     this.dropThrough -= dt;
     this.walkT += dt;
+    this._clock += dt;
     for (let i = 0; i < 4; i++) this.spellCds[i] -= dt;
     if (this.comboT <= 0) this.comboIdx = 0;
     if (this.dashCd <= 0 && this.dashCharges < st.dashMax) {
@@ -124,6 +156,25 @@ AR.Player = class {
     let dir = 0;
     if (In.down('left')) dir -= 1;
     if (In.down('right')) dir += 1;
+
+    // Double-tap gauche/droite = dash (en plus de la touche dash dédiée). Fenêtre de 0.28s
+    // entre deux appuis (front montant) sur la même direction.
+    const TAP_WINDOW = 0.28;
+    let doubleTapDashDir = 0;
+    if (In.pressed('left')) {
+      doubleTapDashDir = (this._clock - this._tapLeftT < TAP_WINDOW) ? -1 : 0;
+      this._tapLeftT = this._clock;
+    }
+    if (In.pressed('right')) {
+      doubleTapDashDir = (this._clock - this._tapRightT < TAP_WINDOW) ? 1 : 0;
+      this._tapRightT = this._clock;
+    }
+    // Double-tap bas = descendre à travers une plateforme one-way (même effet que
+    // sauter en tenant bas), utile sans avoir à combiner deux touches.
+    if (In.pressed('down')) {
+      if (this._clock - this._tapDownT < TAP_WINDOW && this.onGround) this.dropThrough = 0.25;
+      this._tapDownT = this._clock;
+    }
 
     if (In.down('dash')) this.dashHeld += dt; else this.dashHeld = 0;
     const sprinting = this.dashHeld > 0.18 && !chargingBow;
@@ -164,10 +215,10 @@ AR.Player = class {
     }
 
     // ---------------- dash (appui) / sprint (maintien)
-    if (!this.riding && In.pressed('dash') && this.dashCharges > 0 && !this.dashing && (this.onGround || !this.airDashed)) {
+    if (!this.riding && (In.pressed('dash') || doubleTapDashDir !== 0) && this.dashCharges > 0 && !this.dashing && (this.onGround || !this.airDashed)) {
       this.dashing = true;
       this.dashT = P.DASH_TIME;
-      this.dashDir = dir !== 0 ? dir : this.facing;
+      this.dashDir = doubleTapDashDir !== 0 ? doubleTapDashDir : (dir !== 0 ? dir : this.facing);
       this.dashCharges--;
       this.dashCd = st.dashCd;
       if (!this.onGround) this.airDashed = true;
@@ -245,6 +296,14 @@ AR.Player = class {
         AR.EventLog.push('player', { event: 'double_jump', x: Math.round(this.x), y: Math.round(this.y) });
         AR.Particles.burst(this.x + this.w / 2, this.y + this.h, 10,
           { color: AR.C.COLORS.spirit, speed: 140, size: 3, life: 0.35, spread: 1.2, angle: Math.PI / 2 });
+      } else if (this.jumpsUsed === 2 && this.skills.has('wind1')) {
+        this.vy = P.TRIPLE_JUMP_VY;
+        this.jumpBuffer = 0;
+        this.jumpsUsed = 3;
+        AR.Audio.sfx('djump');
+        AR.EventLog.push('player', { event: 'triple_jump', x: Math.round(this.x), y: Math.round(this.y) });
+        AR.Particles.burst(this.x + this.w / 2, this.y + this.h, 12,
+          { color: AR.C.COLORS.magic, speed: 150, size: 3, life: 0.4, spread: 1.3, angle: Math.PI / 2 });
       }
     }
     if (In.released('jump') && this.vy < 0 && !this.climbing) this.vy *= P.JUMP_CUT;
@@ -276,7 +335,10 @@ AR.Player = class {
     }
 
     // ---------------- gravité + collision
-    if (!this.dashing && !this.climbing) this.vy += AR.C.GRAV * dt;
+    this.levitating = this._updateLevitate(dt, game, In);
+    if (this.levitating) {
+      this.vy = Math.max(P.LEVITATE_MAX_VY, this.vy - P.LEVITATE_LIFT * dt);
+    } else if (!this.dashing && !this.climbing) this.vy += AR.C.GRAV * dt;
     this.vy = Math.min(this.vy, 980);
     this.kvx *= Math.pow(0.01, dt);
     const wasGround = this.onGround;
@@ -390,11 +452,13 @@ AR.Player = class {
       AR.EventLog.push('player', { event: 'potion', hpAfter: this.hp, potionsLeft: this.potions });
       AR.Audio.sfx('potion');
       AR.Particles.burst(this.x + this.w / 2, this.y + this.h / 2, 14,
-        { color: ['#4a90c2', '#8ecfff'], speed: 90, size: 3, life: 0.6, g: -150 });
+        { color: [AR.C.COLORS.hp, '#ff9a9a'], speed: 90, size: 3, life: 0.6, g: -150 });
     }
 
-    // ---------------- sorts
-    for (let i = 0; i < 4; i++) {
+    // ---------------- sorts (les sorts « channel » comme Lévitation se gèrent à part,
+    // cf. _updateLevitate — un In.pressed ici ne conviendrait pas à une touche tenue)
+    for (let i = 0; i < AR.SPELLS.length; i++) {
+      if (AR.SPELLS[i].channel) continue;
       if (In.pressed('spell' + (i + 1))) this.castSpell(i, game, aim);
     }
   }
@@ -471,7 +535,7 @@ AR.Player = class {
         x: sx + Math.cos(a) * 22, y: sy + Math.sin(a) * 22, kind: 'arrow', friendly: true,
         dmg: st.bowDmg * (n > 1 ? 0.7 : 1), r: 6,
         vx: Math.cos(a) * AR.C.PLAYER.ARROW_SPEED, vy: Math.sin(a) * AR.C.PLAYER.ARROW_SPEED,
-        g: 120, life: AR.C.PLAYER.ARROW_RANGE / AR.C.PLAYER.ARROW_SPEED,
+        g: 420, life: AR.C.PLAYER.ARROW_RANGE / AR.C.PLAYER.ARROW_SPEED,
       });
     }
   }
@@ -494,7 +558,11 @@ AR.Player = class {
     // voie venir).
     const overT = Math.max(0, this.bowHold - st.bowChargeTime);
     const chargeLevel = AR.U.clamp(overT / (st.bowChargeTime * 0.6), 0, 1);
-    const g = AR.U.lerp(260, 90, chargeLevel);
+    // g calé sur le même ordre de grandeur que les projectiles ennemis à trajectoire
+    // parabolique (rock/javelin, g:500, cf. enemy.js) — les anciennes valeurs (260/90)
+    // étaient si faibles par rapport à la vitesse de la flèche que la chute restait
+    // imperceptible à l'écran (retour joueur : "elles partent très très loin tout droit").
+    const g = AR.U.lerp(600, 250, chargeLevel);
     const life = AR.U.lerp(0.7, 0.95, chargeLevel);
     AR.Projectiles.spawn({
       x: sx, y: sy, kind: 'parrow', friendly: true,
@@ -537,6 +605,9 @@ AR.Player = class {
           AR.Projectiles.spawn({
             x: cx, y: cy, kind: 'kunai', friendly: true, dmg, r: 7, pierce: true,
             vx: Math.cos(a) * 820, vy: Math.sin(a) * 820, life: 0.7,
+            // étourdit brièvement chaque ennemi touché (cf. Enemy#stun, projectiles.js) — pratique
+            // pour se replacer derrière lui sans encaisser de dégât de contact pendant ce temps
+            stunDur: 1.2,
           });
         }
         break;
@@ -544,13 +615,15 @@ AR.Player = class {
       case 'blink': {
         const dist = 270;
         const x0 = cx;
-        // dégâts sur le trajet
+        // dégâts sur le trajet + étourdit chaque ennemi traversé (cf. Enemy#stun) : le héros passe
+        // littéralement à travers, l'étourdissement évite qu'il encaisse un coup en pleine face
         for (const e of game.enemies) {
           if (e.dead) continue;
           const ex = e.centerX();
           if (AR.U.sign(ex - x0) === this.facing && Math.abs(ex - x0) < dist &&
               Math.abs(e.centerY() - cy) < 90) {
             game.hitEnemy(e, dmg, { knockX: this.facing * 200, fromX: x0, pierceBlock: true });
+            e.stun(1.6);
           }
         }
         for (let k = 0; k < 10; k++) {
@@ -573,6 +646,41 @@ AR.Player = class {
         game.veilT = 5;
         AR.Particles.shockwave(cx, cy, 320, AR.C.COLORS.magic);
         break;
+      case 'teleport': {
+        // Sur un chariot (R6) : le déplacement est forcé par `this.riding` jusqu'à endX, se
+        // téléporter ailleurs le laisserait orphelin — annulé comme si la destination était
+        // solide (remboursé, cf. plus bas).
+        const tx = AR.U.clamp(aim.x - this.w / 2, 0, (game.level.tilesW - 1) * AR.C.TILE - this.w);
+        const ty = Math.max(0, aim.y - this.h);
+        const T = AR.C.TILE;
+        const fits = !this.riding &&
+          !game.level.solidAt(Math.floor(tx / T), Math.floor(ty / T)) &&
+          !game.level.solidAt(Math.floor((tx + this.w) / T), Math.floor(ty / T)) &&
+          !game.level.solidAt(Math.floor(tx / T), Math.floor((ty + this.h) / T)) &&
+          !game.level.solidAt(Math.floor((tx + this.w) / T), Math.floor((ty + this.h) / T));
+        if (!fits) {
+          // destination invalide : on annule et on rembourse le coût déjà déduit plus haut
+          this.spirit += cost;
+          AR.Audio.sfx('error');
+          break;
+        }
+        for (let k = 0; k < 8; k++) {
+          AR.Particles.spawn({
+            x: this.x + this.w / 2 + (Math.random() - 0.5) * this.w, y: this.y + this.h * (0.3 + Math.random() * 0.6),
+            vx: 0, vy: -30, life: 0.35, size: 6, color: AR.C.COLORS.magic, type: 'glow',
+          });
+        }
+        this.x = tx; this.y = ty;
+        this.vx = 0; this.vy = 0; this.jumpsUsed = 0; this.airDashed = false;
+        this.invulnT = Math.max(this.invulnT, 0.3);
+        for (let k = 0; k < 10; k++) {
+          AR.Particles.spawn({
+            x: tx + this.w / 2 + (Math.random() - 0.5) * this.w, y: ty + this.h * (0.3 + Math.random() * 0.6),
+            vx: 0, vy: -30, life: 0.35, size: 6, color: AR.C.COLORS.magic, type: 'glow',
+          });
+        }
+        break;
+      }
     }
   }
 
@@ -580,6 +688,17 @@ AR.Player = class {
   takeDamage(dmg, fromX, ignoreIframes) {
     if (this.dead) return 0;
     if (!ignoreIframes && (this.invulnT > 0 || this.dashing)) return 0;
+    // Compétence « Esquive » (voie du Vent, 'wind2') : 30% de chances d'éviter totalement une
+    // attaque, corps à corps ou à distance. `fromX` n'est jamais défini pour les dégâts
+    // environnementaux (chute, cf. update()) : ceux-ci restent volontairement inesquivables.
+    if (fromX !== undefined && this.skills.has('wind2') && Math.random() < 0.3) {
+      this.attackAnim = 'dodge'; this.attackAnimT = 0.3;
+      AR.Audio.sfx('dash');
+      AR.Particles.burst(this.x + this.w / 2, this.y + this.h / 2, 8,
+        { color: AR.C.COLORS.spirit, speed: 130, size: 3, life: 0.3 });
+      AR.EventLog.push('player', { event: 'dodge', x: Math.round(this.x), y: Math.round(this.y) });
+      return 0;
+    }
     dmg = Math.max(1, Math.round(dmg * this.stats.armor));
     this.hp -= dmg;
     this.invulnT = AR.C.PLAYER.INVULN;

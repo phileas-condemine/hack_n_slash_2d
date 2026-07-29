@@ -36,7 +36,7 @@ AR.ERAS = [
     far: '#7d8f96', mid: '#a89a80', fog: 'rgba(232,220,192,0.15)',
     ground: '#5d4d3d', groundTop: '#8f7a5c', accent: '#c9a86a', rock: '#7a6a52',
     weather: 'dust', props: ['crate', 'cannon', 'tent', 'flag'],
-    enemies: ['pikeman', 'musketeer', 'bombardier', 'mortar_crew', 'armored_captain'],
+    enemies: ['pikeman', 'musketeer', 'bombardier', 'cannoneer', 'lansquenet', 'armored_captain'],
     elite: 'armored_captain', boss: 'war_engineer',
   },
   {
@@ -45,7 +45,7 @@ AR.ERAS = [
     far: '#3d4034', mid: '#4d5040', fog: 'rgba(138,132,104,0.25)',
     ground: '#33301f', groundTop: '#565236', accent: '#8a7f52', rock: '#454231',
     weather: 'rain', props: ['sandbag', 'wire', 'wreck', 'crater'],
-    enemies: ['trench_soldier', 'flamethrower', 'armored_trooper', 'roller_scout', 'bombardier'],
+    enemies: ['trench_soldier', 'flamethrower', 'armored_trooper', 'roller_scout', 'mortar_crew'],
     elite: 'roller_scout', boss: 'diesel_behemoth',
   },
   {
@@ -92,13 +92,24 @@ AR.ENEMIES = {
   // Sbire dédié du Commandant de Char (summon uniquement)
   standard_bearer:{ name: 'Porte-étendard', hp: 36, dmg: 13, speed: 95, xp: 18, coins: 7, h: 84, behavior: 'melee', range: 85, aggro: 460, atkCd: 1.5, tele: 0.45 },
   // Monstres dédiés de la petite cache secrète SEC_ANTIQUITY_02 (cf. level_specs.js) — jamais
-  // utilisés ailleurs, comme stone_cave_stalker/stone_cave_bats pour l'ère 1.
+  // utilisés ailleurs, comme stone_cave_stalker/stone_cave_bats pour l'ère 1. Art dédié de
+  // crypt_wraith généré le 2026-07-29 (audit doublons) : partageait auparavant le sprite de
+  // desert_raider via AR.ENEMY_FALLBACK, ce qui en faisait un simple bandit vivant au lieu d'un
+  // spectre mort-vivant des catacombes.
   crypt_wraith:   { name: 'Spectre des catacombes', hp: 95, dmg: 13, speed: 135, xp: 24, coins: 10, h: 88, behavior: 'assassin', range: 64, aggro: 520, atkCd: 1.7, tele: 0.4, blinkCd: 3.0, facing: 'l', parry: true },
   tomb_scarabs:   { name: 'Nuée de scarabées', hp: 48, dmg: 9, speed: 145, xp: 14, coins: 5, h: 60, behavior: 'flyer', range: 58, aggro: 520, atkCd: 1.6, tele: 0.35, dive: true, flyH: 140 },
   // Monstres dédiés du Quartier des Esclaves (SEC_ANTIQUITY souterrain, cf. level_specs.js) —
   // jamais utilisés en surface (forum/rue/arène), pour donner à cette zone sa propre identité.
+  // Art dédié généré le 2026-07-29 (audit doublons) : chain_overseer partageait le sprite de
+  // temple_guardian (un noble garde en armure ornée, rien à voir avec un contremaître d'esclaves)
+  // et pit_vermin celui de desert_raider (un bandit fier, alors que ce monstre doit lire comme un
+  // prisonnier famélique et désespéré).
   chain_overseer: { name: 'Contremaître enchaîné', hp: 110, dmg: 16, speed: 70, xp: 28, coins: 11, h: 90, behavior: 'shield', range: 70, aggro: 440, atkCd: 1.6, tele: 0.5, block: 0.65, knock: 300 },
   pit_vermin:     { name: 'Vermine des fosses', hp: 30, dmg: 7, speed: 170, xp: 8, coins: 3, h: 64, behavior: 'melee', range: 50, aggro: 460, atkCd: 1.0, tele: 0.25, facing: 'l' },
+  // Art dédié généré le 2026-07-29 (retour joueur : partageait le sprite de hoplite, un soldat
+  // grec en armure, aucun rapport avec un forçat brisant ses chaînes) : nouveau colosse torse
+  // nu couvert de cicatrices, manilles brisées aux poignets, collier de fer arraché, qui combat
+  // avec un tronçon de chaîne cassée — même famille visuelle que chain_overseer/pit_vermin.
   manacled_brute: { name: 'Forçat brisant ses chaînes', hp: 180, dmg: 20, speed: 60, xp: 35, coins: 14, h: 100, behavior: 'brute', range: 95, aggro: 400, atkCd: 1.8, tele: 0.6, facing: 'l', knock: 340 },
 
   // Champions de l'Arène des Gladiateurs (Fosse des Esclaves, cf. level_specs.js) : 5
@@ -146,6 +157,9 @@ AR.ENEMIES = {
     ] },
 
   // --- Japon médiéval
+  // Art régénéré le 2026-07-29 (audit cohérence thématique) : l'ancien sprite (morion européen,
+  // rapière) ne ressemblait pas à un samouraï — remplacé par un vrai rônin (katana, kimono/hakama
+  // déchirés, dō fissuré). L'ancien art a été déplacé vers 'lansquenet' (Renaissance).
   ronin:          { name: 'Rônin', hp: 110, dmg: 15, speed: 130, xp: 22, coins: 9, h: 80, behavior: 'melee', range: 78, aggro: 480, atkCd: 1.0, tele: 0.32, combo2: true, parry: true },
   ninja_assassin: { name: 'Assassin ninja', hp: 75, dmg: 14, speed: 190, xp: 26, coins: 11, h: 78, behavior: 'assassin', range: 58, aggro: 560, atkCd: 1.6, tele: 0.3, facing: 'l', blinkCd: 3.2, parry: true },
   // Nouveau monstre de terrain (carte authored R3, cf. level_specs.js MEDIEVAL) : embuscade
@@ -159,22 +173,45 @@ AR.ENEMIES = {
   lantern_wisp:   { name: 'Feu-follet', hp: 28, dmg: 10, speed: 55, xp: 22, coins: 9, h: 70, behavior: 'caster', range: 520, keep: 340, aggro: 600, atkCd: 2.1, tele: 0.55, proj: 'wisp', float: true },
 
   // --- Renaissance
+  // Reprend l'id/l'art qui occupait à tort la place de 'ronin' en ère 3 (audit cohérence
+  // thématique du 2026-07-29) : ce sprite (morion, rapière, pourpoint à crevés) est en fait un
+  // mercenaire lansquenet Renaissance, pas un guerrier japonais — déplacé ici où il colle enfin
+  // à son ère. Stats identiques à l'ancien 'ronin' (même rôle : duelliste rapide au corps-à-corps).
+  lansquenet:     { name: 'Lansquenet', hp: 110, dmg: 15, speed: 130, xp: 22, coins: 9, h: 80, behavior: 'melee', range: 78, aggro: 480, atkCd: 1.0, tele: 0.32, combo2: true, parry: true },
   pikeman:        { name: 'Piquier', hp: 120, dmg: 14, speed: 85, xp: 24, coins: 10, h: 84, behavior: 'melee', range: 105, aggro: 440, atkCd: 1.5, tele: 0.5 },
   musketeer:      { name: 'Mousquetaire', hp: 75, dmg: 16, speed: 80, xp: 26, coins: 11, h: 76, behavior: 'ranged', range: 640, keep: 420, aggro: 700, atkCd: 2.3, tele: 0.7, proj: 'bullet' },
   bombardier:     { name: 'Bombardier', hp: 90, dmg: 18, speed: 75, xp: 28, coins: 12, h: 84, behavior: 'artillery', range: 520, keep: 320, aggro: 600, atkCd: 2.6, tele: 0.6, proj: 'bomb' },
-  mortar_crew:    { name: 'Servants de mortier', hp: 150, dmg: 20, speed: 40, xp: 34, coins: 14, h: 92, behavior: 'artillery', range: 720, keep: 420, aggro: 780, atkCd: 3.2, tele: 0.8, proj: 'mortar' },
+  // Remplace mortar_crew dans le roster R4 (audit cohérence thématique du 2026-07-29) : l'art de
+  // mortar_crew (masque à gaz, attirail WWI) ne collait pas à la Renaissance — déplacé tel quel
+  // vers la Guerre diesel (où il colle parfaitement), remplacé ici par un nouveau monstre dédié
+  // au look Renaissance (même rôle tactique d'artillerie longue portée). Art généré via ChatGPT.
+  cannoneer:      { name: 'Canonnier', hp: 150, dmg: 20, speed: 40, xp: 34, coins: 14, h: 92, behavior: 'artillery', range: 720, keep: 420, aggro: 780, atkCd: 3.2, tele: 0.8, proj: 'mortar' },
+  // Art redessiné le 2026-07-29 (retour joueur : trop proche visuellement de temple_guardian,
+  // élite de R2 — les deux étaient des chevaliers en armure de plaques ornée avec un grand
+  // bouclier héraldique au lion). Nouveau look "capitaine mercenaire" du XVIe/XVIIe siècle
+  // (burgonet à plumet, cuirasse noircie, écharpe, rapière, petite rondache) qui partage le
+  // langage matériel de pikeman/musketeer/bombardier au lieu d'un chevalier médiéval-fantasy.
   armored_captain:{ name: 'Capitaine cuirassé', hp: 160, dmg: 22, speed: 70, xp: 60, coins: 26, h: 106, behavior: 'shield', range: 84, aggro: 420, atkCd: 1.8, tele: 0.55, block: 0.8, knock: 360, elite: true },
   // Sbire dédié de l'Ingénieur de Guerre (summon), réutilisé comme ennemi de terrain sur la
   // carte authored R4 (même précédent que lantern_wisp pour R3).
   gear_servitor:  { name: 'Serviteur à engrenages', hp: 50, dmg: 15, speed: 65, xp: 24, coins: 10, h: 78, behavior: 'brute', range: 80, aggro: 420, atkCd: 1.7, tele: 0.55, knock: 280 },
   // Monstre dédié des zones secrètes de la carte authored R4 (Souterrain des Sapeurs / Tour de
   // Siège) — premier archétype `parry` de l'ère (chaque ère précédente en a un dédié aux zones
-  // secrètes : stone_cave_stalker, crypt_wraith, medieval_bamboo_stalker). Pas de nouvel art :
-  // sprite emprunté via AR.ENEMY_FALLBACK (même mécanisme que stone_cave_stalker/crypt_wraith).
-  powder_saboteur:{ name: 'Saboteur des tranchées', hp: 90, dmg: 13, speed: 150, xp: 26, coins: 11, h: 80, behavior: 'assassin', range: 60, aggro: 520, atkCd: 1.7, tele: 0.35, blinkCd: 2.8, facing: 'l', parry: true },
+  // secrètes : stone_cave_stalker, crypt_wraith, medieval_bamboo_stalker). Art dédié généré le
+  // 2026-07-29 (audit cohérence thématique) : partageait auparavant le sprite de musketeer via
+  // AR.ENEMY_FALLBACK (littéralement la même image que le mousquetaire, sans rapport avec un
+  // saboteur), et son nom d'origine ("Saboteur des tranchées") empruntait un mot ("tranchées")
+  // qui appartient déjà à la Guerre diesel (`trench_soldier`) — renommé en Sapeur, en écho au nom
+  // de la zone secrète, avec une pioche de mineur comme arme au lieu d'un mousquet.
+  powder_saboteur:{ name: 'Sapeur', hp: 90, dmg: 13, speed: 150, xp: 26, coins: 11, h: 80, behavior: 'assassin', range: 60, aggro: 520, atkCd: 1.7, tele: 0.35, blinkCd: 2.8, facing: 'l', parry: true },
 
   // --- Guerre diesel
   trench_soldier: { name: 'Soldat des tranchées', hp: 115, dmg: 14, speed: 95, xp: 28, coins: 11, h: 82, behavior: 'ranged', range: 520, keep: 300, aggro: 620, atkCd: 1.8, tele: 0.5, proj: 'bullet', bayonet: true },
+  // Déplacé depuis le roster R4 (audit cohérence thématique du 2026-07-29) : son art (masque à
+  // gaz, réservoirs, tenue WWI) ne collait pas à la Renaissance et colle en fait parfaitement ici,
+  // aux côtés de trench_soldier/flamethrower/armored_trooper. Stats/id/art inchangés, seule son
+  // ère d'apparition change (cf. AR.ERAS.diesel.enemies + level_specs.js DIESEL).
+  mortar_crew:    { name: 'Servants de mortier', hp: 150, dmg: 20, speed: 40, xp: 34, coins: 14, h: 92, behavior: 'artillery', range: 720, keep: 420, aggro: 780, atkCd: 3.2, tele: 0.8, proj: 'mortar' },
   flamethrower:   { name: 'Lance-flammes', hp: 175, dmg: 6, speed: 70, xp: 34, coins: 14, h: 88, behavior: 'ranged', range: 240, keep: 170, aggro: 460, atkCd: 2.4, tele: 0.55, proj: 'flame' },
   armored_trooper:{ name: 'Trooper blindé', hp: 110, dmg: 18, speed: 60, xp: 40, coins: 16, h: 92, behavior: 'shield', range: 76, aggro: 400, atkCd: 1.7, tele: 0.5, block: 0.85, knock: 320 },
   roller_scout:   { name: 'Éclaireur à rouleau', hp: 300, dmg: 20, speed: 80, xp: 48, coins: 20, h: 96, behavior: 'charger', range: 520, aggro: 600, atkCd: 2.2, tele: 0.6, chargeSpeed: 500, knock: 360, elite: true },
@@ -182,8 +219,10 @@ AR.ENEMIES = {
   armored_hound:  { name: 'Chien de guerre blindé', hp: 34, dmg: 14, speed: 150, xp: 22, coins: 9, h: 60, behavior: 'melee', range: 65, aggro: 520, atkCd: 1.3, tele: 0.35, facing: 'l' },
   // Monstre dédié des zones secrètes de la carte authored R5 (galeries en cul-de-sac, salle de
   // grisou) — premier archétype `parry` de l'ère, même précédent que chaque ère précédente
-  // (stone_cave_stalker/crypt_wraith/medieval_bamboo_stalker/powder_saboteur). Pas de nouvel art :
-  // sprite emprunté via AR.ENEMY_FALLBACK.
+  // (stone_cave_stalker/crypt_wraith/medieval_bamboo_stalker). Art dédié généré le 2026-07-29
+  // (audit doublons via tools/check_sprite_duplicates.js) : partageait auparavant le sprite
+  // d'armored_trooper via AR.ENEMY_FALLBACK, ce qui ne rendait pas justice à son archétype
+  // agile/assassin (armored_trooper est un lourd porte-bouclier).
   diesel_tunnel_stalker: { name: 'Traqueur des galeries', hp: 120, dmg: 16, speed: 155, xp: 30, coins: 12, h: 84, behavior: 'assassin', range: 62, aggro: 540, atkCd: 1.7, tele: 0.32, blinkCd: 2.6, facing: 'l', parry: true },
 
   // --- Ère cyber
@@ -202,13 +241,7 @@ AR.ENEMIES = {
 AR.ENEMY_FALLBACK = {
   stone_cave_stalker: 'beast_hunter',
   stone_cave_bats: 'war_shaman',
-  crypt_wraith: 'desert_raider',
   tomb_scarabs: 'war_shaman',
-  chain_overseer: 'temple_guardian',
-  pit_vermin: 'desert_raider',
-  manacled_brute: 'hoplite',
-  powder_saboteur: 'musketeer',
-  diesel_tunnel_stalker: 'armored_trooper',
 };
 
 // ------------------------------------------------------------------ LES BOSS
@@ -279,22 +312,35 @@ AR.BOSSES = {
 };
 
 // ------------------------------------------------------------------- ARMES
+// 11 crans chacun (10 améliorations), ~2 par ère (R1->R6) pour étaler la progression sur
+// toute la run plutôt que la boucler dès R3 (cf. section Économie du TODO) et laisser la
+// place à une fenêtre de révélation par cran (cf. `Game#_grantWeaponTier`, `AR.UI.drawWeaponReveal`).
 AR.WEAPONS = {
   sword: [
-    { name: 'Katana usé', mult: 1.0 },
-    { name: 'Lame d\'obsidienne', mult: 1.3 },
-    { name: 'Katana ancestral', mult: 1.65 },
-    { name: 'Lame damasquinée', mult: 2.05 },
-    { name: 'Acier trempé au diesel', mult: 2.55 },
-    { name: 'Lame à plasma', mult: 3.2 },
+    { name: 'Katana usé', mult: 1.00 },
+    { name: 'Lame de silex taillé', mult: 1.15 },
+    { name: 'Gladius de bronze', mult: 1.30 },
+    { name: 'Lame d\'obsidienne', mult: 1.50 },
+    { name: 'Katana ancestral', mult: 1.70 },
+    { name: 'Lame du sanctuaire', mult: 1.95 },
+    { name: 'Rapière damasquinée', mult: 2.20 },
+    { name: 'Lame forgée au creuset', mult: 2.50 },
+    { name: 'Acier trempé au diesel', mult: 2.80 },
+    { name: 'Lame à turbine', mult: 3.15 },
+    { name: 'Lame à plasma', mult: 3.50 },
   ],
   bow: [
-    { name: 'Arc court', mult: 1.0 },
-    { name: 'Arc composite', mult: 1.3 },
-    { name: 'Arc du tengu', mult: 1.65 },
-    { name: 'Arc long renforcé', mult: 2.05 },
-    { name: 'Arc mécanique', mult: 2.55 },
-    { name: 'Arc à impulsion', mult: 3.2 },
+    { name: 'Arc court', mult: 1.00 },
+    { name: 'Arc en os taillé', mult: 1.15 },
+    { name: 'Arc composite', mult: 1.30 },
+    { name: 'Arc du sable', mult: 1.50 },
+    { name: 'Arc du tengu', mult: 1.70 },
+    { name: 'Arc laqué du sanctuaire', mult: 1.95 },
+    { name: 'Arc long renforcé', mult: 2.20 },
+    { name: 'Arbalète à ressort', mult: 2.50 },
+    { name: 'Arc mécanique', mult: 2.80 },
+    { name: 'Arc à contrepoids', mult: 3.15 },
+    { name: 'Arc à impulsion', mult: 3.50 },
   ],
 };
 
@@ -337,18 +383,51 @@ AR.SKILLS = [
       { id: 'spirit4', name: 'Transcendance', cost: 4, desc: 'Sorts : coût -30%, dégâts +50%' },
     ],
   },
+  // Mobilité/évasion — délibérément moins chère que les 4 autres voies (1+2+3+4=10 pts au lieu
+  // de 10 aussi mais sans dépendre d'y investir d'abord dans une autre branche complète, cf.
+  // retour joueur du 2026-07-29 : le triple saut/vol enterrés en fin de Voie de l'Esprit
+  // coûtaient bien trop cher en cumulé). Chaque nœud est indépendant, pas de paire comme
+  // spirit1/spirit3.
+  {
+    id: 'wind', name: 'Voie du Vent', color: '#4ad2ff',
+    nodes: [
+      { id: 'wind1', name: 'Bond du héron', cost: 1, desc: 'Débloque un triple saut' },
+      { id: 'wind2', name: 'Esquive', cost: 2, desc: '30% de chances d\'esquiver une attaque (corps à corps ou à distance)' },
+      { id: 'wind3', name: 'Lévitation', cost: 3, desc: 'Débloque le sort Lévitation (5)' },
+      { id: 'wind4', name: 'Faille personnelle', cost: 4, desc: 'Débloque le sort Téléport (6)' },
+    ],
+  },
 ];
 
 // ------------------------------------------------------------------- SORTS
 AR.SPELLS = [
   { id: 'wave', name: 'Vague spirituelle', key: '1', cost: 25, dmg: 30, desc: 'Onde de choc à 360° qui repousse les ennemis',
     icon: 'spells/icons/wave', cast: 'spells/wave_cast' },
-  { id: 'kunai', name: 'Nuée de kunaïs', key: '2', cost: 30, dmg: 14, desc: '5 kunaïs perforants en éventail',
+  { id: 'kunai', name: 'Nuée de kunaïs', key: '2', cost: 30, dmg: 14,
+    desc: '5 kunaïs perforants en éventail, étourdissent brièvement les ennemis touchés',
     icon: 'spells/icons/kunai', cast: 'spells/kunai_cast' },
-  { id: 'blink', name: 'Frappe éclair', key: '3', cost: 35, dmg: 40, desc: 'Traverse les ennemis en éclair, blessant tout sur le passage',
+  { id: 'blink', name: 'Frappe éclair', key: '3', cost: 35, dmg: 40,
+    desc: 'Traverse les ennemis en éclair, les blesse et les étourdit brièvement',
     icon: 'spells/icons/blink', cast: 'spells/blink_cast' },
   { id: 'veil', name: 'Voile temporel', key: '4', cost: 45, dmg: 0, desc: 'Ralentit tous les ennemis de 50% pendant 5 s',
     icon: 'spells/icons/veil', cast: 'spells/veil_cast' },
+  // `channel: true` : contrairement aux autres sorts (cast instantané, `cost` = coût ponctuel),
+  // la Lévitation se maintient tant que la touche est tenue et `cost` représente un coût en
+  // Esprit PAR SECONDE (cf. Player#_computeLevitating). Purement une aide au déplacement — le
+  // joueur garde sabre/arc/dash normalement en volant (cf. update()) — donc pas d'art dédié,
+  // réutilise l'icône/pose de Voile temporel.
+  { id: 'levitate', name: 'Lévitation', key: '5', cost: 16, dmg: 0, channel: true,
+    desc: 'Maintenir : flotte et s\'élève doucement, draine l\'Esprit en continu',
+    icon: 'spells/icons/veil', cast: 'spells/veil_cast' },
+  // Téléporte le héros à l'emplacement du curseur (cf. Player#castSpell, case 'teleport') —
+  // portée déjà limitée à l'écran visible puisque `aim` est la position souris convertie en
+  // coordonnées monde. Annulé sans consommer l'Esprit si la destination est solide (cf.
+  // vérification `solidAt` dans castSpell). Pose de cast dédiée (art généré le 2026-07-29,
+  // cf. assets/raw/hero_dodge_teleport_sheet.png) ; icône HUD réutilisée (Frappe éclair —
+  // même idée de déplacement instantané) en attendant un art dédié à cette taille.
+  { id: 'teleport', name: 'Téléport', key: '6', cost: 28, dmg: 0,
+    desc: 'Téléporte instantanément le héros à l\'emplacement du curseur',
+    icon: 'spells/icons/blink', cast: 'spells/teleport_cast' },
 ];
 
 // ---------------------------------------------------------------- BOUTIQUE
@@ -385,11 +464,11 @@ AR.ERA_SCALE = [1.0, 1.25, 1.55, 1.9, 2.3, 2.8];
 // titre, au lieu de toujours repartir de zéro (voir Game#newRun).
 AR.ERA_START_PROFILE = [
   { level: 1, coins: 60, swordTier: 0, bowTier: 0, skills: [], skillPoints: 0, potions: 1 },
-  { level: 5, coins: 180, swordTier: 1, bowTier: 0, skills: ['blade1'], skillPoints: 2, potions: 2 },
-  { level: 9, coins: 380, swordTier: 2, bowTier: 1, skills: ['blade1', 'blade2', 'bow1'], skillPoints: 3, potions: 2 },
-  { level: 13, coins: 650, swordTier: 3, bowTier: 2, skills: ['blade1', 'blade2', 'bow1', 'bow2', 'body1'], skillPoints: 4, potions: 3 },
-  { level: 17, coins: 980, swordTier: 4, bowTier: 3, skills: ['blade1', 'blade2', 'blade3', 'bow1', 'bow2', 'body1', 'body2'], skillPoints: 3, potions: 3 },
-  { level: 21, coins: 1400, swordTier: 5, bowTier: 4, skills: ['blade1', 'blade2', 'blade3', 'bow1', 'bow2', 'body1', 'body2', 'body3', 'spirit1'], skillPoints: 3, potions: 4 },
+  { level: 5, coins: 180, swordTier: 2, bowTier: 1, skills: ['blade1'], skillPoints: 2, potions: 2 },
+  { level: 9, coins: 380, swordTier: 4, bowTier: 3, skills: ['blade1', 'blade2', 'bow1'], skillPoints: 3, potions: 2 },
+  { level: 13, coins: 650, swordTier: 6, bowTier: 5, skills: ['blade1', 'blade2', 'bow1', 'bow2', 'body1'], skillPoints: 4, potions: 3 },
+  { level: 17, coins: 980, swordTier: 8, bowTier: 7, skills: ['blade1', 'blade2', 'blade3', 'bow1', 'bow2', 'body1', 'body2'], skillPoints: 3, potions: 3 },
+  { level: 21, coins: 1400, swordTier: 10, bowTier: 9, skills: ['blade1', 'blade2', 'blade3', 'bow1', 'bow2', 'body1', 'body2', 'body3', 'spirit1'], skillPoints: 3, potions: 4 },
 ];
 
 // ---------------------------------------------------- NIVEAUX DE DIFFICULTÉ

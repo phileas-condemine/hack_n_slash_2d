@@ -18,7 +18,8 @@ AR.C = {
   PLAYER: {
     W: 34, H: 62, DRAW_H: 92,
     WALK: 160, SPRINT: 265, ACCEL: 2400, AIR_CTRL: 0.75,
-    JUMP_VY: -600, DOUBLE_JUMP_VY: -540, JUMP_CUT: 0.45,
+    JUMP_VY: -600, DOUBLE_JUMP_VY: -540, TRIPLE_JUMP_VY: -460, JUMP_CUT: 0.45,
+    LEVITATE_LIFT: 900, LEVITATE_MAX_VY: -70, LEVITATE_SPIRIT_PER_S: 16,
     COYOTE: 0.09, BUFFER: 0.12,
     DASH_SPEED: 660, DASH_TIME: 0.16, DASH_CD: 0.5,
     HP: 100, SPIRIT: 100, SPIRIT_REGEN: 4,
@@ -47,6 +48,7 @@ AR.C = {
     interact: ['KeyE'],
     potion: ['KeyF'],
     spell1: ['Digit1'], spell2: ['Digit2'], spell3: ['Digit3'], spell4: ['Digit4'],
+    spell5: ['Digit5'], spell6: ['Digit6'],
     skills: ['KeyT'],
     toggleStats: ['Tab'],
     toggleMap: ['KeyN'],

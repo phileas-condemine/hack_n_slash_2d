@@ -67,7 +67,7 @@ AR.Pickups = {
       if (p.type === 'heart' || p.type === 'potionDrop') {
         if (AR.U.dist(p.x, p.y, pcx, pcy) < 34) {
           if (p.type === 'heart') { pl.heal(16); AR.Particles.text(p.x, p.y - 20, '+16', AR.C.COLORS.hp); }
-          else if (pl.potions < pl.potionMax) { pl.potions++; AR.Particles.text(p.x, p.y - 20, '+1 potion', '#7ec8ff'); }
+          else if (pl.potions < pl.potionMax) { pl.potions++; AR.Particles.text(p.x, p.y - 20, '+1 potion', AR.C.COLORS.hp); }
           else { game.addCoins(15); AR.Particles.text(p.x, p.y - 20, '+15 or', AR.C.COLORS.gold); }
           AR.Audio.sfx('potion');
           this.list.splice(i, 1); continue;
@@ -119,7 +119,7 @@ AR.Pickups = {
           break;
         }
         case 'potionDrop':
-          ctx.fillStyle = '#4a90c2';
+          ctx.fillStyle = AR.C.COLORS.hp;
           ctx.beginPath(); ctx.arc(0, -5, 7, 0, Math.PI * 2); ctx.fill();
           ctx.fillStyle = '#8a6a42'; ctx.fillRect(-2.5, -16, 5, 6);
           ctx.fillStyle = 'rgba(255,255,255,0.5)';

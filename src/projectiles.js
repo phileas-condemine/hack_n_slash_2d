@@ -130,6 +130,8 @@ AR.Projectiles = {
               break;
             }
             game.hitEnemy(e, p.dmg, { knockX: AR.U.sign(p.vx) * (p.knock || 160), proj: p });
+            // effet bonus du sort Nuée de kunaïs (cf. Player#castSpell, AR.SPELLS 'kunai')
+            if (p.stunDur && e.stun) e.stun(p.stunDur);
             if (p.explodeR) { this._explode(p, game); dead = true; break; }
             if (p.hitSet) p.hitSet.add(e);
             else { dead = true; break; }

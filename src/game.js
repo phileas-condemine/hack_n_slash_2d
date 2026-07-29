@@ -11,6 +11,7 @@ AR.Game = class {
     this.skillOpen = false;
     this.shopOpen = false;
     this.spellReveal = null;    // [idx, idx] : fenêtre explicative forcée à l'ouverture de 2 sorts
+    this.weaponReveal = null;   // {kind,prevTier,tier,name,dmgBefore,dmgAfter} : idem pour un cran d'arme
     this.demo = false;
     this.speed = 1;             // ×1 ×2 ×4 ×8 ×10 ×15 ×20 ×30 ×40 (mode démo)
     this.time = 0;
@@ -73,8 +74,8 @@ AR.Game = class {
     if (atBoss) {
       pl.level = base.level + 3;
       pl.skillPoints = base.skillPoints + 1;
-      pl.swordTier = Math.min(5, base.swordTier + 1);
-      pl.bowTier = Math.min(5, base.bowTier + 1);
+      pl.swordTier = Math.min(AR.WEAPONS.sword.length - 1, base.swordTier + 1);
+      pl.bowTier = Math.min(AR.WEAPONS.bow.length - 1, base.bowTier + 1);
       pl.potions = 3;
       this.coins = Math.round(base.coins * 1.6);
     } else {
@@ -115,7 +116,7 @@ AR.Game = class {
     this.loadLevel();
     if (this.startAtBoss) this._startBossFight();
     this.state = 'play';
-    this.paused = false; this.skillOpen = false; this.shopOpen = false; this.spellReveal = null;
+    this.paused = false; this.skillOpen = false; this.shopOpen = false; this.spellReveal = null; this.weaponReveal = null;
     if (demo) AR.HUD.notify('Plan IA équilibré — affinité ' + AR.DemoAI.focusLabel(), AR.C.COLORS.spirit);
   }
 
@@ -260,7 +261,7 @@ AR.Game = class {
 
     this.loadLevel();
     this.state = 'play';
-    this.paused = false; this.skillOpen = false; this.shopOpen = false; this.spellReveal = null;
+    this.paused = false; this.skillOpen = false; this.shopOpen = false; this.spellReveal = null; this.weaponReveal = null;
     AR.HUD.notify('Partie chargée : ' + s.name, AR.C.COLORS.spirit);
     return true;
   }
@@ -340,6 +341,7 @@ AR.Game = class {
     if (this.state === 'play') {
       if (In.pressed('pause')) {
         if (this.spellReveal) this.spellReveal = null;
+        else if (this.weaponReveal) this.weaponReveal = null;
         else if (this.skillOpen) this.skillOpen = false;
         else if (this.shopOpen) this.shopOpen = false;
         else this.paused = !this.paused;
@@ -798,6 +800,31 @@ AR.Game = class {
     this.stats.coinsEarned += n;
   }
 
+  // Incrémente le cran d'une arme (épée/arc) d'un cran, notifie, recalcule les stats et
+  // arme la fenêtre de révélation (`AR.UI.drawWeaponReveal`) avec l'avant/après réel des
+  // dégâts (lu sur `pl.stats`, donc toujours cohérent avec les bonus de compétences déjà
+  // acquis). Centralise ce qui était dupliqué à 7 endroits (coffres/boutique/faille), avec
+  // le même bug latent partout (plafond `5` en dur, devenu faux avec le passage à 11 crans).
+  // Retourne false si déjà au cran maximum (l'appelant compense alors autrement, ex. en or).
+  _grantWeaponTier(kind) {
+    const pl = this.player;
+    const tierKey = kind === 'sword' ? 'swordTier' : 'bowTier';
+    const weapons = kind === 'sword' ? AR.WEAPONS.sword : AR.WEAPONS.bow;
+    const dmgKey = kind === 'sword' ? 'swordDmg' : 'bowDmg';
+    if (pl[tierKey] >= weapons.length - 1) return false;
+    const prevTier = pl[tierKey];
+    const dmgBefore = pl.stats[dmgKey];
+    pl[tierKey] = prevTier + 1;
+    pl.recalcStats(this);
+    const icon = kind === 'sword' ? '⚔' : '🏹';
+    const label = kind === 'sword' ? 'Nouvelle lame' : 'Nouvel arc';
+    AR.HUD.notify(icon + ' ' + label + ' : ' + weapons[pl[tierKey]].name + ' !', kind === 'sword' ? AR.C.COLORS.impact : AR.C.COLORS.spirit);
+    if (!this.demo) {
+      this.weaponReveal = { kind, prevTier, tier: pl[tierKey], name: weapons[pl[tierKey]].name, dmgBefore, dmgAfter: pl.stats[dmgKey] };
+    }
+    return true;
+  }
+
   // ================================================== BUTIN & COFFRES
   openChest(chest) {
     chest.opened = true;
@@ -813,14 +840,8 @@ AR.Game = class {
       return;
     }
     if (chest.guaranteed === 'swordUp' || chest.guaranteed === 'bowUp') {
-      const tierKey = chest.guaranteed === 'swordUp' ? 'swordTier' : 'bowTier';
-      const weapons = chest.guaranteed === 'swordUp' ? AR.WEAPONS.sword : AR.WEAPONS.bow;
-      const icon = chest.guaranteed === 'swordUp' ? '⚔' : '🏹';
-      if (pl[tierKey] < 5) {
-        pl[tierKey]++;
-        AR.HUD.notify(icon + ' Nouvelle arme : ' + weapons[pl[tierKey]].name + ' !', AR.C.COLORS.impact);
-        pl.recalcStats(this);
-      } else {
+      const kind = chest.guaranteed === 'swordUp' ? 'sword' : 'bow';
+      if (!this._grantWeaponTier(kind)) {
         AR.Pickups.coinBurst(chest.x, chest.y - 14, 40, 3); // déjà au max : compensation en or
       }
       return;
@@ -828,14 +849,10 @@ AR.Game = class {
     // coffres perchés : le butin récompense toujours l'escalade
     if (chest.high) {
       const r2 = Math.random();
-      if (r2 < 0.45 && (pl.swordTier < 5 || pl.bowTier < 5)) {
-        if ((Math.random() < 0.5 && pl.swordTier < 5) || pl.bowTier >= 5) {
-          pl.swordTier++;
-          AR.HUD.notify('⚔ Nouvelle lame : ' + AR.WEAPONS.sword[pl.swordTier].name + ' !', AR.C.COLORS.impact);
-        } else {
-          pl.bowTier++;
-          AR.HUD.notify('🏹 Nouvel arc : ' + AR.WEAPONS.bow[pl.bowTier].name + ' !', AR.C.COLORS.spirit);
-        }
+      const swordMax = AR.WEAPONS.sword.length - 1, bowMax = AR.WEAPONS.bow.length - 1;
+      if (r2 < 0.45 && (pl.swordTier < swordMax || pl.bowTier < bowMax)) {
+        const preferSword = (Math.random() < 0.5 && pl.swordTier < swordMax) || pl.bowTier >= bowMax;
+        this._grantWeaponTier(preferSword ? 'sword' : 'bow');
       } else if (r2 < 0.75) {
         pl.skillPoints++;
         AR.HUD.notify('📜 Parchemin ancien : +1 point de compétence !', AR.C.COLORS.xp);
@@ -861,16 +878,13 @@ AR.Game = class {
       if (r < 0.40) { AR.Pickups.drop('potionDrop', chest.x, chest.y - 10); return; }
       if (r < 0.78) { AR.Pickups.drop('heart', chest.x, chest.y - 10); return; }
       if (r < 0.86) {
-        if (Math.random() < 0.5 && pl.swordTier < 5) {
-          pl.swordTier++;
-          AR.HUD.notify('⚔ Nouvelle lame : ' + AR.WEAPONS.sword[pl.swordTier].name + ' !', AR.C.COLORS.impact);
-        } else if (pl.bowTier < 5) {
-          pl.bowTier++;
-          AR.HUD.notify('🏹 Nouvel arc : ' + AR.WEAPONS.bow[pl.bowTier].name + ' !', AR.C.COLORS.spirit);
+        if (Math.random() < 0.5 && pl.swordTier < AR.WEAPONS.sword.length - 1) {
+          this._grantWeaponTier('sword');
+        } else if (pl.bowTier < AR.WEAPONS.bow.length - 1) {
+          this._grantWeaponTier('bow');
         } else {
           AR.Pickups.coinBurst(chest.x, chest.y - 14, 14, 3);
         }
-        pl.recalcStats(this);
         return;
       }
       if (r < 0.93) {
@@ -896,16 +910,13 @@ AR.Game = class {
       AR.Pickups.drop('heart', chest.x, chest.y - 10);
     } else if (r < 0.62) {
       // amélioration d'arme
-      if (Math.random() < 0.5 && pl.swordTier < 5) {
-        pl.swordTier++;
-        AR.HUD.notify('⚔ Nouvelle lame : ' + AR.WEAPONS.sword[pl.swordTier].name + ' !', AR.C.COLORS.impact);
-      } else if (pl.bowTier < 5) {
-        pl.bowTier++;
-        AR.HUD.notify('🏹 Nouvel arc : ' + AR.WEAPONS.bow[pl.bowTier].name + ' !', AR.C.COLORS.spirit);
+      if (Math.random() < 0.5 && pl.swordTier < AR.WEAPONS.sword.length - 1) {
+        this._grantWeaponTier('sword');
+      } else if (pl.bowTier < AR.WEAPONS.bow.length - 1) {
+        this._grantWeaponTier('bow');
       } else {
         AR.Pickups.coinBurst(chest.x, chest.y - 14, 14, 3);
       }
-      pl.recalcStats(this);
     } else if (r < 0.78) {
       pl.skillPoints++;
       AR.HUD.notify('📜 Parchemin ancien : +1 point de compétence !', AR.C.COLORS.xp);
@@ -943,16 +954,16 @@ AR.Game = class {
     const pl = this.player;
     // achats à effets uniques impossibles ?
     if (item.id === 'potion' && pl.potions >= pl.potionMax) { AR.HUD.notify('Potions déjà au maximum'); return false; }
-    if (item.id === 'swordUp' && pl.swordTier >= 5) { AR.HUD.notify('Épée déjà au maximum'); return false; }
-    if (item.id === 'bowUp' && pl.bowTier >= 5) { AR.HUD.notify('Arc déjà au maximum'); return false; }
+    if (item.id === 'swordUp' && pl.swordTier >= AR.WEAPONS.sword.length - 1) { AR.HUD.notify('Épée déjà au maximum'); return false; }
+    if (item.id === 'bowUp' && pl.bowTier >= AR.WEAPONS.bow.length - 1) { AR.HUD.notify('Arc déjà au maximum'); return false; }
     this.coins -= item.price;
     item.sold = item.id !== 'potion' || pl.potions + 1 >= pl.potionMax;
     AR.Audio.sfx('buy');
     switch (item.id) {
       case 'potion': pl.potions++; break;
       case 'fullheal': pl.heal(pl.maxHp); break;
-      case 'swordUp': pl.swordTier++; AR.HUD.notify('⚔ ' + AR.WEAPONS.sword[pl.swordTier].name + ' !', AR.C.COLORS.impact); break;
-      case 'bowUp': pl.bowTier++; AR.HUD.notify('🏹 ' + AR.WEAPONS.bow[pl.bowTier].name + ' !', AR.C.COLORS.spirit); break;
+      case 'swordUp': this._grantWeaponTier('sword'); break;
+      case 'bowUp': this._grantWeaponTier('bow'); break;
       case 'crit': pl.buffs.crit++; break;
       case 'hpUp': pl.buffs.hpUp++; break;
       case 'spiritUp': pl.buffs.spiritUp++; break;
@@ -1000,8 +1011,8 @@ AR.Game = class {
 
     const upgrades = this.shopStock.map((item, i) => ({ item, i }))
       .filter(({ item }) => !item.sold && permanent.has(item.id) &&
-        !(item.id === 'swordUp' && pl.swordTier >= 5) &&
-        !(item.id === 'bowUp' && pl.bowTier >= 5))
+        !(item.id === 'swordUp' && pl.swordTier >= AR.WEAPONS.sword.length - 1) &&
+        !(item.id === 'bowUp' && pl.bowTier >= AR.WEAPONS.bow.length - 1))
       .sort((a, b) => {
         const score = ({ item }) => (baseScore[item.id] || 0) +
           (focusItems.has(item.id) ? 25 : 0) +
@@ -1040,12 +1051,20 @@ AR.Game = class {
       AR.HUD.notify('Sorts 3 et 4 débloqués !', AR.C.COLORS.magic);
       if (!this.demo) this.spellReveal = [2, 3];
     }
+    if (nodeId === 'wind3') {
+      AR.HUD.notify('Sort Lévitation débloqué !', AR.C.COLORS.magic);
+      if (!this.demo) this.spellReveal = [AR.SPELLS.findIndex((s) => s.id === 'levitate')];
+    }
+    if (nodeId === 'wind4') {
+      AR.HUD.notify('Sort Téléport débloqué !', AR.C.COLORS.magic);
+      if (!this.demo) this.spellReveal = [AR.SPELLS.findIndex((s) => s.id === 'teleport')];
+    }
     return true;
   }
 
   buySkillAuto() {
-    const order = ['blade1', 'bow1', 'body1', 'spirit1', 'blade3', 'bow2', 'body2', 'spirit2',
-      'blade2', 'bow3', 'body3', 'spirit3', 'blade4', 'bow4', 'body4', 'spirit4'];
+    const order = ['blade1', 'bow1', 'body1', 'spirit1', 'wind1', 'blade3', 'bow2', 'body2', 'spirit2', 'wind2',
+      'blade2', 'bow3', 'body3', 'spirit3', 'wind3', 'blade4', 'bow4', 'body4', 'spirit4', 'wind4'];
     for (const id of order) {
       if (this.player.skillPoints <= 0) break;
       if (this.player.skills.has(id)) continue;
@@ -1112,12 +1131,11 @@ AR.Game = class {
     const rift = this.riftChoices[i];
     const pl = this.player;
     switch (rift.id) {
-      case 'forge':
-        if (Math.random() < 0.5 && pl.swordTier < 5) pl.swordTier++;
-        else if (pl.bowTier < 5) pl.bowTier++;
-        else if (pl.swordTier < 5) pl.swordTier++;
-        AR.HUD.notify('⚔ ' + AR.WEAPONS.sword[pl.swordTier].name + ' / ' + AR.WEAPONS.bow[pl.bowTier].name);
+      case 'forge': {
+        const preferSword = (Math.random() < 0.5 && pl.swordTier < AR.WEAPONS.sword.length - 1) || pl.bowTier >= AR.WEAPONS.bow.length - 1;
+        this._grantWeaponTier(preferSword ? 'sword' : 'bow');
         break;
+      }
       case 'sanctuary': pl.heal(Math.round(pl.maxHp * 0.6)); break;
       case 'blood': this.mods.hpMult *= 0.8; this.mods.dmgMult *= 1.4; break;
       case 'market': this.addCoins(120); this.mods.shopDiscount = 0.7; break;
@@ -1196,9 +1214,10 @@ AR.Game = class {
     if (this.state === 'gameover') { AR.UI.drawEnd(ctx, this, false); AR.UI.drawCursor(ctx); return; }
     if (this.state === 'victory') { AR.UI.drawEnd(ctx, this, true); AR.UI.drawCursor(ctx); return; }
     if (this.spellReveal) AR.UI.drawSpellReveal(ctx, this);
+    else if (this.weaponReveal) AR.UI.drawWeaponReveal(ctx, this);
     else if (this.skillOpen) AR.UI.drawSkills(ctx, this);
     else if (this.shopOpen) AR.UI.drawShop(ctx, this);
     else if (this.paused) AR.UI.drawPause(ctx, this);
-    if (this.spellReveal || this.skillOpen || this.shopOpen || this.paused) AR.UI.drawCursor(ctx);
+    if (this.spellReveal || this.weaponReveal || this.skillOpen || this.shopOpen || this.paused) AR.UI.drawCursor(ctx);
   }
 };

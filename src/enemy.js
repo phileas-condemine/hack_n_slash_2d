@@ -81,6 +81,18 @@ AR.Enemy = class {
     this.hijackFireT = 0.4;
   }
 
+  // Effet bonus des sorts Nuée de kunaïs / Frappe éclair (cf. Player#castSpell, AR.SPELLS) :
+  // réutilise l'état 'stunned' déjà déclenché quand un chargeur percute un mur (cf. update(),
+  // case 'charge'), avec une durée personnalisée au lieu du défaut 0.9s codé en dur dans ce
+  // cas-là. Les boss ignorent l'étourdissement (même armure que le knockback, cf. `opts.knockX
+  // && !this.isBoss` plus bas) — sinon spammer le sort verrouillerait un boss en continu.
+  stun(duration) {
+    if (this.dead || this.isBoss) return;
+    this.state = 'stunned';
+    this.t = 0;
+    this.stunDur = duration;
+  }
+
   centerX() { return this.x + this.w / 2; }
   centerY() { return this.y + this.h / 2; }
 
@@ -436,7 +448,9 @@ AR.Enemy = class {
       }
       case 'stunned': {
         this.vx = 0;
-        if (this.t > 0.9) { this.state = 'chase'; this.t = 0; this.atkTimer = def.atkCd * diff.atkCdMult; }
+        if (this.t > (this.stunDur || 0.9)) {
+          this.state = 'chase'; this.t = 0; this.atkTimer = def.atkCd * diff.atkCdMult; this.stunDur = 0;
+        }
         break;
       }
       // Piratage (R6, cf. `hijack()`) : mode tourelle alliée — immobile (même flottement que
@@ -481,8 +495,10 @@ AR.Enemy = class {
       }
       if (this.y > (game.level.worldH || AR.C.WORLD_H) * AR.C.TILE + 100) { this.hp = 0; this.die(game, true); }
     }
-    // contact direct (hors charge, qui gère ses dégâts)
-    if (!pl.dead && this.state !== 'charge' && this.state !== 'dive' &&
+    // contact direct (hors charge, qui gère ses dégâts, et hors étourdi — chargeur sonné contre
+    // un mur (case 'charge' ci-dessus) ou cible de kunai/Frappe éclair (cf. Enemy#stun) : pas
+    // dangereux au toucher pendant ce temps, c'est tout l'intérêt de l'étourdissement)
+    if (!pl.dead && this.state !== 'charge' && this.state !== 'dive' && this.state !== 'stunned' &&
         AR.U.rectsOverlap(this.getRect(), pl.getRect())) {
       game.hitPlayer(Math.round(this.dmg * 0.4), this.centerX());
     }
@@ -950,6 +966,22 @@ AR.Enemy = class {
     if (this.flash > 0.4) tint = 'brightness(2.6)';
     else if (visualState === 'windup') tint = (Math.sin(time * 26) > 0) ? 'brightness(1.6) saturate(1.6)' : undefined;
     AR.Assets.draw(ctx, key, fx, fy + bob, this.drawH, flip, alpha, tint);
+
+    // étourdi (chargeur contre un mur, ou touché par kunai/Frappe éclair, cf. Enemy#stun) :
+    // petites étoiles qui tournent au-dessus de la tête, en plus de la pose neutre déjà choisie
+    // par `_visualState()` pour cet état — signale clairement que le contact est sans danger.
+    if (this.state === 'stunned') {
+      ctx.save();
+      const scx = fx, scy = fy - this.h - 8;
+      ctx.font = 'bold 13px sans-serif';
+      ctx.textAlign = 'center';
+      ctx.fillStyle = AR.C.COLORS.gold;
+      for (let s = 0; s < 3; s++) {
+        const a = time * 5 + s * (Math.PI * 2 / 3);
+        ctx.fillText('★', scx + Math.cos(a) * 15, scy + Math.sin(a) * 5);
+      }
+      ctx.restore();
+    }
 
     // télégraphe de téléportation : trait d'énergie vers la zone cible
     if (this.state === 'tpWindup' && this.tpTarget) {

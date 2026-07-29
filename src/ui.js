@@ -193,7 +193,7 @@ AR.UI = {
     ctx.fillText(game.eraStartIdx === 0
       ? startEra.name + ' — départ classique (niveau 1, sans équipement)'
       : startEra.name + ' — départ niveau ' + startProfile.level + ', ' + startProfile.coins + ' or, sabre ' +
-        (startProfile.swordTier + 1) + '/6, arc ' + (startProfile.bowTier + 1) + '/6',
+        (startProfile.swordTier + 1) + '/' + AR.WEAPONS.sword.length + ', arc ' + (startProfile.bowTier + 1) + '/' + AR.WEAPONS.bow.length,
       W / 2, 610);
     ctx.restore();
 
@@ -249,13 +249,14 @@ AR.UI = {
     this.panel(ctx, 160, 50, AR.C.VIEW_W - 320, AR.C.VIEW_H - 100, '— AIDE —');
     const lines = [
       ['Déplacements', 'ZQSD / WASD / Flèches — Espace : saut, ressauter en l\'air : double saut'],
-      ['Dash / Sprint', 'Maj (appui bref) : dash avec invulnérabilité — Maj (maintenu) : sprint'],
+      ['Dash / Sprint', 'Maj (appui bref) ou double appui gauche/droite : dash invulnérable — Maj (maintenu) : sprint'],
       ['Sabre', 'Clic gauche : coup rapide (3 coups = combo). MAINTENIR puis relâcher : frappe chargée'],
       ['', 'qui traverse les ennemis alignés. La barre au-dessus du héros montre la charge.'],
       ['Arc', 'Clic droit : tir rapide. MAINTENIR : bander l\'arc — relâcher une fois chargé'],
       ['', 'pour une flèche perçante qui transperce tout sur sa trajectoire.'],
       ['Sorts', 'Touches 1-4 (à débloquer dans l\'arbre de compétences, coûtent de l\'esprit)'],
-      ['Interactions', 'E : coffres, marchand, portail — F : boire une potion — S+Espace : descendre'],
+      ['Interactions', 'E : coffres, marchand, portail — F : boire une potion'],
+      ['', 'S+Espace ou double appui bas : descendre à travers une plateforme'],
       ['Progression', 'T : arbre de compétences. L\'XP donne des niveaux, chaque niveau donne 1 point.'],
       ['', 'À la fin de chaque ère : un boss, puis un choix de faille qui modifie la suite.'],
       ['Mode démo', 'G : l\'IA joue toute seule — +/- : vitesse ×1 ×2 ×4 ×8'],
@@ -407,8 +408,11 @@ AR.UI = {
     ctx.fillText('★ Points disponibles : ' + pl.skillPoints, W / 2, 78);
     ctx.restore();
 
-    const colW = (W - 260) / 4;
-    for (let b = 0; b < 4; b++) {
+    // Nombre de colonnes calculé sur AR.SKILLS (5 voies depuis l'ajout de la Voie du Vent,
+    // cf. `data.js`) plutôt que fixé en dur, pour ne pas avoir à retoucher ce layout à chaque
+    // ajout/suppression de branche.
+    const colW = (W - 260) / AR.SKILLS.length;
+    for (let b = 0; b < AR.SKILLS.length; b++) {
       const branch = AR.SKILLS[b];
       const x = 130 + b * colW;
       ctx.save();
@@ -417,7 +421,7 @@ AR.UI = {
       ctx.font = 'bold 17px Georgia, serif';
       ctx.fillText(branch.name, x + colW / 2 - 10, 118);
       ctx.restore();
-      for (let n = 0; n < 4; n++) {
+      for (let n = 0; n < branch.nodes.length; n++) {
         const node = branch.nodes[n];
         const owned = pl.skills.has(node.id);
         const prerequisiteMet = n === 0 || pl.skills.has(branch.nodes[n - 1].id);
@@ -432,12 +436,13 @@ AR.UI = {
         ctx.lineWidth = owned ? 2.5 : 1.5;
         ctx.strokeRect(r.x, r.y, r.w, r.h);
         ctx.fillStyle = owned ? branch.color : canBuy ? AR.C.COLORS.text : AR.C.COLORS.textDim;
-        ctx.font = 'bold 14px "Segoe UI", sans-serif';
+        ctx.font = 'bold 13px "Segoe UI", sans-serif';
         ctx.textAlign = 'left';
-        ctx.fillText((owned ? '✔ ' : canBuy ? '○ ' : '🔒 ') + node.name, r.x + 10, y + 24);
+        this._wrapText(ctx, (owned ? '✔ ' : canBuy ? '○ ' : '🔒 ') + node.name, r.x + 10, y + 20, r.w - 44, 15);
         ctx.textAlign = 'right';
         ctx.fillStyle = owned ? branch.color : canBuy ? AR.C.COLORS.xp : AR.C.COLORS.textDim;
-        ctx.fillText(node.cost + ' pt' + (node.cost > 1 ? 's' : ''), r.x + r.w - 10, y + 24);
+        ctx.font = 'bold 12px "Segoe UI", sans-serif';
+        ctx.fillText(node.cost + ' pt' + (node.cost > 1 ? 's' : ''), r.x + r.w - 8, y + 18);
         ctx.font = '12px "Segoe UI", sans-serif';
         ctx.textAlign = 'left';
         ctx.fillStyle = AR.C.COLORS.textDim;
@@ -456,8 +461,8 @@ AR.UI = {
     const W = AR.C.VIEW_W, H = AR.C.VIEW_H;
     const ids = game.spellReveal;
     const pw = 560, ph = 300, px = W / 2 - pw / 2, py = H / 2 - ph / 2;
-    this.panel(ctx, px, py, pw, ph, '✨ Nouveaux sorts !');
-    const colW = pw / 2;
+    this.panel(ctx, px, py, pw, ph, ids.length > 1 ? '✨ Nouveaux sorts !' : '✨ Nouveau sort !');
+    const colW = pw / ids.length;
     for (let i = 0; i < ids.length; i++) {
       const sp = AR.SPELLS[ids[i]];
       const cx = px + colW * i;
@@ -476,11 +481,111 @@ AR.UI = {
       this._wrapTextCentered(ctx, sp.desc, cx + colW / 2, py + 170, colW - 60, 15);
       ctx.fillStyle = AR.C.COLORS.spirit;
       ctx.font = 'bold 12px "Segoe UI", sans-serif';
-      ctx.fillText('Coût : ' + sp.cost + ' esprit', cx + colW / 2, py + 222);
+      ctx.fillText('Coût : ' + sp.cost + ' esprit' + (sp.channel ? '/s' : ''), cx + colW / 2, py + 222);
       ctx.restore();
     }
     if (this.button(ctx, W / 2 - 110, py + ph - 56, 220, 42, 'Compris  [Entrée]') ||
       AR.Input.pressed('confirm')) game.spellReveal = null;
+  },
+
+  // ======================================= RÉVÉLATION DE CRAN D'ARME
+  // Fenêtre déclenchée par `Game#_grantWeaponTier` à chaque amélioration d'épée/arc (coffre,
+  // boutique, faille de forge) : montre le nouveau design (icône réelle si un art dédié existe
+  // dans `assets/weapons/`, sinon une icône procédurale de repli qui progresse déjà visuellement
+  // avec le cran) et l'écart de dégâts réel avant/après (lu sur `pl.stats`, donc cohérent avec
+  // les bonus de compétences déjà acquis).
+  drawWeaponReveal(ctx, game) {
+    const W = AR.C.VIEW_W, H = AR.C.VIEW_H;
+    const r = game.weaponReveal;
+    const weapons = r.kind === 'sword' ? AR.WEAPONS.sword : AR.WEAPONS.bow;
+    const maxTier = weapons.length - 1;
+    const pw = 380, ph = 372, px = W / 2 - pw / 2, py = H / 2 - ph / 2;
+    this.panel(ctx, px, py, pw, ph, r.kind === 'sword' ? '⚔ Nouvelle lame !' : '🏹 Nouvel arc !');
+    const cx = px + pw / 2;
+
+    ctx.save();
+    ctx.fillStyle = 'rgba(10,14,18,0.7)';
+    ctx.fillRect(px + 20, py + 66, pw - 40, 110);
+    ctx.strokeStyle = r.kind === 'sword' ? AR.C.COLORS.impact : AR.C.COLORS.spirit;
+    ctx.lineWidth = 1.5;
+    ctx.strokeRect(px + 20, py + 66, pw - 40, 110);
+    const iconKey = 'weapons/' + r.kind + '_' + (r.tier + 1);
+    if (AR.SPRITE_META && AR.SPRITE_META[iconKey]) {
+      AR.Assets.drawIcon(ctx, iconKey, cx - 44, py + 74, 88, 1);
+    } else {
+      this._drawWeaponIcon(ctx, r.kind, cx, py + 121, 84, r.tier, maxTier);
+    }
+    ctx.restore();
+
+    ctx.textAlign = 'center';
+    ctx.fillStyle = AR.C.COLORS.text;
+    ctx.font = 'bold 17px "Segoe UI", sans-serif';
+    ctx.fillText(r.name, cx, py + 202);
+    ctx.fillStyle = AR.C.COLORS.textDim;
+    ctx.font = '12px "Segoe UI", sans-serif';
+    ctx.fillText('Cran ' + (r.tier + 1) + ' / ' + (maxTier + 1), cx, py + 222);
+
+    const pct = r.dmgBefore > 0 ? Math.round((r.dmgAfter / r.dmgBefore - 1) * 100) : 0;
+    ctx.font = 'bold 15px "Segoe UI", sans-serif';
+    ctx.fillStyle = AR.C.COLORS.textDim;
+    ctx.fillText('Dégâts', cx, py + 254);
+    ctx.font = 'bold 20px "Segoe UI", sans-serif';
+    ctx.fillStyle = AR.C.COLORS.text;
+    ctx.fillText(Math.round(r.dmgBefore) + ' → ' + Math.round(r.dmgAfter), cx, py + 280);
+    ctx.font = 'bold 14px "Segoe UI", sans-serif';
+    ctx.fillStyle = AR.C.COLORS.spirit;
+    ctx.fillText('+' + pct + '%', cx, py + 300);
+
+    if (this.button(ctx, cx - 110, py + ph - 50, 220, 40, 'Compris  [Entrée]') ||
+      AR.Input.pressed('confirm')) game.weaponReveal = null;
+  },
+
+  // Icône de repli dessinée à la main (tant qu'aucun art dédié n'existe pour ce cran dans
+  // `assets/weapons/`) : silhouette simple qui se dore et se pare d'un léger halo à mesure que
+  // le cran progresse, pour donner un vrai sentiment de progression même sans sprite réel.
+  _drawWeaponIcon(ctx, kind, cx, cy, size, tier, maxTier) {
+    const f = maxTier > 0 ? tier / maxTier : 0;
+    const metal = f < 0.5 ? '#9aa0a6' : (f < 0.8 ? '#d8c88a' : '#ffe9a3');
+    const glow = kind === 'sword' ? '#ff7a45' : AR.C.COLORS.spirit;
+    ctx.save();
+    ctx.translate(cx, cy);
+    if (f > 0.55) { ctx.shadowColor = glow; ctx.shadowBlur = 10 + f * 18; }
+    const s = size;
+    if (kind === 'sword') {
+      ctx.fillStyle = metal;
+      ctx.beginPath();
+      ctx.moveTo(0, -s * 0.46);
+      ctx.lineTo(s * 0.07, -s * 0.06);
+      ctx.lineTo(s * 0.05, s * 0.1);
+      ctx.lineTo(-s * 0.05, s * 0.1);
+      ctx.lineTo(-s * 0.07, -s * 0.06);
+      ctx.closePath();
+      ctx.fill();
+      if (f > 0.55) {
+        ctx.strokeStyle = glow; ctx.lineWidth = 1.5;
+        ctx.beginPath(); ctx.moveTo(0, -s * 0.42); ctx.lineTo(0, s * 0.06); ctx.stroke();
+      }
+      ctx.fillStyle = '#7a6a52';
+      ctx.fillRect(-s * 0.17, s * 0.1, s * 0.34, s * 0.05);
+      ctx.fillStyle = '#4a3f30';
+      ctx.fillRect(-s * 0.035, s * 0.15, s * 0.07, s * 0.16);
+      ctx.beginPath(); ctx.arc(0, s * 0.34, s * 0.045, 0, Math.PI * 2); ctx.fill();
+    } else {
+      ctx.strokeStyle = metal; ctx.lineWidth = s * 0.045; ctx.lineCap = 'round';
+      ctx.beginPath();
+      ctx.arc(s * 0.32, 0, s * 0.42, Math.PI * 0.58, -Math.PI * 0.58, true);
+      ctx.stroke();
+      ctx.strokeStyle = f > 0.55 ? glow : 'rgba(230,225,212,0.65)';
+      ctx.lineWidth = 1.2;
+      ctx.beginPath();
+      ctx.moveTo(-s * 0.02, -s * 0.34);
+      ctx.lineTo(-s * 0.16, 0);
+      ctx.lineTo(-s * 0.02, s * 0.34);
+      ctx.stroke();
+      ctx.strokeStyle = metal; ctx.lineWidth = s * 0.03;
+      ctx.beginPath(); ctx.moveTo(-s * 0.16, 0); ctx.lineTo(s * 0.24, 0); ctx.stroke();
+    }
+    ctx.restore();
   },
 
   // ============================================================ BOUTIQUE

@@ -44,7 +44,7 @@ AR.HUD = {
     for (let i = 0; i < pl.potionMax; i++) {
       const px = bx + i * 26, py = by + 66;
       ctx.globalAlpha = i < pl.potions ? 1 : 0.25;
-      ctx.fillStyle = '#4a90c2';
+      ctx.fillStyle = AR.C.COLORS.hp;
       ctx.beginPath(); ctx.arc(px + 8, py + 10, 8, 0, Math.PI * 2); ctx.fill();
       ctx.fillStyle = '#8a6a42'; ctx.fillRect(px + 5, py - 2, 6, 6);
       ctx.globalAlpha = 1;
@@ -76,11 +76,11 @@ AR.HUD = {
     let sx = bx;
     const slot = 48, sy = AR.C.VIEW_H - 66;
     let hoverSpell = -1, hoverX = 0;
-    for (let i = 0; i < 4; i++) {
+    for (let i = 0; i < AR.SPELLS.length; i++) {
       const sp = AR.SPELLS[i];
       const unlocked = pl.spellUnlocked(i);
       const cost = sp.cost * pl.stats.spellCostMult;
-      const ready = unlocked && pl.spirit >= cost && pl.spellCds[i] <= 0;
+      const ready = unlocked && (sp.channel ? pl.spirit > 0 : pl.spirit >= cost) && pl.spellCds[i] <= 0;
       if (AR.U.pointInRect(AR.Input.mouse.x, AR.Input.mouse.y, { x: sx, y: sy, w: slot, h: slot })) {
         hoverSpell = i; hoverX = sx;
       }
@@ -108,12 +108,15 @@ AR.HUD = {
       ctx.font = 'bold 11px "Segoe UI", sans-serif'; ctx.textAlign = 'center';
       ctx.fillText(sp.key, sx + 7.5, sy + 11.5);
       if (unlocked) {
-        // coût en esprit (coin bas-droit)
+        // coût en esprit (coin bas-droit) — pour un sort « channel » (Lévitation), il s'agit
+        // d'un coût par seconde tant que la touche est tenue, pas d'un coût ponctuel : suffixé
+        // « /s » pour éviter toute confusion avec les 4 sorts à cast instantané.
+        const costW = sp.channel ? 26 : 19;
         ctx.fillStyle = 'rgba(0,0,0,0.75)';
-        ctx.fillRect(sx + slot - 19, sy + slot - 14, 19, 14);
-        ctx.fillStyle = pl.spirit >= cost ? C.spirit : C.danger;
+        ctx.fillRect(sx + slot - costW, sy + slot - 14, costW, 14);
+        ctx.fillStyle = (sp.channel ? pl.spirit > 0 : pl.spirit >= cost) ? C.spirit : C.danger;
         ctx.font = 'bold 10px "Segoe UI", sans-serif';
-        ctx.fillText(Math.round(cost), sx + slot - 9.5, sy + slot - 3.5);
+        ctx.fillText(Math.round(cost) + (sp.channel ? '/s' : ''), sx + slot - costW / 2, sy + slot - 3.5);
       } else {
         // cadenas
         ctx.fillStyle = 'rgba(0,0,0,0.45)';
@@ -128,7 +131,12 @@ AR.HUD = {
     // nom du sort survolé... au cast : petit rappel sous les slots
     ctx.fillStyle = C.textDim;
     ctx.font = '10px "Segoe UI", sans-serif';
-    ctx.fillText(pl.spellUnlocked(0) || pl.spellUnlocked(2) ? 'Sorts [1-4]' : 'Sorts : arbre [T], voie de l\'Esprit', bx, AR.C.VIEW_H - 8);
+    // Les sorts 5/6 se débloquent désormais indépendamment (voie du Vent) plutôt que par paire
+    // (spirit1/spirit3 ci-dessus) : on cherche le dernier emplacement débloqué plutôt que de
+    // supposer une progression continue [1-2-3-4-5-6].
+    let lastUnlockedIdx = -1;
+    for (let k = AR.SPELLS.length - 1; k >= 0; k--) { if (pl.spellUnlocked(k)) { lastUnlockedIdx = k; break; } }
+    ctx.fillText(lastUnlockedIdx >= 0 ? 'Sorts [1-' + AR.SPELLS[lastUnlockedIdx].key + ']' : 'Sorts : arbre [T], voie de l\'Esprit', bx, AR.C.VIEW_H - 8);
 
     // info-bulle au survol (souris uniquement — sur tactile, la fenêtre de révélation
     // affichée au déblocage du sort fait déjà ce travail, cf. AR.UI.drawSpellReveal)
@@ -343,7 +351,7 @@ AR.HUD = {
     if (unlocked) {
       ctx.fillStyle = C.spirit;
       ctx.font = 'bold 12px "Segoe UI", sans-serif';
-      ctx.fillText('Coût : ' + Math.round(sp.cost * pl.stats.spellCostMult) + ' esprit' + (sp.dmg ? '   Dégâts : ' + sp.dmg : ''), x + 12, ty + 8);
+      ctx.fillText('Coût : ' + Math.round(sp.cost * pl.stats.spellCostMult) + ' esprit' + (sp.channel ? '/s' : '') + (sp.dmg ? '   Dégâts : ' + sp.dmg : ''), x + 12, ty + 8);
     } else {
       ctx.fillStyle = C.textDim;
       ctx.font = 'italic 12px "Segoe UI", sans-serif';

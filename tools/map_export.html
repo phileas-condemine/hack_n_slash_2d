@@ -19,6 +19,10 @@
   .era .meta { color: #9aa5a8; font-size: 12px; margin-bottom: 6px; }
   .canvasWrap { overflow-x: auto; border: 1px solid #3a4a52; background: #04060a; }
   canvas { display: block; image-rendering: pixelated; }
+  .monsterGallery { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 10px; }
+  .monsterCell { width: 78px; text-align: center; }
+  .monsterCell canvas { width: 72px; height: 72px; background: #04060a; border: 1px solid #3a4a52; border-radius: 4px; image-rendering: auto; }
+  .monsterLabel { font-size: 10px; line-height: 1.25; color: #9aa5a8; margin-top: 3px; }
 </style>
 </head>
 <body>
@@ -30,6 +34,9 @@
     terrain pixel-exacte + coffres / marchand / salles (ère 1 uniquement, les autres sont procédurales)
     / zone de l'arène de boss / position d'apparition de chaque monstre, y compris les monstres
     d'embuscade (ère 1) qui émergent du sol au déclenchement plutôt que d'être placés d'avance.
+    Sous chaque carte, une galerie affiche le sprite neutre de chaque monstre pouvant apparaître
+    dans l'ère (roster de base + spéciaux de zones secrètes + élite + boss), pour auditer d'un
+    coup d'œil la cohérence thématique (ex. repérer un mortier au milieu de chevaliers).
     À chaque évolution des maps
     (<code>level_specs.js</code>, génération
     procédurale dans <code>level.js</code>...), il suffit de recharger cette page (ou de cliquer sur
@@ -56,14 +63,17 @@
   <div id="eras"></div>
 
   <!-- Sous-ensemble minimal de src/*.js nécessaire à la génération de niveau + à la miniature
-       de la minimap : pas de rendu de sprites/audio/UI, donc pas de chargement d'images/assets. -->
-  <script src="../src/config.js?v=20260729k"></script>
-  <script src="../src/arenas.js?v=20260729k"></script>
-  <script src="../src/utils.js?v=20260729k"></script>
-  <script src="../src/data.js?v=20260729k"></script>
-  <script src="../src/level_specs.js?v=20260729k"></script>
-  <script src="../src/level.js?v=20260729k"></script>
-  <script src="../src/minimap.js?v=20260729k"></script>
+       de la minimap, plus sprites_meta.js/assets.js pour dessiner les icônes neutres des
+       monstres dans la galerie (pas de rendu de terrain/audio/UI complet). -->
+  <script src="../src/config.js?v=20260729v"></script>
+  <script src="../src/arenas.js?v=20260729v"></script>
+  <script src="../src/utils.js?v=20260729v"></script>
+  <script src="../src/data.js?v=20260729v"></script>
+  <script src="../src/level_specs.js?v=20260729v"></script>
+  <script src="../src/level.js?v=20260729v"></script>
+  <script src="../src/minimap.js?v=20260729v"></script>
+  <script src="../src/sprites_meta.js?v=20260729v"></script>
+  <script src="../src/assets.js?v=20260729v"></script>
 
   <script>
     const SCALE = 4; // agrandissement de la miniature (1px/tuile en natif -> illisible tel quel)
@@ -163,6 +173,89 @@
       return { cnv, lvl };
     }
 
+    // Tous les monstres pouvant apparaître dans une ère : roster de base (`era.enemies`) +
+    // tout id présent dans les spawns/embuscades du niveau généré (spéciaux de zones secrètes,
+    // sbires de boss...) + élite + boss (jamais dans `lvl.spawns`, il est ancré à l'arène).
+    // Indépendant de la seed en pratique : les ids possibles viennent des specs authored, seule
+    // leur position/répartition varie avec le RNG.
+    function eraMonsterIds(era, lvl) {
+      const ids = [];
+      const seen = new Set();
+      const add = (id) => { if (id && !seen.has(id)) { seen.add(id); ids.push(id); } };
+      (era.enemies || []).forEach(add);
+      (lvl.spawns || []).forEach((s) => add(s.id));
+      (lvl.encounters || []).forEach((enc) => (enc.waves || []).forEach((w) => (w.ids || []).forEach(add)));
+      add(era.elite);
+      add(era.boss);
+      return ids;
+    }
+
+    // Sprite "neutre" (pose de repos, pas d'animation d'attaque) - même convention que le
+    // constructeur d'Enemy (src/enemy.js) : préfère 'enemies/states/{id}_neutral', sinon la
+    // planche de base 'enemies/{id}', sinon le repli AR.ENEMY_FALLBACK (monstres de zones
+    // secrètes sans art dédié, qui empruntent le sprite d'un autre ennemi).
+    function neutralSpriteKey(id) {
+      let sid = id;
+      if (!AR.SPRITE_META['enemies/states/' + sid + '_neutral'] && !AR.SPRITE_META['enemies/' + sid] &&
+          AR.ENEMY_FALLBACK && AR.ENEMY_FALLBACK[sid]) {
+        sid = AR.ENEMY_FALLBACK[sid];
+      }
+      const k = 'enemies/states/' + sid + '_neutral';
+      return AR.SPRITE_META[k] ? k : 'enemies/' + sid;
+    }
+
+    function buildMonsterGallery(era, lvl) {
+      const gallery = document.createElement('div');
+      gallery.className = 'monsterGallery';
+      for (const id of eraMonsterIds(era, lvl)) {
+        // Les boss sont définis à part dans AR.BOSSES (pas AR.ENEMIES), même convention de
+        // sprite ('enemies/{id}' / 'enemies/states/{id}_neutral').
+        const def = AR.ENEMIES[id] || (AR.BOSSES && AR.BOSSES[id]);
+        if (!def) continue;
+        const key = neutralSpriteKey(id);
+        const cell = document.createElement('div');
+        cell.className = 'monsterCell';
+        const mc = document.createElement('canvas');
+        mc.width = 144; mc.height = 144; // 2x le CSS 72px, plus net
+        mc.dataset.spriteKey = key;
+        cell.appendChild(mc);
+        const label = document.createElement('div');
+        label.className = 'monsterLabel';
+        let tag = '';
+        if (id === era.boss) tag = ' (boss)';
+        else if (id === era.elite) tag = ' (élite)';
+        label.textContent = def.name + tag;
+        if (id === era.boss) label.style.color = AR.C.COLORS.danger;
+        else if (id === era.elite) label.style.color = AR.C.COLORS.gold;
+        cell.appendChild(label);
+        gallery.appendChild(cell);
+      }
+      return gallery;
+    }
+
+    // Charge (une seule fois, mise en cache dans AR.Assets.images) tous les sprites référencés
+    // par les <canvas data-sprite-key>, puis les dessine. Les cartes s'affichent tout de suite ;
+    // les icônes de monstres apparaissent progressivement au fur et à mesure du chargement.
+    function paintMonsterIcons() {
+      const canvases = Array.from(document.querySelectorAll('.monsterCell canvas'));
+      const byKey = new Map();
+      for (const c of canvases) {
+        if (!byKey.has(c.dataset.spriteKey)) byKey.set(c.dataset.spriteKey, []);
+        byKey.get(c.dataset.spriteKey).push(c);
+      }
+      const drawKey = (key) => {
+        for (const c of byKey.get(key)) AR.Assets.drawIcon(c.getContext('2d'), key, 0, 0, c.width, 1);
+      };
+      for (const key of byKey.keys()) {
+        if (AR.Assets.images[key] && AR.Assets.images[key].complete) { drawKey(key); continue; }
+        const img = new Image();
+        AR.Assets.images[key] = img;
+        img.onload = () => drawKey(key);
+        img.onerror = () => console.error('Sprite de monstre introuvable :', key);
+        img.src = '../assets/' + key + '.png';
+      }
+    }
+
     function render() {
       const seed = parseInt(document.getElementById('seedInput').value, 10) || 0;
       const root = document.getElementById('eras');
@@ -184,8 +277,10 @@
         cnv.dataset.filename = `minimap_R${i + 1}_${era.id}_seed${seed + i}.png`;
         wrap.appendChild(cnv);
         box.appendChild(wrap);
+        box.appendChild(buildMonsterGallery(era, lvl));
         root.appendChild(box);
       });
+      paintMonsterIcons();
     }
 
     function downloadCanvas(cnv) {

@@ -8,7 +8,7 @@ import json, os, sys
 from PIL import Image
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-GROUPS = {"hero": "assets/hero", "enemies": "assets/enemies", "spells": "assets/spells"}
+GROUPS = {"hero": "assets/hero", "enemies": "assets/enemies", "spells": "assets/spells", "weapons": "assets/weapons"}
 
 # Downscale caps (max dimension in px) by path fragment: keeps the repo light,
 # the game never draws these bigger anyway.
