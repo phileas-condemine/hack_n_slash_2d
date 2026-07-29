@@ -133,6 +133,7 @@ AR.Touch = {
     this.root.querySelectorAll('.tbtn[data-action]').forEach((btn) => {
       const action = btn.dataset.action;
       if (action === 'demo') { this._bindDemoBtn(btn); return; }
+      if (action === 'bow') { this._bindBowButton(btn); return; }
       const down = (e) => { AR.Input.touch[action] = true; btn.classList.add('active'); e.preventDefault(); };
       const up = (e) => { AR.Input.touch[action] = false; btn.classList.remove('active'); };
       btn.addEventListener('pointerdown', down);
@@ -140,6 +141,47 @@ AR.Touch = {
       btn.addEventListener('pointercancel', up);
       btn.addEventListener('pointerleave', up);
     });
+  },
+
+  // Bouton Arc : maintenir charge le tir (comme les autres boutons), mais glisser le doigt
+  // pendant la charge vise dans la direction du glissement (retour joueur 2026-07-30 : viser
+  // à l'arc au pouce nécessitait sinon de jongler entre ce bouton et le stick de visée séparé).
+  // Même mapping écran que `_onAim` (centre de l'écran + delta × K) et même capture de pointeur
+  // que les sticks (`setPointerCapture`) pour continuer à suivre le doigt hors des limites du
+  // bouton. Contrairement au stick de visée, ce bouton n'a pas de rayon visuel fixe : le seuil
+  // `DEAD` ci-dessous évite qu'un simple tap (sans intention de viser) ne dévie légèrement la
+  // dernière direction visée.
+  _bindBowButton(btn) {
+    const RADIUS = 90, DEAD = 0.15;
+    let pid = null, originX = 0, originY = 0;
+    const down = (e) => {
+      AR.Input.touch.bow = true;
+      btn.classList.add('active');
+      pid = e.pointerId;
+      originX = e.clientX; originY = e.clientY;
+      btn.setPointerCapture(pid);
+      e.preventDefault();
+    };
+    const move = (e) => {
+      if (pid === null || e.pointerId !== pid) return;
+      let dx = (e.clientX - originX) / RADIUS;
+      let dy = (e.clientY - originY) / RADIUS;
+      const len = Math.hypot(dx, dy);
+      if (len < DEAD) return;
+      if (len > 1) { dx /= len; dy /= len; }
+      this._onAim(dx, dy);
+      e.preventDefault();
+    };
+    const up = (e) => {
+      if (pid !== null && e.pointerId !== undefined && e.pointerId !== pid) return;
+      AR.Input.touch.bow = false;
+      btn.classList.remove('active');
+      pid = null;
+    };
+    btn.addEventListener('pointerdown', down);
+    btn.addEventListener('pointermove', move);
+    btn.addEventListener('pointerup', up);
+    btn.addEventListener('pointercancel', up);
   },
 
   // appui long (~600ms) pour éviter un basculement IA accidentel en plein combat
