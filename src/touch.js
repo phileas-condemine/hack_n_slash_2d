@@ -37,14 +37,18 @@ AR.Touch = {
     const root = document.createElement('div');
     root.id = 'touchUI';
     root.innerHTML = `
-      <div class="tzone tzone-move"><div class="tstick"><div class="tknob"></div></div></div>
-      <div class="tzone tzone-aim"><div class="tstick"><div class="tknob"></div></div></div>
+      <div id="touchZones">
+        <div class="tzone tzone-move"><div class="tstick"><div class="tknob"></div></div></div>
+        <div class="tzone tzone-aim"><div class="tstick"><div class="tknob"></div></div></div>
+      </div>
       <button class="tbtn tbtn-jump" data-action="jump">Saut</button>
       <button class="tbtn tbtn-dash" data-action="dash">Dash</button>
       <button class="tbtn tbtn-sword" data-action="sword">Épée</button>
       <button class="tbtn tbtn-bow" data-action="bow">Arc</button>
       <button class="tbtn tbtn-potion" data-action="potion">Potion</button>
       <button class="tbtn tbtn-interact" data-action="interact">E</button>
+      <button class="tbtn tbtn-skills" data-action="skills">★</button>
+      <button class="tbtn tbtn-stats" data-action="toggleStats">📊</button>
       <button class="tbtn tbtn-pause" data-action="pause">⏸</button>
       <button class="tbtn tbtn-map" data-action="toggleMap">🗺</button>
       <button class="tbtn tbtn-demo" data-action="demo"><span class="tring"></span><span class="tlabel">IA</span></button>
@@ -213,7 +217,15 @@ AR.Touch = {
   },
   _update() {
     const g = AR.game;
-    const playing = !!g && g.state === 'play' && !g.paused && !g.skillOpen && !g.shopOpen;
+    // Fenêtres de révélation (nouveau sort/cran d'arme, cf. Game#newRun/_grantWeaponTier) : le
+    // bouton « Fermer » est dessiné sur le canvas, sous la zone de déplacement flottante - sur
+    // tactile, le tap atterrissait donc sur cette zone (qui capte le pointeur en premier, cf.
+    // #touchZones) au lieu d'atteindre le canvas, rendant le bouton illusoirement inerte (retour
+    // joueur 2026-07-30 : « le bouton fermer n'est pas cliquable »). Masquer tout le tactile ici
+    // laisse le tap traverser directement jusqu'au canvas, où `AR.Input`/`AR.UI._click` le
+    // capte normalement (même mécanisme déjà utilisé pour cliquer les boutons du menu titre).
+    const playing = !!g && g.state === 'play' && !g.paused && !g.skillOpen && !g.shopOpen &&
+      !g.spellReveal && !g.weaponReveal;
     this.root.classList.toggle('hidden', !playing);
     if (!playing) {
       if (this.moveStick.active || this.aimStick.active) { this.moveStick.active = false; this.aimStick.active = false; }

@@ -32,6 +32,20 @@ html, body {
 }
 #touchUI.hidden { display: none; }
 
+/* Zones de glissement (déplacement/visée) : couvrent tout le viewport plutôt que le seul
+   rectangle du canvas (`#touchUI` lui-même, redimensionné en JS pour coller au canvas dans
+   `_layout()`) - sur un écran plus large que le ratio du jeu, les bandes noires de chaque
+   côté sont ainsi utilisables au lieu d'être une zone morte (retour joueur 2026-07-30). En
+   `position: fixed` imbriqué dans `#touchUI`, ce conteneur ignore la taille de son parent et
+   se cale directement sur la fenêtre. Placé AVANT les boutons dans le DOM (même niveau
+   d'empilement, `z-index: auto` des deux côtés) pour que les boutons restent cliquables
+   par-dessus lorsqu'ils chevauchent visuellement une zone.
+*/
+#touchZones {
+  position: fixed;
+  inset: 0;
+  touch-action: none;
+}
 #touchUI .tzone {
   position: absolute;
   top: 0;
@@ -90,8 +104,21 @@ html, body {
 #touchUI .tbtn-potion { width: 48px; height: 48px; right: 38%; bottom: 4%; font-size: 11px; }
 #touchUI .tbtn-interact { width: 48px; height: 48px; right: 50%; bottom: 4%; font-size: 15px; }
 
-/* Pause / IA / vitesse : rassemblés dans le creux libre en haut du HUD (entre la
-   barre de vie à gauche et le panneau de caractéristiques à droite) */
+/* Compétences / stats / pause / IA / vitesse : rassemblés dans le creux libre en haut du HUD
+   (entre la barre de vie à gauche et le panneau de caractéristiques à droite) - ces actions
+   n'avaient pas d'équivalent tactile aux touches T/Tab/N (retour joueur 2026-07-30) */
+#touchUI .tbtn-skills {
+  width: 38px; height: 38px;
+  left: 26%; top: 1%;
+  transform: translateX(-50%);
+  font-size: 15px;
+}
+#touchUI .tbtn-stats {
+  width: 38px; height: 38px;
+  left: 34%; top: 1%;
+  transform: translateX(-50%);
+  font-size: 13px;
+}
 #touchUI .tbtn-pause {
   width: 38px; height: 38px;
   left: 42%; top: 1%;
