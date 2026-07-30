@@ -1247,6 +1247,7 @@ AR.Game = class {
     if (this.state === 'help') { AR.UI.beginFrame(); AR.UI.drawHelp(ctx, this); AR.UI.drawCursor(ctx); return; }
     if (this.state === 'rift') { AR.UI.beginFrame(); AR.UI.drawRift(ctx, this); AR.UI.drawCursor(ctx); return; }
     if (this.state === 'saves') { AR.UI.beginFrame(); AR.UI.drawSaves(ctx, this); AR.UI.drawCursor(ctx); return; }
+    if (this.state === 'cloud') { AR.UI.beginFrame(); AR.UI.drawCloud(ctx, this); AR.UI.drawCursor(ctx); return; }
 
     // monde
     const cam = this.camera, lvl = this.level;

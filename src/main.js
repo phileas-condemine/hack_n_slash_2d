@@ -18,6 +18,7 @@ AR.VERSION = '1.0.0';
   resize();
 
   AR.Save.load();
+  if (AR.CloudSave) AR.CloudSave.init();
   AR.EventLog.recoverPending();
   AR.Audio.muted = !!AR.Save.data.settings.muted;
   AR.Input.init(canvas);

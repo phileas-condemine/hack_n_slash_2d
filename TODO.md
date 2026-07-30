@@ -53,7 +53,24 @@ Référence de qualité déjà en place : Yōkai (boules d'énergie flottantes, 
 
 ## Sauvegarde
 
-- [ ] Peux-tu m'expliquer comment fonctionne le système de sauvegarde ? sur PC ou sur téléphone, en local ou déployé sur github.io, comment ça marche ? le plus important c'est pour PC. Idéalement je veux que ça marche avec github pages sur PC, c'est possible ? de sauvegarder et charger ma sauvegarde dans 2 semaines ? quels sont les risques ?
+Sauvegarde locale (`AR.Save`, `src/utils.js`) : localStorage, cloisonné par navigateur+origine
+(donc pas de partage entre PC/téléphone ni entre local/GitHub Pages). Suffisant pour un rappel
+dans 2 semaines sur le même navigateur/appareil, mais aucun filet si le storage est effacé.
+
+- [x] Sauvegarde cloud facultative par pseudo + code à 4 chiffres (2026-07-30) : `src/cloudsave.js`
+  (`AR.CloudSave`) + écran titre "☁ COMPTE" (`src/ui.js#drawCloud`). Repose sur Firestore (choisi
+  plutôt que Supabase : les projets Supabase gratuits se mettent en pause après ~7 jours
+  d'inactivité, ce qui aurait cassé exactement le scénario "je reviens dans 2 semaines" ;
+  Firestore Spark ne se met jamais en pause). Aucune authentification réelle — le pseudo+code EST
+  l'id du document Firestore (`AR.CloudSave._docId`), donc pas de vraie protection, juste un
+  garde-fou contre les collisions accidentelles (cf. commentaires dans `src/firebase-config.js`).
+  **Reste à faire pour activer** (ne peut pas être fait par l'agent, nécessite un compte Google) :
+  créer un projet Firebase gratuit, activer Firestore, coller les règles de sécurité fournies,
+  enregistrer une appli web, et remplir `AR.FIREBASE_CONFIG` dans `src/firebase-config.js`
+  (`enabled: true` + les 6 clés). Instructions détaillées pas-à-pas en commentaire en tête de ce
+  fichier. Tant que non configuré, `enabled: false` -> aucune régression, comportement localStorage
+  pur inchangé (testé en isolation : boot sans erreur, écran cloud fonctionnel, statut "cloud
+  indisponible" affiché proprement).
 
 
 ## IA apprenante

@@ -120,13 +120,17 @@ AR.UI = {
     if (this.button(ctx, bx, 332, bw, 46, '🤖  MODE DÉMO (IA)  [G]') || AR.Input.pressed('demo')) {
       game.newRun(true);
     }
-    const halfBw = (bw - 10) / 2;
-    if (this.button(ctx, bx, 390, halfBw, 46, '❓ AIDE  [H]') || AR.Input.keys['KeyH']) {
+    const thirdBw = (bw - 20) / 3;
+    if (this.button(ctx, bx, 390, thirdBw, 46, '❓ AIDE  [H]', { font: 'bold 13px' }) || AR.Input.keys['KeyH']) {
       game.stateBefore = 'title'; game.state = 'help';
     }
     const hasSaves = AR.Save.data.saves.length > 0;
-    if (this.button(ctx, bx + halfBw + 10, 390, halfBw, 46, '💾 CHARGER', { disabled: !hasSaves })) {
+    if (this.button(ctx, bx + thirdBw + 10, 390, thirdBw, 46, '💾 CHARGER', { disabled: !hasSaves, font: 'bold 13px' })) {
       game.stateBefore = 'title'; game.saveMenuMode = 'load'; game.savePage = 0; game.state = 'saves';
+    }
+    const cloudLabel = AR.CloudSave && AR.CloudSave.linked ? '☁ ' + AR.CloudSave.pseudo : '☁ COMPTE';
+    if (this.button(ctx, bx + (thirdBw + 10) * 2, 390, thirdBw, 46, cloudLabel, { font: 'bold 13px' })) {
+      game.stateBefore = 'title'; game.state = 'cloud';
     }
 
     // ---- sélecteur de difficulté
@@ -398,6 +402,96 @@ AR.UI = {
     }
 
     if (this.button(ctx, W / 2 - 110, H - 74, 220, 42, 'Retour  [Échap]') || AR.Input.pressed('pause')) {
+      game.state = game.stateBefore || 'title';
+    }
+  },
+
+  // ========================================================= COMPTE CLOUD
+  // Pseudo + code à 4 chiffres, aucune identification réelle - cf. src/cloudsave.js.
+  // Facultatif : sans config Firebase (src/firebase-config.js), AR.CloudSave.ready reste faux
+  // et cet écran se contente d'afficher un statut "cloud indisponible" au clic sur connexion.
+  drawCloud(ctx, game) {
+    const W = AR.C.VIEW_W, H = AR.C.VIEW_H;
+    const px = W / 2 - 260, py = 100, pw = 520, ph = 440;
+    this.panel(ctx, px, py, pw, ph, '— COMPTE CLOUD —');
+    const cs = AR.CloudSave || { ready: false, linked: false, status: '' };
+    let y = py + 74;
+
+    ctx.save();
+    ctx.textAlign = 'center';
+    ctx.font = '13px "Segoe UI", sans-serif';
+    ctx.fillStyle = AR.C.COLORS.textDim;
+    ctx.fillText('Pseudo + code à 4 chiffres : retrouve tes sauvegardes sur un autre appareil.', W / 2, y);
+    ctx.fillText('Aucun mot de passe réel — ne réutilise pas un code sensible ailleurs.', W / 2, y + 18);
+    ctx.restore();
+    y += 46;
+
+    if (cs.linked) {
+      ctx.save();
+      ctx.textAlign = 'center';
+      ctx.font = 'bold 20px "Segoe UI", sans-serif';
+      ctx.fillStyle = AR.C.COLORS.spirit;
+      ctx.fillText('☁ Connecté : ' + cs.pseudo, W / 2, y + 10);
+      ctx.restore();
+      y += 50;
+      if (this.button(ctx, W / 2 - 140, y, 280, 44, 'Déconnecter')) {
+        cs.unlink();
+      }
+      y += 60;
+    } else {
+      const fx = W / 2 - 160;
+
+      ctx.save();
+      ctx.textAlign = 'left'; ctx.font = '13px "Segoe UI", sans-serif'; ctx.fillStyle = AR.C.COLORS.textDim;
+      ctx.fillText('Pseudo', fx, y - 6);
+      ctx.restore();
+      const pseudoRect = { x: fx, y, w: 320, h: 36 };
+      ctx.save();
+      ctx.fillStyle = 'rgba(10,14,18,0.85)'; ctx.fillRect(pseudoRect.x, pseudoRect.y, pseudoRect.w, pseudoRect.h);
+      ctx.strokeStyle = this._hover(pseudoRect) ? AR.C.COLORS.spirit : AR.C.COLORS.uiEdge;
+      ctx.strokeRect(pseudoRect.x, pseudoRect.y, pseudoRect.w, pseudoRect.h);
+      ctx.fillStyle = AR.C.COLORS.text; ctx.font = '15px "Segoe UI", sans-serif';
+      ctx.textAlign = 'left'; ctx.textBaseline = 'middle';
+      ctx.fillText(game.cloudPseudoDraft || '(clique pour saisir)', pseudoRect.x + 10, pseudoRect.y + pseudoRect.h / 2 + 1);
+      ctx.restore();
+      if (this._click(pseudoRect)) {
+        AR.TextEdit.open(pseudoRect, game.cloudPseudoDraft || '', (v) => { game.cloudPseudoDraft = v.trim().slice(0, 24); });
+      }
+      y += 58;
+
+      ctx.save();
+      ctx.textAlign = 'left'; ctx.font = '13px "Segoe UI", sans-serif'; ctx.fillStyle = AR.C.COLORS.textDim;
+      ctx.fillText('Code (4 chiffres)', fx, y - 6);
+      ctx.restore();
+      const pinRect = { x: fx, y, w: 140, h: 36 };
+      ctx.save();
+      ctx.fillStyle = 'rgba(10,14,18,0.85)'; ctx.fillRect(pinRect.x, pinRect.y, pinRect.w, pinRect.h);
+      ctx.strokeStyle = this._hover(pinRect) ? AR.C.COLORS.spirit : AR.C.COLORS.uiEdge;
+      ctx.strokeRect(pinRect.x, pinRect.y, pinRect.w, pinRect.h);
+      ctx.fillStyle = AR.C.COLORS.text; ctx.font = '15px "Segoe UI", sans-serif';
+      ctx.textAlign = 'left'; ctx.textBaseline = 'middle';
+      ctx.fillText(game.cloudPinDraft ? '•'.repeat(game.cloudPinDraft.length) : '(----)', pinRect.x + 10, pinRect.y + pinRect.h / 2 + 1);
+      ctx.restore();
+      if (this._click(pinRect)) {
+        AR.TextEdit.open(pinRect, game.cloudPinDraft || '', (v) => { game.cloudPinDraft = v.replace(/\D/g, '').slice(0, 4); });
+      }
+      y += 64;
+
+      if (this.button(ctx, W / 2 - 140, y, 280, 44, 'Se connecter')) {
+        AR.CloudSave && AR.CloudSave.link(game.cloudPseudoDraft || '', game.cloudPinDraft || '', false);
+      }
+      y += 58;
+    }
+
+    if (cs.status) {
+      ctx.save();
+      ctx.textAlign = 'center'; ctx.font = 'italic 14px "Segoe UI", sans-serif';
+      ctx.fillStyle = AR.C.COLORS.spirit;
+      ctx.fillText(cs.status, W / 2, y);
+      ctx.restore();
+    }
+
+    if (this.button(ctx, W / 2 - 110, py + ph - 58, 220, 42, 'Retour  [Échap]') || AR.Input.pressed('pause')) {
       game.state = game.stateBefore || 'title';
     }
   },

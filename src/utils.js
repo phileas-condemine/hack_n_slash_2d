@@ -102,6 +102,9 @@ AR.Save = {
   },
   save() {
     try { localStorage.setItem(this.KEY, JSON.stringify(this.data)); } catch (e) { /* stockage indisponible */ }
+    // Synchro cloud facultative (pseudo + code, cf. src/cloudsave.js) - no-op si non lié/non
+    // configuré. Point d'intégration unique : tout appelant de AR.Save.save() reste inchangé.
+    if (AR.CloudSave) AR.CloudSave.push();
   },
 
   // ---- sauvegardes de partie : point de contrôle en début d'ère, nommées et éditables
