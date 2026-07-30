@@ -438,11 +438,17 @@ AR.Player = class {
       this.swordReadyPing = false;
     }
 
-    // ---------------- ARC (appui = tir rapide ; maintien = charge perçante)
+    // ---------------- ARC (appui = commence à encocher ; relâché tôt = tir rapide, relâché
+    // après le seuil = tir chargé perçant). Le tir rapide part désormais au RELÂCHEMENT (pas à
+    // l'appui) — retour joueur 2026-07-30 : « quand je commence à appuyer, ça envoie toujours
+    // une flèche, ça ne devrait pas plutôt charger ». Avant ce correctif, un tir rapide partait
+    // instantanément à l'appui puis, si le joueur maintenait au-delà du seuil, un DEUXIÈME tir
+    // (chargé) partait au relâchement — deux flèches pour une seule pression tenue, et aucune
+    // fenêtre de visée avant le tout premier départ. Décider au relâchement laisse le temps de
+    // viser dans tous les cas, et ne tire jamais plus d'une flèche par pression.
     if (In.down('bow')) {
       if (this.bowHold < 0) {
         this.bowHold = 0;
-        if (this.bowCd <= 0) this._bowQuick(game, aim);
       } else {
         this.bowHold += dt;
         if (this.bowHold >= st.bowChargeTime && !this.chargeReadyPing) {
@@ -466,6 +472,7 @@ AR.Player = class {
       }
     } else {
       if (this.bowHold >= st.bowChargeTime) this._bowCharged(game, aim);
+      else if (this.bowHold >= 0 && this.bowCd <= 0) this._bowQuick(game, aim);
       this.bowHold = -1;
       this.chargeReadyPing = false;
     }
@@ -811,6 +818,68 @@ AR.Player = class {
     if (this.flash > 0.5) tint = 'brightness(2.4)';
 
     AR.Assets.draw(ctx, key, fx, fy, AR.C.PLAYER.DRAW_H, this.facing < 0, alpha, tint);
+
+    // ------ prévisualisation de la trajectoire du tir chargé (retour joueur 2026-07-30 : viser
+    // à l'arc sur tactile sans retour visuel sur la portée réelle rend la visée hasardeuse - un
+    // tracé pointillé, particulièrement utile puisqu'on n'a pas de ligne de mire naturelle comme
+    // à la souris). Rejoue EXACTEMENT la même formule que `_bowCharged` (même `chargeLevel`,
+    // même interpolation de g/vitesse/portée) pour que le tracé corresponde vraiment à ce que
+    // lâcher le tir produirait à cet instant, y compris l'aplatissement progressif de la parabole
+    // à mesure que l'arc se tend (cf. commentaire de `_bowCharged`).
+    //
+    // Gardé sur `bowCharged` (bowHold >= bowChargeTime), PAS `chargingBow` tout court (retour
+    // joueur 2026-07-30 : « la flèche tombe davantage que le tracé ne le laissait penser » sur un
+    // simple tir rapide). Le tir rapide (`_bowQuick`) part dès l'appui, avec sa propre physique
+    // bien plus lente et bien plus courbée (ARROW_SPEED/g=420) que celle du tir chargé
+    // (CHARGED_ARROW_SPEED/g=600-250) que ce tracé prévisualise — l'afficher dès le début de
+    // l'appui (chargeLevel=0, donc la partie la plus tendue de la courbe chargée) donnait
+    // l'illusion trompeuse d'une trajectoire bien plus plate que celle du tir qui vient
+    // réellement de partir. Avant le seuil de charge, relâcher ne tire de toute façon rien de
+    // nouveau (le tir rapide est déjà parti à l'appui) : rien à prévisualiser avant `bowCharged`.
+    if (bowCharged) {
+      const aimPt = AR.Input.aim(cam);
+      const sx = this.x + this.w / 2, sy = this.y + this.h * 0.38;
+      const ang = AR.U.angle(sx, sy, aimPt.x, aimPt.y);
+      const overT = Math.max(0, this.bowHold - st.bowChargeTime);
+      const chargeLevel = AR.U.clamp(overT / (st.bowChargeTime * 0.6), 0, 1);
+      const tvx = Math.cos(ang) * AR.C.PLAYER.CHARGED_ARROW_SPEED;
+      const tvy = Math.sin(ang) * AR.C.PLAYER.CHARGED_ARROW_SPEED;
+      const tg = AR.U.lerp(600, 250, chargeLevel);
+      const tlife = AR.U.lerp(0.7, 0.95, chargeLevel);
+      // toujours blanc ici : ce bloc ne s'exécute que si `bowCharged` est vrai (cf. garde plus
+      // haut), donc plus de branche "pas encore chargé" à distinguer par couleur.
+      const dotColor = '#ffffff';
+      const STEP = 0.05, n = Math.floor(tlife / STEP);
+      const pts = [];
+      for (let i = 1; i <= n; i++) {
+        const t = i * STEP;
+        pts.push({ x: sx + tvx * t - cx, y: sy + tvy * t + 0.5 * tg * t * t - cy });
+      }
+      // Trait pointillé épais + halo (retour joueur 2026-07-30 : la première version, en petits
+      // points semi-transparents, restait invisible sur smartphone et à peine perceptible sur
+      // PC). Un même chemin est tracé deux fois : d'abord un halo sombre bien plus large que le
+      // trait coloré, pour garantir un contraste net quelle que soit la couleur du terrain
+      // derrière (clair ou sombre) ; puis le trait coloré lui-même par-dessus, avec une lueur
+      // (`shadowBlur`) pour se détacher franchement du décor.
+      ctx.save();
+      ctx.lineCap = 'round';
+      ctx.lineJoin = 'round';
+      ctx.setLineDash([12, 9]);
+      ctx.beginPath();
+      ctx.moveTo(pts[0].x, pts[0].y);
+      for (let k = 1; k < pts.length; k++) ctx.lineTo(pts[k].x, pts[k].y);
+      ctx.globalAlpha = 0.55;
+      ctx.strokeStyle = '#000000';
+      ctx.lineWidth = 9;
+      ctx.stroke();
+      ctx.globalAlpha = 0.95;
+      ctx.strokeStyle = dotColor;
+      ctx.lineWidth = 4.5;
+      ctx.shadowColor = dotColor;
+      ctx.shadowBlur = 12;
+      ctx.stroke();
+      ctx.restore();
+    }
 
     // ------ indicateur de charge (barre au-dessus de la tête)
     let chargeK = -1, chargeColor = AR.C.COLORS.spirit;
